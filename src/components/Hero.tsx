@@ -31,7 +31,8 @@ const Hero = ({ onViewMenu }: HeroProps) => {
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="mx-auto mb-6 w-48 h-auto drop-shadow-2xl"
+          className="mx-auto mb-6 w-56 h-auto"
+          style={{ mixBlendMode: "screen" }}
         />
 
         <h1 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
