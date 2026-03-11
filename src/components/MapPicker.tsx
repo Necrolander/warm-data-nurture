@@ -19,7 +19,7 @@ interface MapPickerProps {
   selectedLocation: { lat: number; lng: number } | null;
 }
 
-type MapState = "idle" | "loading" | "ready" | "error";
+type MapState = "idle" | "loading" | "show_map" | "error";
 
 const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
   const mapRef = useRef<L.Map | null>(null);
@@ -27,41 +27,56 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mapState, setMapState] = useState<MapState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const pendingLocation = useRef<{ lat: number; lng: number } | null>(null);
   const onLocationSelectRef = useRef(onLocationSelect);
   onLocationSelectRef.current = onLocationSelect;
 
-  const initMap = useCallback((lat: number, lng: number) => {
+  // Initialize map once the container is visible (mapState === "show_map")
+  useEffect(() => {
+    if (mapState !== "show_map") return;
     if (!containerRef.current) return;
+    if (mapRef.current) return; // already initialized
 
-    // Clean up existing map
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      markerRef.current = null;
-    }
+    const loc = pendingLocation.current || {
+      lat: STORE_CONFIG.coordinates.lat,
+      lng: STORE_CONFIG.coordinates.lng,
+    };
 
-    const map = L.map(containerRef.current).setView([lat, lng], 15);
+    // Small delay to ensure DOM is painted
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+      const map = L.map(containerRef.current).setView([loc.lat, loc.lng], 15);
 
-    // Add marker at user location
-    markerRef.current = L.marker([lat, lng], { icon: DefaultIcon }).addTo(map);
-    onLocationSelectRef.current(lat, lng);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
 
-    map.on("click", (e: L.LeafletMouseEvent) => {
-      if (markerRef.current) markerRef.current.remove();
-      markerRef.current = L.marker([e.latlng.lat, e.latlng.lng], { icon: DefaultIcon }).addTo(map);
-      onLocationSelectRef.current(e.latlng.lat, e.latlng.lng);
-    });
+      markerRef.current = L.marker([loc.lat, loc.lng], { icon: DefaultIcon }).addTo(map);
+      onLocationSelectRef.current(loc.lat, loc.lng);
 
-    mapRef.current = map;
-    setMapState("ready");
+      map.on("click", (e: L.LeafletMouseEvent) => {
+        if (markerRef.current) markerRef.current.remove();
+        markerRef.current = L.marker([e.latlng.lat, e.latlng.lng], { icon: DefaultIcon }).addTo(map);
+        onLocationSelectRef.current(e.latlng.lat, e.latlng.lng);
+      });
 
-    // Fix map rendering after container becomes visible
-    setTimeout(() => map.invalidateSize(), 200);
-  }, []);
+      mapRef.current = map;
+
+      // Force resize after render
+      setTimeout(() => map.invalidateSize(), 300);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [mapState]);
+
+  // Update marker when selectedLocation changes externally
+  useEffect(() => {
+    if (!mapRef.current || !selectedLocation) return;
+    if (markerRef.current) markerRef.current.remove();
+    markerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng], { icon: DefaultIcon }).addTo(mapRef.current);
+    mapRef.current.setView([selectedLocation.lat, selectedLocation.lng], 15);
+  }, [selectedLocation]);
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -75,10 +90,18 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        initMap(pos.coords.latitude, pos.coords.longitude);
+        pendingLocation.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
+        // Clean up existing map if re-requesting
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+          markerRef.current = null;
+        }
+
+        setMapState("show_map");
       },
       (err) => {
-        console.error("Geolocation error:", err);
         if (err.code === 1) {
           setErrorMsg("Permissão de localização negada. Ative o GPS e permita o acesso.");
         } else if (err.code === 2) {
@@ -90,19 +113,17 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, [initMap]);
+  }, []);
 
   const openWithDefault = useCallback(() => {
-    initMap(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng);
-  }, [initMap]);
-
-  // Update marker when selectedLocation changes from outside
-  useEffect(() => {
-    if (!mapRef.current || !selectedLocation) return;
-    if (markerRef.current) markerRef.current.remove();
-    markerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng], { icon: DefaultIcon }).addTo(mapRef.current);
-    mapRef.current.setView([selectedLocation.lat, selectedLocation.lng], 15);
-  }, [selectedLocation]);
+    pendingLocation.current = { lat: STORE_CONFIG.coordinates.lat, lng: STORE_CONFIG.coordinates.lng };
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    }
+    setMapState("show_map");
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -122,11 +143,7 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
               Ativar minha localização
             </span>
           </button>
-          <button
-            type="button"
-            onClick={openWithDefault}
-            className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
-          >
+          <button type="button" onClick={openWithDefault} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
             Marcar no mapa manualmente
           </button>
         </div>
@@ -154,25 +171,21 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             <RefreshCw className="w-5 h-5" />
             Tentar novamente
           </button>
-          <button
-            type="button"
-            onClick={openWithDefault}
-            className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
-          >
+          <button type="button" onClick={openWithDefault} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
             Marcar no mapa manualmente
           </button>
         </div>
       )}
 
-      {mapState === "ready" && (
+      {mapState === "show_map" && (
         <>
           <p className="text-xs text-muted-foreground">
             Toque no mapa para ajustar o ponto de entrega
           </p>
           <div
             ref={containerRef}
-            className="h-72 rounded-xl overflow-hidden border border-border"
-            style={{ zIndex: 0 }}
+            style={{ height: "288px", width: "100%", zIndex: 0 }}
+            className="rounded-xl overflow-hidden border border-border"
           />
           <button
             type="button"
@@ -186,11 +199,6 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             <p className="text-success text-sm font-bold text-center">✅ Localização marcada com sucesso</p>
           )}
         </>
-      )}
-
-      {/* Hidden container for map when not in ready state yet */}
-      {mapState !== "ready" && (
-        <div ref={containerRef} className="hidden" />
       )}
     </div>
   );
