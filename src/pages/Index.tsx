@@ -1,9 +1,26 @@
+import { useState } from "react";
+import Hero from "@/components/Hero";
+import MenuSection from "@/components/MenuSection";
+import PromoBanner from "@/components/PromoBanner";
+import FloatingCart from "@/components/FloatingCart";
+import CartDrawer from "@/components/CartDrawer";
+import WhatsAppFloat from "@/components/WhatsAppFloat";
+
 const Index = () => {
+  const [cartOpen, setCartOpen] = useState(false);
+
+  const scrollToMenu = () => {
+    document.getElementById("menu")?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black">
-      <button className="rounded-lg bg-green-500 px-8 py-4 text-xl font-bold text-white transition-opacity hover:opacity-80">
-        TESTE LOVABLE
-      </button>
+    <div className="min-h-screen bg-background">
+      <Hero onViewMenu={scrollToMenu} />
+      <PromoBanner />
+      <MenuSection />
+      <FloatingCart onClick={() => setCartOpen(true)} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <WhatsAppFloat />
     </div>
   );
 };
