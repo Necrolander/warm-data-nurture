@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import logo from "@/assets/logo-truebox.png";
 
 interface HeroProps {
   onViewMenu: () => void;
@@ -24,18 +25,18 @@ const Hero = ({ onViewMenu }: HeroProps) => {
         className="relative z-10 text-center max-w-lg"
       >
         {/* Logo placeholder */}
-        <motion.div
+        <motion.img
+          src={logo}
+          alt="Truebox Hamburgueria"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="mx-auto mb-6 w-24 h-24 rounded-full bg-primary flex items-center justify-center text-4xl shadow-lg shadow-primary/30"
-        >
-          🍔
-        </motion.div>
+          className="mx-auto mb-6 w-48 h-auto drop-shadow-2xl"
+        />
 
         <h1 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
           Os burgers mais{" "}
-          <span className="text-primary">brabos</span> do Gama 🔥
+          <span className="text-secondary">brabos</span> do Gama 🔥
         </h1>
 
         <div className="flex flex-wrap justify-center gap-4 mb-8 text-sm text-muted-foreground">

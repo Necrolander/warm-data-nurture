@@ -1,10 +1,10 @@
 export const STORE_CONFIG = {
-  name: "Burger House",
-  phone: "5561999999999", // WhatsApp number with country code
+  name: "Truebox Hamburgueria",
+  phone: "5561996179376",
   address: "Gama - DF",
   coordinates: {
-    lat: -15.9594,
-    lng: -48.0482,
+    lat: -16.014293069314565,
+    lng: -48.05929532023717,
   },
   hours: {
     open: "18:00",
