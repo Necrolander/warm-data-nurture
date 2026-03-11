@@ -5,6 +5,7 @@ import PromoBanner from "@/components/PromoBanner";
 import FloatingCart from "@/components/FloatingCart";
 import CartDrawer from "@/components/CartDrawer";
 import WhatsAppFloat from "@/components/WhatsAppFloat";
+import InAppBrowserGate from "@/components/InAppBrowserGate";
 
 const Index = () => {
   const [cartOpen, setCartOpen] = useState(false);
@@ -14,14 +15,16 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Hero onViewMenu={scrollToMenu} />
-      <PromoBanner />
-      <MenuSection />
-      <FloatingCart onClick={() => setCartOpen(true)} />
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
-      <WhatsAppFloat />
-    </div>
+    <InAppBrowserGate>
+      <div className="min-h-screen bg-background">
+        <Hero onViewMenu={scrollToMenu} />
+        <PromoBanner />
+        <MenuSection />
+        <FloatingCart onClick={() => setCartOpen(true)} />
+        <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+        <WhatsAppFloat />
+      </div>
+    </InAppBrowserGate>
   );
 };
 
