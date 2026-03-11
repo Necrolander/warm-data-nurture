@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/contexts/CartContext";
-import MapPicker from "@/components/MapPicker";
 import { getDeliveryFee } from "@/utils/delivery";
 import { sendWhatsAppOrder } from "@/utils/whatsapp";
 import { toast } from "sonner";
 import { STORE_CONFIG } from "@/config/store";
+
+const MapPicker = lazy(() => import("@/components/MapPicker"));
 
 const PAYMENT_METHODS = ["Pix", "Dinheiro", "Cartão na entrega"];
 
@@ -166,7 +167,9 @@ const Checkout = () => {
         {/* Map */}
         <div>
           <h3 className="font-bold text-foreground mb-3">Localização da entrega</h3>
-          <MapPicker onLocationSelect={(lat, lng) => setLocation({ lat, lng })} selectedLocation={location} />
+          <Suspense fallback={<div className="h-64 bg-muted rounded-xl flex items-center justify-center text-muted-foreground">Carregando mapa...</div>}>
+            <MapPicker onLocationSelect={(lat, lng) => setLocation({ lat, lng })} selectedLocation={location} />
+          </Suspense>
         </div>
 
         {outOfRange && (
