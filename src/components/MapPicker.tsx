@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import { STORE_CONFIG } from "@/config/store";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Navigation, RefreshCw } from "lucide-react";
+import { MapPin, Navigation, RefreshCw, Search } from "lucide-react";
 
 const DefaultIcon = L.icon({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -27,22 +27,23 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [mapState, setMapState] = useState<MapState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [addressQuery, setAddressQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const pendingLocation = useRef<{ lat: number; lng: number } | null>(null);
   const onLocationSelectRef = useRef(onLocationSelect);
   onLocationSelectRef.current = onLocationSelect;
 
-  // Initialize map once the container is visible (mapState === "show_map")
+  // Initialize map once the container is visible
   useEffect(() => {
     if (mapState !== "show_map") return;
     if (!containerRef.current) return;
-    if (mapRef.current) return; // already initialized
+    if (mapRef.current) return;
 
     const loc = pendingLocation.current || {
       lat: STORE_CONFIG.coordinates.lat,
       lng: STORE_CONFIG.coordinates.lng,
     };
 
-    // Small delay to ensure DOM is painted
     const timer = setTimeout(() => {
       if (!containerRef.current) return;
 
@@ -62,8 +63,6 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
       });
 
       mapRef.current = map;
-
-      // Force resize after render
       setTimeout(() => map.invalidateSize(), 300);
     }, 100);
 
@@ -78,9 +77,23 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
     mapRef.current.setView([selectedLocation.lat, selectedLocation.lng], 15);
   }, [selectedLocation]);
 
+  const cleanupMap = useCallback(() => {
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    }
+  }, []);
+
+  const showMapAt = useCallback((lat: number, lng: number) => {
+    pendingLocation.current = { lat, lng };
+    cleanupMap();
+    setMapState("show_map");
+  }, [cleanupMap]);
+
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setErrorMsg("Seu navegador não suporta geolocalização.");
+      setErrorMsg("Seu navegador não suporta geolocalização. Use a busca por endereço abaixo.");
       setMapState("error");
       return;
     }
@@ -90,45 +103,79 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        pendingLocation.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-
-        // Clean up existing map if re-requesting
-        if (mapRef.current) {
-          mapRef.current.remove();
-          mapRef.current = null;
-          markerRef.current = null;
-        }
-
-        setMapState("show_map");
+        showMapAt(pos.coords.latitude, pos.coords.longitude);
       },
       (err) => {
         if (err.code === 1) {
-          setErrorMsg("Permissão de localização negada. Ative o GPS e permita o acesso.");
+          setErrorMsg("Permissão negada. Use a busca por endereço abaixo ou abra no navegador do celular.");
         } else if (err.code === 2) {
-          setErrorMsg("Não foi possível obter sua localização. Verifique se o GPS está ligado.");
+          setErrorMsg("Não foi possível obter sua localização. Use a busca por endereço abaixo.");
         } else {
-          setErrorMsg("Tempo esgotado ao buscar localização. Tente novamente.");
+          setErrorMsg("Tempo esgotado. Use a busca por endereço ou tente novamente.");
         }
         setMapState("error");
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, []);
+  }, [showMapAt]);
 
-  const openWithDefault = useCallback(() => {
-    pendingLocation.current = { lat: STORE_CONFIG.coordinates.lat, lng: STORE_CONFIG.coordinates.lng };
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-      markerRef.current = null;
+  const searchAddress = useCallback(async () => {
+    if (!addressQuery.trim()) return;
+    setSearching(true);
+    try {
+      const q = encodeURIComponent(addressQuery.trim());
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1&countrycodes=br`
+      );
+      const data = await res.json();
+      if (data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        showMapAt(lat, lng);
+      } else {
+        setErrorMsg("Endereço não encontrado. Tente ser mais específico (ex: Rua X, 123, Gama-DF).");
+        if (mapState !== "show_map") setMapState("error");
+      }
+    } catch {
+      setErrorMsg("Erro ao buscar endereço. Verifique sua conexão.");
+      if (mapState !== "show_map") setMapState("error");
+    } finally {
+      setSearching(false);
     }
-    setMapState("show_map");
-  }, []);
+  }, [addressQuery, showMapAt, mapState]);
+
+  const AddressSearch = () => (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground font-bold">📍 Ou busque seu endereço:</p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={addressQuery}
+          onChange={(e) => setAddressQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && searchAddress()}
+          placeholder="Ex: Rua 5, Setor Sul, Gama-DF"
+          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <button
+          type="button"
+          onClick={searchAddress}
+          disabled={searching || !addressQuery.trim()}
+          className="bg-primary text-primary-foreground font-bold px-4 py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
+        >
+          {searching ? (
+            <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Search className="w-5 h-5" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
       {mapState === "idle" && (
-        <div className="flex flex-col items-center gap-4 py-8">
+        <div className="flex flex-col items-center gap-4 py-6">
           <p className="text-sm text-muted-foreground text-center">
             Para encontrar você, precisamos da sua localização 📍
           </p>
@@ -143,7 +190,12 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
               Ativar minha localização
             </span>
           </button>
-          <button type="button" onClick={openWithDefault} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
+
+          <div className="w-full border-t border-border pt-4">
+            <AddressSearch />
+          </div>
+
+          <button type="button" onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
             Marcar no mapa manualmente
           </button>
         </div>
@@ -158,20 +210,25 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
       )}
 
       {mapState === "error" && (
-        <div className="flex flex-col items-center gap-4 py-8">
+        <div className="flex flex-col items-center gap-4 py-6">
           <div className="w-16 h-16 rounded-full bg-destructive/20 flex items-center justify-center">
             <MapPin className="w-8 h-8 text-destructive" />
           </div>
           <p className="text-destructive font-bold text-center text-sm">{errorMsg}</p>
+          
+          <div className="w-full">
+            <AddressSearch />
+          </div>
+
           <button
             type="button"
             onClick={requestLocation}
             className="flex items-center gap-2 bg-secondary text-secondary-foreground font-bold px-6 py-3 rounded-xl shadow-lg hover:brightness-110 transition-all"
           >
             <RefreshCw className="w-5 h-5" />
-            Tentar novamente
+            Tentar GPS novamente
           </button>
-          <button type="button" onClick={openWithDefault} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
+          <button type="button" onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
             Marcar no mapa manualmente
           </button>
         </div>
@@ -187,6 +244,7 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             style={{ height: "288px", width: "100%", zIndex: 0 }}
             className="rounded-xl overflow-hidden border border-border"
           />
+          <AddressSearch />
           <button
             type="button"
             onClick={requestLocation}
