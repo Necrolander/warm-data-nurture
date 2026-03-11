@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import logo from "@/assets/logo-truebox.png";
+import logo from "@/assets/logo-truebox-transparent.png";
 
 interface HeroProps {
   onViewMenu: () => void;
