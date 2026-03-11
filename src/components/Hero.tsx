@@ -36,7 +36,7 @@ const Hero = ({ onViewMenu }: HeroProps) => {
 
         <h1 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
           Os burgers mais{" "}
-          <span className="text-primary">brabos</span> do Gama 🔥
+          <span className="text-secondary">brabos</span> do Gama 🔥
         </h1>
 
         <div className="flex flex-wrap justify-center gap-4 mb-8 text-sm text-muted-foreground">
