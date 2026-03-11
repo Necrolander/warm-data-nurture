@@ -261,18 +261,6 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
               Ativar minha localização
             </span>
           </button>
-
-          <div className="w-full border-t border-border pt-4">
-            <ManualLocationTools />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)}
-            className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
-          >
-            Marcar no mapa manualmente
-          </button>
         </div>
       )}
 
