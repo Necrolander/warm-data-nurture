@@ -16,8 +16,9 @@ export const STORE_CONFIG = {
     { maxKm: 5, fee: 7 },
     { maxKm: 7, fee: 10 },
     { maxKm: 10, fee: 15 },
+    { maxKm: 15, fee: 20 },
   ],
-  maxDeliveryKm: 10,
+  maxDeliveryKm: 15,
 };
 
 export type StoreConfig = typeof STORE_CONFIG;
