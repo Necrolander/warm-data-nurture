@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import L from "leaflet";
 import { STORE_CONFIG } from "@/config/store";
 import "leaflet/dist/leaflet.css";
-import { MapPin, Navigation, RefreshCw, Search } from "lucide-react";
+import { MapPin, Navigation, RefreshCw, Search, Link2 } from "lucide-react";
 
 const DefaultIcon = L.icon({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
@@ -21,6 +21,31 @@ interface MapPickerProps {
 
 type MapState = "idle" | "loading" | "show_map" | "error";
 
+const extractCoordinatesFromText = (value: string): { lat: number; lng: number } | null => {
+  const text = decodeURIComponent(value.trim());
+
+  const patterns = [
+    /@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/, // Google Maps @lat,lng
+    /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/, // q=lat,lng
+    /[?&]ll=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/, // ll=lat,lng
+    /(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/, // plain lat,lng
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (!match) continue;
+
+    const lat = Number(match[1]);
+    const lng = Number(match[2]);
+
+    if (Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+};
+
 const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -28,12 +53,13 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
   const [mapState, setMapState] = useState<MapState>("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [addressQuery, setAddressQuery] = useState("");
+  const [mapsLink, setMapsLink] = useState("");
   const [searching, setSearching] = useState(false);
+  const [manualError, setManualError] = useState("");
   const pendingLocation = useRef<{ lat: number; lng: number } | null>(null);
   const onLocationSelectRef = useRef(onLocationSelect);
   onLocationSelectRef.current = onLocationSelect;
 
-  // Initialize map once the container is visible
   useEffect(() => {
     if (mapState !== "show_map") return;
     if (!containerRef.current) return;
@@ -69,7 +95,6 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
     return () => clearTimeout(timer);
   }, [mapState]);
 
-  // Update marker when selectedLocation changes externally
   useEffect(() => {
     if (!mapRef.current || !selectedLocation) return;
     if (markerRef.current) markerRef.current.remove();
@@ -85,15 +110,20 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
     }
   }, []);
 
-  const showMapAt = useCallback((lat: number, lng: number) => {
-    pendingLocation.current = { lat, lng };
-    cleanupMap();
-    setMapState("show_map");
-  }, [cleanupMap]);
+  const showMapAt = useCallback(
+    (lat: number, lng: number) => {
+      pendingLocation.current = { lat, lng };
+      cleanupMap();
+      setMapState("show_map");
+      setManualError("");
+      setErrorMsg("");
+    },
+    [cleanupMap]
+  );
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setErrorMsg("Seu navegador não suporta geolocalização. Use a busca por endereço abaixo.");
+      setErrorMsg("Seu navegador não suporta geolocalização. Use busca por endereço ou link do Google Maps.");
       setMapState("error");
       return;
     }
@@ -107,11 +137,11 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
       },
       (err) => {
         if (err.code === 1) {
-          setErrorMsg("Permissão negada. Use a busca por endereço abaixo ou abra no navegador do celular.");
+          setErrorMsg("Permissão negada. Use busca por endereço ou cole o link da sua localização.");
         } else if (err.code === 2) {
-          setErrorMsg("Não foi possível obter sua localização. Use a busca por endereço abaixo.");
+          setErrorMsg("Não foi possível obter sua localização. Tente novamente ou use link do Google Maps.");
         } else {
-          setErrorMsg("Tempo esgotado. Use a busca por endereço ou tente novamente.");
+          setErrorMsg("Tempo esgotado. Tente novamente ou use busca manual.");
         }
         setMapState("error");
       },
@@ -121,54 +151,97 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
 
   const searchAddress = useCallback(async () => {
     if (!addressQuery.trim()) return;
+
     setSearching(true);
+    setManualError("");
+
     try {
-      const q = encodeURIComponent(addressQuery.trim());
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1&countrycodes=br`
-      );
+      const hasDfContext = /(bras[ií]lia|distrito federal|\bdf\b)/i.test(addressQuery);
+      const enrichedQuery = hasDfContext ? addressQuery.trim() : `${addressQuery.trim()}, Brasília, Distrito Federal, Brasil`;
+      const q = encodeURIComponent(enrichedQuery);
+
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&q=${q}`);
       const data = await res.json();
-      if (data.length > 0) {
+
+      if (Array.isArray(data) && data.length > 0) {
         const lat = parseFloat(data[0].lat);
         const lng = parseFloat(data[0].lon);
         showMapAt(lat, lng);
       } else {
-        setErrorMsg("Endereço não encontrado. Tente ser mais específico (ex: Rua X, 123, Gama-DF).");
+        setManualError("Endereço não encontrado. Tente com quadra/bloco/número ou cole o link do Google Maps.");
         if (mapState !== "show_map") setMapState("error");
       }
     } catch {
-      setErrorMsg("Erro ao buscar endereço. Verifique sua conexão.");
+      setManualError("Erro ao buscar endereço. Verifique a conexão e tente novamente.");
       if (mapState !== "show_map") setMapState("error");
     } finally {
       setSearching(false);
     }
-  }, [addressQuery, showMapAt, mapState]);
+  }, [addressQuery, mapState, showMapAt]);
 
-  const AddressSearch = () => (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground font-bold">📍 Ou busque seu endereço:</p>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={addressQuery}
-          onChange={(e) => setAddressQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && searchAddress()}
-          placeholder="Ex: Rua 5, Setor Sul, Gama-DF"
-          className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-        <button
-          type="button"
-          onClick={searchAddress}
-          disabled={searching || !addressQuery.trim()}
-          className="bg-primary text-primary-foreground font-bold px-4 py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
-        >
-          {searching ? (
-            <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Search className="w-5 h-5" />
-          )}
-        </button>
+  const useMapsLink = useCallback(() => {
+    if (!mapsLink.trim()) return;
+
+    const coords = extractCoordinatesFromText(mapsLink);
+    if (!coords) {
+      setManualError("Não consegui ler o link. No Google Maps, toque em compartilhar e cole o link completo aqui.");
+      return;
+    }
+
+    showMapAt(coords.lat, coords.lng);
+  }, [mapsLink, showMapAt]);
+
+  const ManualLocationTools = () => (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground font-bold">📍 Buscar por endereço (com contexto de Brasília):</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={addressQuery}
+            onChange={(e) => setAddressQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && searchAddress()}
+            placeholder="Ex: SQN 210 Bloco C, Asa Norte"
+            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <button
+            type="button"
+            onClick={searchAddress}
+            disabled={searching || !addressQuery.trim()}
+            className="bg-primary text-primary-foreground font-bold px-4 py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            {searching ? (
+              <div className="w-5 h-5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Search className="w-5 h-5" />
+            )}
+          </button>
+        </div>
       </div>
+
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground font-bold">🔗 Ou cole o link da sua localização do Google Maps:</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={mapsLink}
+            onChange={(e) => setMapsLink(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && useMapsLink()}
+            placeholder="https://maps.google.com/..."
+            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <button
+            type="button"
+            onClick={useMapsLink}
+            disabled={!mapsLink.trim()}
+            className="bg-secondary text-secondary-foreground font-bold px-4 py-3 rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            <Link2 className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {manualError && <p className="text-destructive text-xs font-bold">{manualError}</p>}
     </div>
   );
 
@@ -176,9 +249,7 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
     <div className="space-y-3">
       {mapState === "idle" && (
         <div className="flex flex-col items-center gap-4 py-6">
-          <p className="text-sm text-muted-foreground text-center">
-            Para encontrar você, precisamos da sua localização 📍
-          </p>
+          <p className="text-sm text-muted-foreground text-center">Para encontrar você, precisamos da sua localização 📍</p>
           <button
             type="button"
             onClick={requestLocation}
@@ -192,10 +263,14 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
           </button>
 
           <div className="w-full border-t border-border pt-4">
-            <AddressSearch />
+            <ManualLocationTools />
           </div>
 
-          <button type="button" onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
+          <button
+            type="button"
+            onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)}
+            className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
+          >
             Marcar no mapa manualmente
           </button>
         </div>
@@ -215,9 +290,9 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             <MapPin className="w-8 h-8 text-destructive" />
           </div>
           <p className="text-destructive font-bold text-center text-sm">{errorMsg}</p>
-          
+
           <div className="w-full">
-            <AddressSearch />
+            <ManualLocationTools />
           </div>
 
           <button
@@ -228,7 +303,11 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             <RefreshCw className="w-5 h-5" />
             Tentar GPS novamente
           </button>
-          <button type="button" onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)} className="text-sm text-muted-foreground underline hover:text-foreground transition-colors">
+          <button
+            type="button"
+            onClick={() => showMapAt(STORE_CONFIG.coordinates.lat, STORE_CONFIG.coordinates.lng)}
+            className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
+          >
             Marcar no mapa manualmente
           </button>
         </div>
@@ -236,15 +315,11 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
 
       {mapState === "show_map" && (
         <>
-          <p className="text-xs text-muted-foreground">
-            Toque no mapa para ajustar o ponto de entrega
-          </p>
-          <div
-            ref={containerRef}
-            style={{ height: "288px", width: "100%", zIndex: 0 }}
-            className="rounded-xl overflow-hidden border border-border"
-          />
-          <AddressSearch />
+          <p className="text-xs text-muted-foreground">Toque no mapa para ajustar o ponto de entrega</p>
+          <div ref={containerRef} style={{ height: "288px", width: "100%", zIndex: 0 }} className="rounded-xl overflow-hidden border border-border" />
+
+          <ManualLocationTools />
+
           <button
             type="button"
             onClick={requestLocation}
@@ -253,9 +328,7 @@ const MapPicker = ({ onLocationSelect, selectedLocation }: MapPickerProps) => {
             <Navigation className="w-4 h-4" />
             Atualizar minha localização
           </button>
-          {selectedLocation && (
-            <p className="text-success text-sm font-bold text-center">✅ Localização marcada com sucesso</p>
-          )}
+          {selectedLocation && <p className="text-success text-sm font-bold text-center">✅ Localização marcada com sucesso</p>}
         </>
       )}
     </div>
