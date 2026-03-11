@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import logo from "@/assets/logo-truebox.png";
+import logo from "@/assets/logo-truebox-new.png";
 
 const isInAppBrowser = (): boolean => {
   const ua = navigator.userAgent || navigator.vendor || "";
