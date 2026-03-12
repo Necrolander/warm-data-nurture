@@ -8,7 +8,9 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useStoreSettings } from "@/hooks/usePublicData";
 import { useQuery } from "@tanstack/react-query";
-import type { Session } from "@supabase/supabase-js";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
 
@@ -31,8 +33,12 @@ const Checkout = () => {
     },
   });
 
-  const [session, setSession] = useState<Session | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -45,39 +51,71 @@ const Checkout = () => {
 
   const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
 
-  // Check auth
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
-      setSession(s);
+      setIsAuthenticated(!!s);
+      if (s?.user) {
+        const meta = s.user.user_metadata;
+        if (meta?.display_name) setName(meta.display_name);
+        if (meta?.phone) setPhone(meta.phone);
+      }
       setAuthLoading(false);
     });
     supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
+      setIsAuthenticated(!!s);
+      if (s?.user) {
+        const meta = s.user.user_metadata;
+        if (meta?.display_name) setName(meta.display_name);
+        if (meta?.phone) setPhone(meta.phone);
+      }
       setAuthLoading(false);
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  // Pre-fill from profile
+  // Show register popup if not authenticated
   useEffect(() => {
-    if (!session?.user) return;
-    const meta = session.user.user_metadata;
-    if (meta?.display_name && !name) setName(meta.display_name);
-    if (meta?.phone && !phone) setPhone(meta.phone);
-  }, [session]);
+    if (!authLoading && !isAuthenticated) {
+      setShowRegister(true);
+    }
+  }, [authLoading, isAuthenticated]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Carregando...</p>
-      </div>
-    );
-  }
+  const handleRegister = async () => {
+    if (!regName.trim()) { toast.error("Informe seu nome"); return; }
+    if (!regPhone.trim() || regPhone.trim().length < 10) { toast.error("Informe um celular válido"); return; }
+    setRegLoading(true);
+    try {
+      // Generate a unique email from phone to satisfy Supabase auth
+      const cleanPhone = regPhone.replace(/\D/g, "");
+      const fakeEmail = `${cleanPhone}@cliente.truebox.app`;
+      const password = `tb_${cleanPhone}_${Date.now()}`;
 
-  if (!session) {
-    navigate("/auth");
-    return null;
-  }
+      const { error } = await supabase.auth.signUp({
+        email: fakeEmail,
+        password,
+        options: {
+          data: { display_name: regName.trim(), phone: regPhone.trim() },
+        },
+      });
+      if (error) throw error;
+      setName(regName.trim());
+      setPhone(regPhone.trim());
+      setShowRegister(false);
+      toast.success("Cadastro realizado! ✅");
+    } catch (err: any) {
+      if (err.message?.includes("already registered")) {
+        // Auto-login with the same credentials
+        const cleanPhone = regPhone.replace(/\D/g, "");
+        const fakeEmail = `${cleanPhone}@cliente.truebox.app`;
+        // Can't login without knowing password, just tell user
+        toast.error("Este celular já está cadastrado. Entre em contato conosco.");
+      } else {
+        toast.error(err.message || "Erro no cadastro");
+      }
+    } finally {
+      setRegLoading(false);
+    }
+  };
 
   if (items.length === 0) {
     return (
@@ -96,7 +134,6 @@ const Checkout = () => {
   const outOfRange = location && !deliveryInfo;
   const total = subtotal + deliveryFee;
 
-  // Change calculation
   const changeVal = parseFloat(change);
   const changeNeeded = payment === "Dinheiro" && !isNaN(changeVal) && changeVal > total
     ? changeVal - total
@@ -116,17 +153,14 @@ const Checkout = () => {
     setSubmitting(true);
 
     try {
-      // Map payment to DB enum
       const paymentMap: Record<string, string> = {
         "Pix": "pix",
         "Dinheiro": "cash",
         "Cartão na entrega": "credit_card",
       };
 
-      // Generate ID client-side to avoid needing SELECT policy
       const orderId = crypto.randomUUID();
 
-      // Save order to DB
       const { error: orderError } = await supabase
         .from("orders")
         .insert({
@@ -148,7 +182,6 @@ const Checkout = () => {
 
       if (orderError) throw orderError;
 
-      // Save order items
       const orderItems = items.map((item) => ({
         order_id: orderId,
         product_name: item.product.name,
@@ -174,6 +207,23 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-background pb-8">
+      {/* Registration popup */}
+      <Dialog open={showRegister} onOpenChange={(open) => { if (!open && !isAuthenticated) return; setShowRegister(open); }}>
+        <DialogContent className="max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl">Cadastro rápido 📝</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground text-center">Informe seus dados para continuar</p>
+          <div className="space-y-3 mt-2">
+            <Input placeholder="Seu nome *" value={regName} onChange={(e) => setRegName(e.target.value)} maxLength={100} />
+            <Input placeholder="Celular (WhatsApp) *" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} type="tel" maxLength={20} />
+            <Button onClick={handleRegister} disabled={regLoading} className="w-full">
+              {regLoading ? "Cadastrando..." : "Continuar"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="sticky top-0 z-20 bg-card border-b border-border p-4 flex items-center gap-3">
         <button onClick={() => navigate("/")} className="text-foreground">
           <ArrowLeft className="w-6 h-6" />
@@ -185,7 +235,7 @@ const Checkout = () => {
         <div className="bg-card border border-primary/40 rounded-xl p-4 shadow-lg shadow-primary/10">
           <p className="text-primary text-xs font-black uppercase tracking-wide mb-1">Passo final</p>
           <h2 className="text-2xl font-black text-foreground">Finalize seu pedido aqui</h2>
-          <p className="text-sm text-muted-foreground mt-1">1) Seus dados • 2) Mapa • 3) Enviar no WhatsApp</p>
+          <p className="text-sm text-muted-foreground mt-1">1) Seus dados • 2) Mapa • 3) Confirmar</p>
         </div>
 
         <div className="bg-card rounded-xl border border-border p-4 space-y-3">
@@ -194,9 +244,7 @@ const Checkout = () => {
             const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
             return (
               <div key={item.id} className="flex justify-between text-sm">
-                <span className="text-foreground">
-                  {item.quantity}x {item.product.name}
-                </span>
+                <span className="text-foreground">{item.quantity}x {item.product.name}</span>
                 <span className="text-primary font-black">
                   R$ {((item.product.price + extrasTotal) * item.quantity).toFixed(2).replace(".", ",")}
                 </span>
@@ -207,61 +255,32 @@ const Checkout = () => {
 
         <div className="space-y-3 bg-card rounded-xl border border-border p-4">
           <h3 className="font-black text-foreground">Seus dados</h3>
-          <input
-            placeholder="Nome"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={100}
-            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <input
-            placeholder="Telefone (WhatsApp)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            maxLength={20}
-            type="tel"
-            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <input
-            placeholder="Ponto de referência"
-            value={reference}
-            onChange={(e) => setReference(e.target.value)}
-            maxLength={200}
-            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <textarea
-            placeholder="Observação do pedido"
-            value={observation}
-            onChange={(e) => setObservation(e.target.value)}
-            maxLength={500}
-            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground resize-none h-20 focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} maxLength={100}
+            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input placeholder="Telefone (WhatsApp)" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} type="tel"
+            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <input placeholder="Ponto de referência" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={200}
+            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
+          <textarea placeholder="Observação do pedido" value={observation} onChange={(e) => setObservation(e.target.value)} maxLength={500}
+            className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground resize-none h-20 focus:outline-none focus:ring-2 focus:ring-ring" />
         </div>
 
         <div className="space-y-3 bg-card rounded-xl border border-border p-4">
           <h3 className="font-black text-foreground">Forma de pagamento</h3>
           <div className="grid grid-cols-3 gap-2">
             {PAYMENT_METHODS.map((m) => (
-              <button
-                key={m}
-                onClick={() => setPayment(m)}
+              <button key={m} onClick={() => setPayment(m)}
                 className={`py-3 rounded-xl text-sm font-bold border transition-colors ${
                   payment === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
-                }`}
-              >
+                }`}>
                 {m}
               </button>
             ))}
           </div>
           {payment === "Dinheiro" && (
             <div className="space-y-2">
-              <input
-                placeholder="Troco para quanto? (ex: 100)"
-                value={change}
-                onChange={(e) => setChange(e.target.value)}
-                type="number"
-                className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
+              <input placeholder="Troco para quanto? (ex: 100)" value={change} onChange={(e) => setChange(e.target.value)} type="number"
+                className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring" />
               {changeNeeded !== null && (
                 <div className="bg-primary/10 border border-primary/30 rounded-xl p-3 text-sm">
                   <span className="text-muted-foreground">Troco necessário: </span>
@@ -297,9 +316,7 @@ const Checkout = () => {
           </div>
           <div className="flex justify-between text-foreground">
             <span>Taxa de entrega</span>
-            <span>
-              {location ? (deliveryInfo ? `R$ ${deliveryFee.toFixed(2).replace(".", ",")} (${deliveryInfo.distance.toFixed(1)} km)` : "—") : "Marque no mapa"}
-            </span>
+            <span>{location ? (deliveryInfo ? `R$ ${deliveryFee.toFixed(2).replace(".", ",")} (${deliveryInfo.distance.toFixed(1)} km)` : "—") : "Marque no mapa"}</span>
           </div>
           <div className="border-t border-border pt-2 flex justify-between text-foreground font-black text-xl">
             <span>Total</span>
@@ -310,10 +327,10 @@ const Checkout = () => {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleSubmit}
-          disabled={outOfRange === true || submitting}
+          disabled={outOfRange === true || submitting || !isAuthenticated}
           className="w-full bg-[hsl(142,71%,45%)] text-white font-black text-lg py-5 rounded-xl shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? "Enviando..." : "Enviar pedido pelo WhatsApp 📲"}
+          {submitting ? "Enviando..." : "Confirmar pedido ✅"}
         </motion.button>
       </div>
     </div>

@@ -142,13 +142,45 @@ const Orders = () => {
     if (data) setDeliveryPersons(data);
   };
 
+  // Play sound for new orders
+  const playSound = () => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 880;
+      osc.type = "sine";
+      gain.gain.value = 0.3;
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+      setTimeout(() => {
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.frequency.value = 1100;
+        osc2.type = "sine";
+        gain2.gain.value = 0.3;
+        osc2.start();
+        osc2.stop(ctx.currentTime + 0.4);
+      }, 200);
+    } catch (_) {}
+  };
+
   useEffect(() => {
     fetchOrders();
     fetchDeliveryPersons();
 
     const channel = supabase
       .channel("orders-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
+        playSound();
+        toast.success("🔔 Novo pedido recebido!");
+        fetchOrders();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
       .subscribe();
