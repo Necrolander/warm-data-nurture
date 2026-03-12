@@ -4,11 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/contexts/CartContext";
 import { getDeliveryFeeSync } from "@/utils/delivery";
-import { sendWhatsAppOrder } from "@/utils/whatsapp";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useStoreSettings } from "@/hooks/usePublicData";
 import { useQuery } from "@tanstack/react-query";
+import type { Session } from "@supabase/supabase-js";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
 
