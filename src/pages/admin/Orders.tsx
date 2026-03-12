@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Database } from "@/integrations/supabase/types";
@@ -37,23 +38,26 @@ const statusColors: Record<string, string> = {
 
 const OrderCard = ({
   order,
+  onAccept,
   onAdvance,
   onSelectDelivery,
+  isPending,
 }: {
   order: OrderWithItems;
+  onAccept: (order: OrderWithItems) => void;
   onAdvance: (order: OrderWithItems) => void;
   onSelectDelivery: (order: OrderWithItems) => void;
+  isPending: boolean;
 }) => {
   const nextStatus: Record<string, string> = {
-    pending: "production",
     production: "ready",
     ready: "out_for_delivery",
   };
 
-  const next = nextStatus[order.status];
+  const next = isPending ? null : nextStatus[order.status];
 
   return (
-    <Card className="mb-3">
+    <Card className={`mb-3 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="font-bold text-primary">#{order.order_number}</span>
@@ -95,7 +99,15 @@ const OrderCard = ({
             R$ {Number(order.total).toFixed(2).replace(".", ",")}
           </span>
 
-          {next && (
+          {isPending ? (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => onAccept(order)}
+            >
+              ✅ Aceitar
+            </Button>
+          ) : next ? (
             <Button
               size="sm"
               onClick={() => {
@@ -109,7 +121,7 @@ const OrderCard = ({
               {next === "out_for_delivery" ? "Enviar" : "Avançar"}
               <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>
@@ -122,6 +134,71 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [selectedDeliveryPerson, setSelectedDeliveryPerson] = useState("");
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+  const [autoAccept, setAutoAccept] = useState(() => {
+    return localStorage.getItem("truebox_auto_accept") === "true";
+  });
+
+  const soundIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const stopSound = useCallback(() => {
+    if (soundIntervalRef.current) {
+      clearInterval(soundIntervalRef.current);
+      soundIntervalRef.current = null;
+    }
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {});
+      audioCtxRef.current = null;
+    }
+  }, []);
+
+  const playBurst = useCallback(() => {
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      const playTone = (freq: number, start: number, dur: number, vol: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "square";
+        gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      };
+      for (let i = 0; i < 3; i++) {
+        playTone(1200, i * 0.35, 0.15, 0.9);
+        playTone(1500, i * 0.35 + 0.15, 0.12, 0.9);
+      }
+    } catch (_) {}
+  }, []);
+
+  const startLoopingSound = useCallback(() => {
+    if (soundIntervalRef.current) return; // already playing
+    playBurst();
+    soundIntervalRef.current = setInterval(() => {
+      playBurst();
+    }, 3000); // repeat every 3 seconds
+  }, [playBurst]);
+
+  // Check if there are pending orders and manage sound
+  useEffect(() => {
+    const hasPending = orders.some((o) => o.status === "pending");
+    if (hasPending && !autoAccept) {
+      startLoopingSound();
+    } else {
+      stopSound();
+    }
+  }, [orders, autoAccept, startLoopingSound, stopSound]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => stopSound();
+  }, [stopSound]);
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
@@ -142,29 +219,10 @@ const Orders = () => {
     if (data) setDeliveryPersons(data);
   };
 
-  // iFood-style loud notification sound
-  const playSound = () => {
-    try {
-      const ctx = new AudioContext();
-      const playTone = (freq: number, start: number, dur: number, vol: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = freq;
-        osc.type = "square";
-        gain.gain.setValueAtTime(vol, ctx.currentTime + start);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + dur);
-      };
-      // 3 loud bursts like iFood
-      for (let i = 0; i < 3; i++) {
-        playTone(1200, i * 0.35, 0.15, 0.8);
-        playTone(1500, i * 0.35 + 0.15, 0.12, 0.8);
-      }
-    } catch (_) {}
-  };
+  const autoAcceptRef = useRef(autoAccept);
+  useEffect(() => {
+    autoAcceptRef.current = autoAccept;
+  }, [autoAccept]);
 
   useEffect(() => {
     fetchOrders();
@@ -172,10 +230,23 @@ const Orders = () => {
 
     const channel = supabase
       .channel("orders-realtime")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, () => {
-        playSound();
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
         toast.success("🔔 Novo pedido recebido!");
         fetchOrders();
+
+        // Auto-accept if enabled
+        if (autoAcceptRef.current && payload.new && (payload.new as any).id) {
+          supabase
+            .from("orders")
+            .update({ status: "production" as any })
+            .eq("id", (payload.new as any).id)
+            .then(({ error }) => {
+              if (!error) {
+                toast.success(`Pedido #${(payload.new as any).order_number} aceito automaticamente!`);
+                fetchOrders();
+              }
+            });
+        }
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, () => {
         fetchOrders();
@@ -185,9 +256,22 @@ const Orders = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const acceptOrder = async (order: OrderWithItems) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "production" as any })
+      .eq("id", order.id);
+
+    if (error) {
+      toast.error("Erro ao aceitar pedido");
+    } else {
+      toast.success(`Pedido #${order.order_number} aceito! → Em Produção`);
+      fetchOrders();
+    }
+  };
+
   const advanceOrder = async (order: OrderWithItems) => {
     const nextStatus: Record<string, string> = {
-      pending: "production",
       production: "ready",
       ready: "out_for_delivery",
     };
@@ -238,35 +322,42 @@ const Orders = () => {
     }
   };
 
+  const handleAutoAcceptToggle = (checked: boolean) => {
+    setAutoAccept(checked);
+    localStorage.setItem("truebox_auto_accept", String(checked));
+    toast.success(checked ? "⚡ Aceitar automaticamente ATIVADO" : "🔔 Aceitar automaticamente DESATIVADO");
+  };
+
   const columns = [
-    {
-      title: "🕐 Pendente",
-      icon: Clock,
-      status: "pending",
-      color: "border-yellow-500/50",
-    },
-    {
-      title: "🔥 Em Produção",
-      icon: Clock,
-      status: "production",
-      color: "border-blue-500/50",
-    },
-    {
-      title: "✅ Pronto",
-      icon: CheckCircle,
-      status: "ready",
-      color: "border-green-500/50",
-    },
-    {
-      title: "🛵 Saiu p/ Entrega",
-      icon: Truck,
-      status: "out_for_delivery",
-      color: "border-purple-500/50",
-    },
+    { title: "🕐 Pendente", icon: Clock, status: "pending", color: "border-yellow-500/50" },
+    { title: "🔥 Em Produção", icon: Clock, status: "production", color: "border-blue-500/50" },
+    { title: "✅ Pronto", icon: CheckCircle, status: "ready", color: "border-green-500/50" },
+    { title: "🛵 Saiu p/ Entrega", icon: Truck, status: "out_for_delivery", color: "border-purple-500/50" },
   ];
+
+  const pendingCount = orders.filter((o) => o.status === "pending").length;
 
   return (
     <div className="space-y-4">
+      {/* Top bar with auto-accept toggle */}
+      <div className="flex items-center justify-between bg-card border border-border rounded-lg p-3">
+        <div className="flex items-center gap-2">
+          {pendingCount > 0 && !autoAccept && (
+            <div className="flex items-center gap-2 text-yellow-400">
+              <Volume2 className="h-5 w-5 animate-bounce" />
+              <span className="text-sm font-medium">{pendingCount} pedido(s) aguardando aceite</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Zap className={`h-4 w-4 ${autoAccept ? "text-green-400" : "text-muted-foreground"}`} />
+            <span className="text-sm font-medium">Aceitar automaticamente</span>
+            <Switch checked={autoAccept} onCheckedChange={handleAutoAcceptToggle} />
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {columns.map((col) => {
           const colOrders = orders.filter((o) => o.status === col.status);
@@ -286,8 +377,10 @@ const Orders = () => {
                     <OrderCard
                       key={order.id}
                       order={order}
+                      onAccept={acceptOrder}
                       onAdvance={advanceOrder}
                       onSelectDelivery={handleSelectDelivery}
+                      isPending={order.status === "pending"}
                     />
                   ))
                 )}
