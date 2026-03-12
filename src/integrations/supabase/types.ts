@@ -74,6 +74,33 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_order_at: string | null
+          name: string
+          phone: string
+          total_orders: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_order_at?: string | null
+          name: string
+          phone: string
+          total_orders?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_order_at?: string | null
+          name?: string
+          phone?: string
+          total_orders?: number | null
+        }
+        Relationships: []
+      }
       delivery_fees: {
         Row: {
           fee: number
@@ -319,6 +346,96 @@ export type Database = {
         }
         Relationships: []
       }
+      promotions: {
+        Row: {
+          code: string | null
+          created_at: string | null
+          ends_at: string | null
+          id: string
+          is_active: boolean | null
+          is_percentage: boolean | null
+          min_order: number | null
+          name: string
+          starts_at: string | null
+          type: string
+          updated_at: string | null
+          value: number
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_percentage?: boolean | null
+          min_order?: number | null
+          name: string
+          starts_at?: string | null
+          type: string
+          updated_at?: string | null
+          value: number
+        }
+        Update: {
+          code?: string | null
+          created_at?: string | null
+          ends_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_percentage?: boolean | null
+          min_order?: number | null
+          name?: string
+          starts_at?: string | null
+          type?: string
+          updated_at?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
+      report_settings: {
+        Row: {
+          id: string
+          pin_hash: string
+          recovery_email: string
+        }
+        Insert: {
+          id?: string
+          pin_hash: string
+          recovery_email: string
+        }
+        Update: {
+          id?: string
+          pin_hash?: string
+          recovery_email?: string
+        }
+        Relationships: []
+      }
+      salon_tables: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          qr_code_url: string | null
+          seats: number | null
+          table_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          qr_code_url?: string | null
+          seats?: number | null
+          table_number: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          qr_code_url?: string | null
+          seats?: number | null
+          table_number?: number
+        }
+        Relationships: []
+      }
       store_settings: {
         Row: {
           id: string
@@ -352,6 +469,30 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      waiters: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string | null
         }
         Relationships: []
       }
