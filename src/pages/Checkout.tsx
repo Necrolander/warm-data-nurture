@@ -88,10 +88,14 @@ const Checkout = () => {
         "Cartão na entrega": "credit_card",
       };
 
+      // Generate ID client-side to avoid needing SELECT policy
+      const orderId = crypto.randomUUID();
+
       // Save order to DB
-      const { data: order, error: orderError } = await supabase
+      const { error: orderError } = await supabase
         .from("orders")
         .insert({
+          id: orderId,
           customer_name: name.trim(),
           customer_phone: phone.trim(),
           reference: reference.trim() || null,
@@ -105,15 +109,13 @@ const Checkout = () => {
           delivery_lat: location.lat,
           delivery_lng: location.lng,
           status: "pending" as const,
-        })
-        .select("id")
-        .single();
+        });
 
       if (orderError) throw orderError;
 
       // Save order items
       const orderItems = items.map((item) => ({
-        order_id: order.id,
+        order_id: orderId,
         product_name: item.product.name,
         product_price: item.product.price,
         quantity: item.quantity,
