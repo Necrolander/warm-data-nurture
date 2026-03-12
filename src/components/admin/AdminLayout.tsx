@@ -28,6 +28,7 @@ import {
   LogOut,
   Smartphone,
   Store,
+  Bike,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -45,6 +46,7 @@ const menuItems = [
   { title: "Cashback & Cupons", url: "/admin/cashback", icon: Gift },
   { title: "Relatórios", url: "/admin/reports", icon: BarChart3 },
   { title: "Frete", url: "/admin/delivery-fees", icon: Truck },
+  { title: "Entregadores", url: "/admin/delivery-persons", icon: Bike },
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
 ];

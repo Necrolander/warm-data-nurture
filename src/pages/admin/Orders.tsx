@@ -142,30 +142,27 @@ const Orders = () => {
     if (data) setDeliveryPersons(data);
   };
 
-  // Play sound for new orders
+  // iFood-style loud notification sound
   const playSound = () => {
     try {
       const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 880;
-      osc.type = "sine";
-      gain.gain.value = 0.3;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-      setTimeout(() => {
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.frequency.value = 1100;
-        osc2.type = "sine";
-        gain2.gain.value = 0.3;
-        osc2.start();
-        osc2.stop(ctx.currentTime + 0.4);
-      }, 200);
+      const playTone = (freq: number, start: number, dur: number, vol: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "square";
+        gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      };
+      // 3 loud bursts like iFood
+      for (let i = 0; i < 3; i++) {
+        playTone(1200, i * 0.35, 0.15, 0.8);
+        playTone(1500, i * 0.35 + 0.15, 0.12, 0.8);
+      }
     } catch (_) {}
   };
 

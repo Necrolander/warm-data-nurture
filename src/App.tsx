@@ -24,6 +24,7 @@ import Reports from "./pages/admin/Reports";
 import DeliveryFees from "./pages/admin/DeliveryFees";
 import DigitalMenu from "./pages/admin/DigitalMenu";
 import Establishment from "./pages/admin/Establishment";
+import DeliveryPersons from "./pages/admin/DeliveryPersons";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="delivery-fees" element={<DeliveryFees />} />
               <Route path="digital-menu" element={<DigitalMenu />} />
               <Route path="establishment" element={<Establishment />} />
+              <Route path="delivery-persons" element={<DeliveryPersons />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
