@@ -161,26 +161,9 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
       if (itemsError) throw itemsError;
 
-      // Send WhatsApp
-      sendWhatsAppOrder({
-        name: name.trim(),
-        phone: phone.trim(),
-        reference: reference.trim(),
-        observation: observation.trim(),
-        payment,
-        change: payment === "Dinheiro" ? change.trim() : undefined,
-        items,
-        subtotal,
-        deliveryFee,
-        total,
-        location,
-        storeName,
-        storePhone,
-      });
-
       clearCart();
-      toast.success("Pedido enviado com sucesso! 🎉");
-      navigate("/");
+      toast.success("Pedido confirmado com sucesso! 🎉");
+      navigate("/order-success");
     } catch (err) {
       console.error("Order error:", err);
       toast.error("Erro ao salvar pedido. Tente novamente.");
