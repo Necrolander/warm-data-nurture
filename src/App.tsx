@@ -10,6 +10,10 @@ import NotFound from "./pages/NotFound";
 import AdminLogin from "./pages/AdminLogin";
 import AdminLayout from "./components/admin/AdminLayout";
 import Orders from "./pages/admin/Orders";
+import NewOrder from "./pages/admin/NewOrder";
+import MenuManager from "./pages/admin/MenuManager";
+import BotManager from "./pages/admin/BotManager";
+import DeliveryFees from "./pages/admin/DeliveryFees";
 import PlaceholderPage from "./pages/admin/PlaceholderPage";
 import { ScrollToTop } from "./components/ScrollToTop";
 
@@ -31,16 +35,16 @@ const App = () => (
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Orders />} />
-              <Route path="new-order" element={<PlaceholderPage title="Fazer Pedido" />} />
-              <Route path="menu-manager" element={<PlaceholderPage title="Gestor de Cardápio" />} />
+              <Route path="new-order" element={<NewOrder />} />
+              <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<PlaceholderPage title="Notas Fiscais" />} />
-              <Route path="bot" element={<PlaceholderPage title="Robô" />} />
+              <Route path="bot" element={<BotManager />} />
               <Route path="salon" element={<PlaceholderPage title="Gestão Salão" />} />
               <Route path="salon-settings" element={<PlaceholderPage title="Configurações do Salão" />} />
               <Route path="contacts" element={<PlaceholderPage title="Contatos" />} />
               <Route path="cashback" element={<PlaceholderPage title="Cashback & Cupons" />} />
               <Route path="reports" element={<PlaceholderPage title="Relatórios" />} />
-              <Route path="delivery-fees" element={<PlaceholderPage title="Frete" />} />
+              <Route path="delivery-fees" element={<DeliveryFees />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
