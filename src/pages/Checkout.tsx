@@ -66,6 +66,19 @@ const Checkout = () => {
     if (meta?.phone && !phone) setPhone(meta.phone);
   }, [session]);
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    navigate("/auth");
+    return null;
+  }
+
   if (items.length === 0) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
