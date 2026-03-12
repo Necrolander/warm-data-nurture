@@ -1,12 +1,14 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/contexts/CartContext";
-import { getDeliveryFee } from "@/utils/delivery";
+import { getDeliveryFeeSync } from "@/utils/delivery";
 import { sendWhatsAppOrder } from "@/utils/whatsapp";
 import { toast } from "sonner";
-import { STORE_CONFIG } from "@/config/store";
+import { supabase } from "@/integrations/supabase/client";
+import { useStoreSettings } from "@/hooks/usePublicData";
+import { useQuery } from "@tanstack/react-query";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
 
@@ -15,6 +17,19 @@ const PAYMENT_METHODS = ["Pix", "Dinheiro", "Cartão na entrega"];
 const Checkout = () => {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCart();
+  const { data: settings } = useStoreSettings();
+
+  const { data: deliveryFees } = useQuery({
+    queryKey: ["public-delivery-fees"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("delivery_fees")
+        .select("max_km, fee")
+        .order("max_km", { ascending: true });
+      if (error) throw error;
+      return (data || []).map((f) => ({ max_km: Number(f.max_km), fee: Number(f.fee) }));
+    },
+  });
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -23,6 +38,11 @@ const Checkout = () => {
   const [payment, setPayment] = useState("");
   const [change, setChange] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
+  const storeName = settings?.store_name || "Truebox Hamburgueria";
+  const storePhone = settings?.whatsapp_phone || "5561996179376";
 
   if (items.length === 0) {
     return (
@@ -35,54 +55,101 @@ const Checkout = () => {
     );
   }
 
-  const deliveryInfo = location ? getDeliveryFee(location.lat, location.lng) : null;
+  const fees = deliveryFees || [];
+  const deliveryInfo = location ? getDeliveryFeeSync(location.lat, location.lng, fees) : null;
   const deliveryFee = deliveryInfo?.fee ?? 0;
   const outOfRange = location && !deliveryInfo;
   const total = subtotal + deliveryFee;
 
-  const handleSubmit = () => {
-    if (!name.trim()) {
-      toast.error("Informe seu nome");
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error("Informe seu telefone");
-      return;
-    }
-    if (!payment) {
-      toast.error("Escolha a forma de pagamento");
-      return;
-    }
-    if (!location) {
-      toast.error("Marque sua localização no mapa");
-      return;
-    }
-    if (outOfRange) {
-      toast.error("Fora da área de entrega");
-      return;
-    }
-    if (subtotal < STORE_CONFIG.minOrder) {
-      toast.error(`Pedido mínimo: R$ ${STORE_CONFIG.minOrder.toFixed(2).replace(".", ",")}`);
+  // Change calculation
+  const changeVal = parseFloat(change);
+  const changeNeeded = payment === "Dinheiro" && !isNaN(changeVal) && changeVal > total
+    ? changeVal - total
+    : null;
+
+  const handleSubmit = async () => {
+    if (!name.trim()) { toast.error("Informe seu nome"); return; }
+    if (!phone.trim()) { toast.error("Informe seu telefone"); return; }
+    if (!payment) { toast.error("Escolha a forma de pagamento"); return; }
+    if (!location) { toast.error("Marque sua localização no mapa"); return; }
+    if (outOfRange) { toast.error("Fora da área de entrega"); return; }
+    if (subtotal < minOrder) {
+      toast.error(`Pedido mínimo: R$ ${minOrder.toFixed(2).replace(".", ",")}`);
       return;
     }
 
-    sendWhatsAppOrder({
-      name: name.trim(),
-      phone: phone.trim(),
-      reference: reference.trim(),
-      observation: observation.trim(),
-      payment,
-      change: payment === "Dinheiro" ? change.trim() : undefined,
-      items,
-      subtotal,
-      deliveryFee,
-      total,
-      location,
-    });
+    setSubmitting(true);
 
-    clearCart();
-    toast.success("Pedido enviado com sucesso! 🎉");
-    navigate("/");
+    try {
+      // Map payment to DB enum
+      const paymentMap: Record<string, string> = {
+        "Pix": "pix",
+        "Dinheiro": "cash",
+        "Cartão na entrega": "credit_card",
+      };
+
+      // Save order to DB
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert({
+          customer_name: name.trim(),
+          customer_phone: phone.trim(),
+          reference: reference.trim() || null,
+          observation: observation.trim() || null,
+          payment_method: paymentMap[payment] as any,
+          change_for: payment === "Dinheiro" && !isNaN(changeVal) ? changeVal : null,
+          order_type: "delivery" as const,
+          subtotal,
+          delivery_fee: deliveryFee,
+          total,
+          delivery_lat: location.lat,
+          delivery_lng: location.lng,
+          status: "pending" as const,
+        })
+        .select("id")
+        .single();
+
+      if (orderError) throw orderError;
+
+      // Save order items
+      const orderItems = items.map((item) => ({
+        order_id: order.id,
+        product_name: item.product.name,
+        product_price: item.product.price,
+        quantity: item.quantity,
+        extras: item.extras.map((e) => ({ name: e.name, price: e.price })),
+        observation: item.observation || null,
+      }));
+
+      const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
+      if (itemsError) throw itemsError;
+
+      // Send WhatsApp
+      sendWhatsAppOrder({
+        name: name.trim(),
+        phone: phone.trim(),
+        reference: reference.trim(),
+        observation: observation.trim(),
+        payment,
+        change: payment === "Dinheiro" ? change.trim() : undefined,
+        items,
+        subtotal,
+        deliveryFee,
+        total,
+        location,
+        storeName,
+        storePhone,
+      });
+
+      clearCart();
+      toast.success("Pedido enviado com sucesso! 🎉");
+      navigate("/");
+    } catch (err) {
+      console.error("Order error:", err);
+      toast.error("Erro ao salvar pedido. Tente novamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -167,12 +234,26 @@ const Checkout = () => {
             ))}
           </div>
           {payment === "Dinheiro" && (
-            <input
-              placeholder="Troco para quanto?"
-              value={change}
-              onChange={(e) => setChange(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
+            <div className="space-y-2">
+              <input
+                placeholder="Troco para quanto? (ex: 100)"
+                value={change}
+                onChange={(e) => setChange(e.target.value)}
+                type="number"
+                className="w-full bg-background border border-border rounded-xl p-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              {changeNeeded !== null && (
+                <div className="bg-primary/10 border border-primary/30 rounded-xl p-3 text-sm">
+                  <span className="text-muted-foreground">Troco necessário: </span>
+                  <span className="text-primary font-black">R$ {changeNeeded.toFixed(2).replace(".", ",")}</span>
+                </div>
+              )}
+              {payment === "Dinheiro" && !isNaN(changeVal) && changeVal > 0 && changeVal <= total && (
+                <p className="text-destructive text-xs font-bold">
+                  ⚠️ O valor precisa ser maior que R$ {total.toFixed(2).replace(".", ",")}
+                </p>
+              )}
+            </div>
           )}
         </div>
 
@@ -209,10 +290,10 @@ const Checkout = () => {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={handleSubmit}
-          disabled={outOfRange === true}
-          className="w-full bg-success text-success-foreground font-black text-lg py-5 rounded-xl shadow-lg shadow-success/40 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={outOfRange === true || submitting}
+          className="w-full bg-[hsl(142,71%,45%)] text-white font-black text-lg py-5 rounded-xl shadow-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Enviar pedido pelo WhatsApp 📲
+          {submitting ? "Enviando..." : "Enviar pedido pelo WhatsApp 📲"}
         </motion.button>
       </div>
     </div>
