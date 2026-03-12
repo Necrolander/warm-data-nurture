@@ -14,6 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_responses: {
+        Row: {
+          id: string
+          include_menu_link: boolean | null
+          is_active: boolean | null
+          response_text: string
+          sort_order: number | null
+          trigger_key: string
+          trigger_label: string
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          include_menu_link?: boolean | null
+          is_active?: boolean | null
+          response_text?: string
+          sort_order?: number | null
+          trigger_key: string
+          trigger_label: string
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          include_menu_link?: boolean | null
+          is_active?: boolean | null
+          response_text?: string
+          sort_order?: number | null
+          trigger_key?: string
+          trigger_label?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          slug: string
+          sort_order: number | null
+        }
+        Insert: {
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          slug: string
+          sort_order?: number | null
+        }
+        Update: {
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          slug?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      delivery_fees: {
+        Row: {
+          fee: number
+          id: string
+          max_km: number
+          sort_order: number | null
+        }
+        Insert: {
+          fee: number
+          id?: string
+          max_km: number
+          sort_order?: number | null
+        }
+        Update: {
+          fee?: number
+          id?: string
+          max_km?: number
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       delivery_persons: {
         Row: {
           created_at: string | null
@@ -145,6 +226,72 @@ export type Database = {
         }
         Relationships: []
       }
+      product_extras: {
+        Row: {
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          sort_order: number | null
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          sort_order?: number | null
+        }
+        Update: {
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          badges: string[] | null
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          price: number
+          sort_order: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          badges?: string[] | null
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          price: number
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          badges?: string[] | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          sort_order?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string | null
@@ -169,6 +316,24 @@ export type Database = {
           phone?: string | null
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      store_settings: {
+        Row: {
+          id: string
+          key: string
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          value?: string
         }
         Relationships: []
       }
