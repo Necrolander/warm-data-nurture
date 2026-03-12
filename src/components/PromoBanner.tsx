@@ -1,10 +1,15 @@
+import { useProducts, useExtras, mapDbProduct } from "@/hooks/usePublicData";
 import { useEffect, useRef, useState } from "react";
-import { PRODUCTS } from "@/data/products";
 
 const PromoBanner = () => {
-  const promoProducts = PRODUCTS.filter((p) => p.badges?.some((b) => b.includes("Economize")));
+  const { data: dbProducts } = useProducts();
+  const { data: dbExtras } = useExtras();
   const [isPaused, setIsPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
+
+  const extras = dbExtras || [];
+  const products = (dbProducts || []).map((p) => mapDbProduct(p, extras));
+  const promoProducts = products.filter((p) => p.badges?.some((b) => b.includes("Economize")));
 
   useEffect(() => {
     const el = trackRef.current;
@@ -12,7 +17,6 @@ const PromoBanner = () => {
 
     const interval = window.setInterval(() => {
       if (isPaused) return;
-
       el.scrollLeft += 1;
       if (el.scrollLeft >= el.scrollWidth / 2) {
         el.scrollLeft = 0;

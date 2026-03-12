@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus } from "lucide-react";
-import { Product, Extra, EXTRAS } from "@/data/products";
+import { Product, Extra } from "@/data/products";
 import { useCart } from "@/contexts/CartContext";
 
 interface ProductModalProps {
@@ -16,7 +16,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
   if (!product) return null;
 
-  const availableExtras = product.extras || EXTRAS;
+  const availableExtras = product.extras || [];
 
   const toggleExtra = (extra: Extra) => {
     setSelectedExtras((prev) =>
@@ -81,37 +81,39 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
             </p>
 
             {/* Extras */}
-            <div className="mt-5">
-              <h3 className="font-bold text-foreground mb-3">Adicionais</h3>
-              <div className="space-y-2">
-                {availableExtras.map((extra) => {
-                  const selected = selectedExtras.find((e) => e.id === extra.id);
-                  return (
-                    <button
-                      key={extra.id}
-                      onClick={() => toggleExtra(extra)}
-                      className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                        selected
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-muted-foreground"
-                      }`}
-                    >
-                      <span className="text-foreground">{extra.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-primary font-bold text-sm">
-                          + R$ {extra.price.toFixed(2).replace(".", ",")}
-                        </span>
-                        {selected ? (
-                          <Minus className="w-4 h-4 text-primary" />
-                        ) : (
-                          <Plus className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+            {availableExtras.length > 0 && (
+              <div className="mt-5">
+                <h3 className="font-bold text-foreground mb-3">Adicionais</h3>
+                <div className="space-y-2">
+                  {availableExtras.map((extra) => {
+                    const selected = selectedExtras.find((e) => e.id === extra.id);
+                    return (
+                      <button
+                        key={extra.id}
+                        onClick={() => toggleExtra(extra)}
+                        className={`w-full flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                          selected
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-muted-foreground"
+                        }`}
+                      >
+                        <span className="text-foreground">{extra.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-primary font-bold text-sm">
+                            + R$ {extra.price.toFixed(2).replace(".", ",")}
+                          </span>
+                          {selected ? (
+                            <Minus className="w-4 h-4 text-primary" />
+                          ) : (
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Observation */}
             <div className="mt-5">
