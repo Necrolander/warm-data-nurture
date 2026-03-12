@@ -12,9 +12,14 @@ import AdminLayout from "./components/admin/AdminLayout";
 import Orders from "./pages/admin/Orders";
 import NewOrder from "./pages/admin/NewOrder";
 import MenuManager from "./pages/admin/MenuManager";
+import Invoices from "./pages/admin/Invoices";
 import BotManager from "./pages/admin/BotManager";
+import SalonManager from "./pages/admin/SalonManager";
+import SalonSettings from "./pages/admin/SalonSettings";
+import Contacts from "./pages/admin/Contacts";
+import CashbackCoupons from "./pages/admin/CashbackCoupons";
+import Reports from "./pages/admin/Reports";
 import DeliveryFees from "./pages/admin/DeliveryFees";
-import PlaceholderPage from "./pages/admin/PlaceholderPage";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -37,13 +42,13 @@ const App = () => (
               <Route index element={<Orders />} />
               <Route path="new-order" element={<NewOrder />} />
               <Route path="menu-manager" element={<MenuManager />} />
-              <Route path="invoices" element={<PlaceholderPage title="Notas Fiscais" />} />
+              <Route path="invoices" element={<Invoices />} />
               <Route path="bot" element={<BotManager />} />
-              <Route path="salon" element={<PlaceholderPage title="Gestão Salão" />} />
-              <Route path="salon-settings" element={<PlaceholderPage title="Configurações do Salão" />} />
-              <Route path="contacts" element={<PlaceholderPage title="Contatos" />} />
-              <Route path="cashback" element={<PlaceholderPage title="Cashback & Cupons" />} />
-              <Route path="reports" element={<PlaceholderPage title="Relatórios" />} />
+              <Route path="salon" element={<SalonManager />} />
+              <Route path="salon-settings" element={<SalonSettings />} />
+              <Route path="contacts" element={<Contacts />} />
+              <Route path="cashback" element={<CashbackCoupons />} />
+              <Route path="reports" element={<Reports />} />
               <Route path="delivery-fees" element={<DeliveryFees />} />
             </Route>
 
