@@ -14,16 +14,206 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      delivery_persons: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string
+        }
+        Relationships: []
+      }
+      order_items: {
+        Row: {
+          created_at: string | null
+          extras: Json | null
+          id: string
+          observation: string | null
+          order_id: string
+          product_name: string
+          product_price: number
+          quantity: number
+        }
+        Insert: {
+          created_at?: string | null
+          extras?: Json | null
+          id?: string
+          observation?: string | null
+          order_id: string
+          product_name: string
+          product_price: number
+          quantity?: number
+        }
+        Update: {
+          created_at?: string | null
+          extras?: Json | null
+          id?: string
+          observation?: string | null
+          order_id?: string
+          product_name?: string
+          product_price?: number
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          change_for: number | null
+          created_at: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_fee: number
+          delivery_lat: number | null
+          delivery_lng: number | null
+          delivery_person_id: string | null
+          id: string
+          observation: string | null
+          order_number: number
+          order_type: Database["public"]["Enums"]["order_type"]
+          payment_method: Database["public"]["Enums"]["payment_method"] | null
+          reference: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          table_number: number | null
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          change_for?: number | null
+          created_at?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_fee?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          delivery_person_id?: string | null
+          id?: string
+          observation?: string | null
+          order_number?: number
+          order_type?: Database["public"]["Enums"]["order_type"]
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          table_number?: number | null
+          total?: number
+          updated_at?: string | null
+        }
+        Update: {
+          change_for?: number | null
+          created_at?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_fee?: number
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          delivery_person_id?: string | null
+          id?: string
+          observation?: string | null
+          order_number?: number
+          order_type?: Database["public"]["Enums"]["order_type"]
+          payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          table_number?: number | null
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          id: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          id?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "staff" | "waiter" | "delivery"
+      order_status:
+        | "pending"
+        | "production"
+        | "ready"
+        | "out_for_delivery"
+        | "delivered"
+        | "cancelled"
+      order_type: "delivery" | "pickup" | "dine_in"
+      payment_method: "pix" | "credit_card" | "debit_card" | "cash"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +340,18 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "staff", "waiter", "delivery"],
+      order_status: [
+        "pending",
+        "production",
+        "ready",
+        "out_for_delivery",
+        "delivered",
+        "cancelled",
+      ],
+      order_type: ["delivery", "pickup", "dine_in"],
+      payment_method: ["pix", "credit_card", "debit_card", "cash"],
+    },
   },
 } as const
