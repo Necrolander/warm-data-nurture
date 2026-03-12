@@ -4,11 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { useCart } from "@/contexts/CartContext";
 import { getDeliveryFeeSync } from "@/utils/delivery";
-import { sendWhatsAppOrder } from "@/utils/whatsapp";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useStoreSettings } from "@/hooks/usePublicData";
 import { useQuery } from "@tanstack/react-query";
+import type { Session } from "@supabase/supabase-js";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
 
@@ -31,6 +31,9 @@ const Checkout = () => {
     },
   });
 
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [reference, setReference] = useState("");
@@ -41,8 +44,40 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
-  const storeName = settings?.store_name || "Truebox Hamburgueria";
-  const storePhone = settings?.whatsapp_phone || "5561996179376";
+
+  // Check auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Pre-fill from profile
+  useEffect(() => {
+    if (!session?.user) return;
+    const meta = session.user.user_metadata;
+    if (meta?.display_name && !name) setName(meta.display_name);
+    if (meta?.phone && !phone) setPhone(meta.phone);
+  }, [session]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (!session) {
+    navigate("/auth");
+    return null;
+  }
 
   if (items.length === 0) {
     return (
@@ -126,26 +161,9 @@ const Checkout = () => {
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
       if (itemsError) throw itemsError;
 
-      // Send WhatsApp
-      sendWhatsAppOrder({
-        name: name.trim(),
-        phone: phone.trim(),
-        reference: reference.trim(),
-        observation: observation.trim(),
-        payment,
-        change: payment === "Dinheiro" ? change.trim() : undefined,
-        items,
-        subtotal,
-        deliveryFee,
-        total,
-        location,
-        storeName,
-        storePhone,
-      });
-
       clearCart();
-      toast.success("Pedido enviado com sucesso! 🎉");
-      navigate("/");
+      toast.success("Pedido confirmado com sucesso! 🎉");
+      navigate("/order-success");
     } catch (err) {
       console.error("Order error:", err);
       toast.error("Erro ao salvar pedido. Tente novamente.");
