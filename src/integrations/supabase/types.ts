@@ -146,6 +146,30 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_regions: {
+        Row: {
+          fee: number
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          fee?: number
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          fee?: number
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -433,6 +457,30 @@ export type Database = {
           qr_code_url?: string | null
           seats?: number | null
           table_number?: number
+        }
+        Relationships: []
+      }
+      store_schedule: {
+        Row: {
+          close_time: string
+          day_of_week: number
+          id: string
+          is_open: boolean | null
+          open_time: string
+        }
+        Insert: {
+          close_time?: string
+          day_of_week: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string
+        }
+        Update: {
+          close_time?: string
+          day_of_week?: number
+          id?: string
+          is_open?: boolean | null
+          open_time?: string
         }
         Relationships: []
       }
