@@ -26,6 +26,8 @@ import {
   BarChart3,
   Truck,
   LogOut,
+  Smartphone,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -43,20 +45,26 @@ const menuItems = [
   { title: "Cashback & Cupons", url: "/admin/cashback", icon: Gift },
   { title: "Relatórios", url: "/admin/reports", icon: BarChart3 },
   { title: "Frete", url: "/admin/delivery-fees", icon: Truck },
+  { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
+  { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
 ];
 
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
+  const [storeOpen, setStoreOpen] = useState(true);
+  const [toggling, setToggling] = useState(false);
+
+  const fetchStoreStatus = async () => {
+    const { data } = await supabase.from("store_settings").select("value").eq("key", "store_open").single();
+    if (data) setStoreOpen(data.value === "true");
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/admin/login");
-        return;
-      }
+      if (!session) { navigate("/admin/login"); return; }
 
       const { data: roles } = await supabase
         .from("user_roles")
@@ -64,25 +72,29 @@ const AdminLayout = () => {
         .eq("user_id", session.user.id);
 
       const hasAccess = roles?.some(r => r.role === "admin" || r.role === "staff");
-      if (!hasAccess) {
-        await supabase.auth.signOut();
-        navigate("/admin/login");
-        return;
-      }
+      if (!hasAccess) { await supabase.auth.signOut(); navigate("/admin/login"); return; }
 
       setLoading(false);
+      fetchStoreStatus();
     };
 
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
-        navigate("/admin/login");
-      }
+      if (event === "SIGNED_OUT") navigate("/admin/login");
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const toggleStore = async () => {
+    setToggling(true);
+    const newVal = !storeOpen;
+    await supabase.from("store_settings").upsert({ key: "store_open", value: String(newVal) }, { onConflict: "key" });
+    setStoreOpen(newVal);
+    toast.success(newVal ? "🟢 Loja ABERTA!" : "🔴 Loja FECHADA!");
+    setToggling(false);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -103,9 +115,24 @@ const AdminLayout = () => {
       <div className="min-h-screen flex w-full">
         <Sidebar collapsible="icon">
           <SidebarContent className="pt-4">
+            {/* Logo + Store status */}
             <div className="px-4 mb-4">
-              <img src={logo} alt="Truebox" className="h-10 mx-auto" />
+              <div className="flex items-center justify-center gap-2">
+                <img src={logo} alt="Truebox" className="h-10" />
+                <button
+                  onClick={toggleStore}
+                  disabled={toggling}
+                  className="relative flex-shrink-0"
+                  title={storeOpen ? "Loja ABERTA — clique para fechar" : "Loja FECHADA — clique para abrir"}
+                >
+                  <span className={`block w-4 h-4 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"} ${storeOpen ? "animate-pulse" : ""}`} />
+                </button>
+              </div>
+              <p className="text-center text-xs text-muted-foreground mt-1">
+                {storeOpen ? "Aberta" : "Fechada"}
+              </p>
             </div>
+
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
@@ -139,13 +166,25 @@ const AdminLayout = () => {
         <div className="flex-1 flex flex-col">
           <header className="h-14 flex items-center border-b border-border px-4">
             <SidebarTrigger className="mr-4" />
-            <h1 className="text-lg font-semibold text-foreground">
-              {menuItems.find(i => 
-                i.url === "/admin" 
-                  ? location.pathname === "/admin" 
+            <h1 className="text-lg font-semibold text-foreground flex-1">
+              {menuItems.find(i =>
+                i.url === "/admin"
+                  ? location.pathname === "/admin"
                   : location.pathname.startsWith(i.url)
               )?.title || "Painel"}
             </h1>
+            <button
+              onClick={toggleStore}
+              disabled={toggling}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                storeOpen
+                  ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
+                  : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+              }`}
+            >
+              <span className={`w-2.5 h-2.5 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"}`} />
+              {storeOpen ? "Aberta" : "Fechada"}
+            </button>
           </header>
           <main className="flex-1 p-4 md:p-6 overflow-auto">
             <Outlet />
