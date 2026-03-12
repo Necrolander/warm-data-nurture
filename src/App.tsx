@@ -38,7 +38,9 @@ const App = () => (
           <ScrollToTop />
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<CustomerAuth />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order-success" element={<OrderSuccess />} />
 
             {/* Admin */}
             <Route path="/admin/login" element={<AdminLogin />} />
