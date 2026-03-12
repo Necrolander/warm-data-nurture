@@ -31,6 +31,9 @@ const Checkout = () => {
     },
   });
 
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [reference, setReference] = useState("");
@@ -41,8 +44,27 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
-  const storeName = settings?.store_name || "Truebox Hamburgueria";
-  const storePhone = settings?.whatsapp_phone || "5561996179376";
+
+  // Check auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Pre-fill from profile
+  useEffect(() => {
+    if (!session?.user) return;
+    const meta = session.user.user_metadata;
+    if (meta?.display_name && !name) setName(meta.display_name);
+    if (meta?.phone && !phone) setPhone(meta.phone);
+  }, [session]);
 
   if (items.length === 0) {
     return (
