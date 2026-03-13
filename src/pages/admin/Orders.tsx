@@ -140,6 +140,13 @@ const printOrderTicket = (order: OrderWithItems) => {
   printWindow.document.close();
 };
 
+const formatWhatsAppLink = (phone: string, message?: string) => {
+  const cleaned = phone.replace(/\D/g, "");
+  const num = cleaned.startsWith("55") ? cleaned : `55${cleaned}`;
+  const msg = message ? `?text=${encodeURIComponent(message)}` : "";
+  return `https://wa.me/${num}${msg}`;
+};
+
 const OrderCard = ({
   order,
   onAccept,
@@ -150,6 +157,7 @@ const OrderCard = ({
   onCancel,
   onPrint,
   isPending,
+  deliveryPersons,
 }: {
   order: OrderWithItems;
   onAccept: (order: OrderWithItems) => void;
@@ -160,6 +168,7 @@ const OrderCard = ({
   onCancel: (order: OrderWithItems) => void;
   onPrint: (order: OrderWithItems) => void;
   isPending: boolean;
+  deliveryPersons: DeliveryPerson[];
 }) => {
   const nextStatus: Record<string, string> = {
     production: "ready",
@@ -194,9 +203,16 @@ const OrderCard = ({
         </div>
 
         <div className="space-y-1 text-sm mb-3">
-          <div className="flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5 text-muted-foreground" />
-            <span>{order.customer_name}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>{order.customer_name}</span>
+            </div>
+            <a href={formatWhatsAppLink(order.customer_phone, `Olá ${order.customer_name}, sobre seu pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp cliente">
+              <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500 hover:text-green-400">
+                <Phone className="h-3.5 w-3.5" />
+              </Button>
+            </a>
           </div>
           <div className="flex items-center gap-1.5">
             <Phone className="h-3.5 w-3.5 text-muted-foreground" />
@@ -209,16 +225,30 @@ const OrderCard = ({
             </div>
           )}
           {mapLink && (
-            <a
-              href={mapLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline"
-            >
+            <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline">
               <ExternalLink className="h-3.5 w-3.5" />
               <span>Ver no mapa</span>
             </a>
           )}
+          {/* Delivery person info */}
+          {order.delivery_person_id && (() => {
+            const dp = deliveryPersons.find((d) => d.id === order.delivery_person_id);
+            if (!dp) return null;
+            return (
+              <div className="flex items-center justify-between bg-muted/50 rounded p-1.5 mt-1">
+                <div className="flex items-center gap-1.5">
+                  <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium">{dp.name}</span>
+                  <span className="text-muted-foreground text-xs">({dp.phone})</span>
+                </div>
+                <a href={formatWhatsAppLink(dp.phone, `Olá ${dp.name}, sobre o pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp motoboy">
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500 hover:text-green-400">
+                    <Phone className="h-3.5 w-3.5" />
+                  </Button>
+                </a>
+              </div>
+            );
+          })()}
           {order.observation && (
             <div className="flex items-start gap-1.5 bg-muted/50 rounded p-1.5 mt-1">
               <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
@@ -642,6 +672,7 @@ const Orders = () => {
                       onCancel={(o) => setCancelOrder(o)}
                       onPrint={printOrderTicket}
                       isPending={order.status === "pending"}
+                      deliveryPersons={deliveryPersons}
                     />
                   ))
                 )}
