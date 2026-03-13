@@ -313,6 +313,41 @@ export type Database = {
         }
         Relationships: []
       }
+      print_queue: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          order_id: string | null
+          printed: boolean
+          type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          printed?: boolean
+          type?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          printed?: boolean
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_queue_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_extras: {
         Row: {
           description: string | null
