@@ -214,7 +214,6 @@ const NewOrder = () => {
     const extrasTotal = c.extras.reduce((s, e) => s + Number(e.price) * (e.quantity || 1), 0);
     return sum + (Number(c.product.price) + extrasTotal) * c.quantity;
   }, 0);
-  }, 0);
 
   const totalItems = cart.reduce((sum, c) => sum + c.quantity, 0);
 
