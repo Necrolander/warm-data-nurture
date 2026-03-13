@@ -26,6 +26,8 @@ interface ExtraItem {
   id: string;
   name: string;
   price: number;
+  max_quantity: number;
+  description: string | null;
   image_url: string | null;
   group_id: string | null;
 }
