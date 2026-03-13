@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap } from "lucide-react";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
@@ -36,17 +37,43 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-destructive/20 text-destructive",
 };
 
+const paymentLabels: Record<string, string> = {
+  pix: "PIX",
+  credit_card: "Cartão de Crédito",
+  debit_card: "Cartão de Débito",
+  cash: "Dinheiro",
+};
+
+const orderTypeLabels: Record<string, string> = {
+  delivery: "🛵 Entrega",
+  pickup: "🏪 Retirada",
+  dine_in: "🍽️ No Salão",
+};
+
+const getMapLink = (order: Order) => {
+  if (order.delivery_lat && order.delivery_lng) {
+    return `https://www.google.com/maps?q=${order.delivery_lat},${order.delivery_lng}`;
+  }
+  return null;
+};
+
 const OrderCard = ({
   order,
   onAccept,
+  onReject,
   onAdvance,
   onSelectDelivery,
+  onMarkDelivered,
+  onCancel,
   isPending,
 }: {
   order: OrderWithItems;
   onAccept: (order: OrderWithItems) => void;
+  onReject: (order: OrderWithItems) => void;
   onAdvance: (order: OrderWithItems) => void;
   onSelectDelivery: (order: OrderWithItems) => void;
+  onMarkDelivered: (order: OrderWithItems) => void;
+  onCancel: (order: OrderWithItems) => void;
   isPending: boolean;
 }) => {
   const nextStatus: Record<string, string> = {
@@ -55,13 +82,27 @@ const OrderCard = ({
   };
 
   const next = isPending ? null : nextStatus[order.status];
+  const mapLink = getMapLink(order);
 
   return (
     <Card className={`mb-3 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="font-bold text-primary">#{order.order_number}</span>
-          <Badge className={statusColors[order.status]}>{statusLabels[order.status]}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={statusColors[order.status]}>{statusLabels[order.status]}</Badge>
+          </div>
+        </div>
+
+        {/* Order type & payment */}
+        <div className="flex items-center gap-2 mb-2 text-xs">
+          <Badge variant="outline">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
+          {order.payment_method && (
+            <Badge variant="outline" className="flex items-center gap-1">
+              <CreditCard className="h-3 w-3" />
+              {paymentLabels[order.payment_method] || order.payment_method}
+            </Badge>
+          )}
         </div>
 
         <div className="space-y-1 text-sm mb-3">
@@ -79,19 +120,57 @@ const OrderCard = ({
               <span className="truncate">{order.reference}</span>
             </div>
           )}
+          {mapLink && (
+            <a
+              href={mapLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Ver no mapa</span>
+            </a>
+          )}
+          {order.observation && (
+            <div className="flex items-start gap-1.5 bg-muted/50 rounded p-1.5 mt-1">
+              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
+              <span className="text-muted-foreground italic">{order.observation}</span>
+            </div>
+          )}
+          {order.change_for && order.payment_method === "cash" && (
+            <div className="text-xs text-muted-foreground">
+              💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}
+            </div>
+          )}
+          {order.table_number && (
+            <div className="text-xs text-muted-foreground">
+              🍽️ Mesa: {order.table_number}
+            </div>
+          )}
         </div>
 
         <div className="border-t border-border pt-2 mb-3">
           {order.order_items?.map((item) => (
-            <div key={item.id} className="flex justify-between text-sm py-0.5">
-              <span>
-                {item.quantity}x {item.product_name}
-              </span>
-              <span className="text-muted-foreground">
-                R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}
-              </span>
+            <div key={item.id} className="text-sm py-0.5">
+              <div className="flex justify-between">
+                <span>
+                  {item.quantity}x {item.product_name}
+                </span>
+                <span className="text-muted-foreground">
+                  R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+              {item.observation && (
+                <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
+              )}
             </div>
           ))}
+          {Number(order.delivery_fee) > 0 && (
+            <div className="flex justify-between text-sm py-0.5 text-muted-foreground">
+              <span>🛵 Taxa de entrega</span>
+              <span>R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between items-center border-t border-border pt-2">
@@ -99,29 +178,70 @@ const OrderCard = ({
             R$ {Number(order.total).toFixed(2).replace(".", ",")}
           </span>
 
-          {isPending ? (
-            <Button
-              size="sm"
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => onAccept(order)}
-            >
-              ✅ Aceitar
-            </Button>
-          ) : next ? (
-            <Button
-              size="sm"
-              onClick={() => {
-                if (next === "out_for_delivery" && order.order_type === "delivery") {
-                  onSelectDelivery(order);
-                } else {
-                  onAdvance(order);
-                }
-              }}
-            >
-              {next === "out_for_delivery" ? "Enviar" : "Avançar"}
-              <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            {isPending ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => onReject(order)}
+                >
+                  ❌ Rejeitar
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => onAccept(order)}
+                >
+                  ✅ Aceitar
+                </Button>
+              </>
+            ) : order.status === "out_for_delivery" ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCancel(order)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => onMarkDelivered(order)}
+                >
+                  ✅ Entregue
+                </Button>
+              </>
+            ) : next ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCancel(order)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (next === "out_for_delivery" && order.order_type === "delivery") {
+                      onSelectDelivery(order);
+                    } else {
+                      onAdvance(order);
+                    }
+                  }}
+                >
+                  {next === "out_for_delivery" ? "Enviar" : "Avançar"}
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="text-xs text-muted-foreground mt-2">
+          {order.created_at && new Date(order.created_at).toLocaleString("pt-BR")}
         </div>
       </CardContent>
     </Card>
@@ -134,6 +254,7 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [selectedDeliveryPerson, setSelectedDeliveryPerson] = useState("");
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+  const [cancelOrder, setCancelOrder] = useState<OrderWithItems | null>(null);
   const [autoAccept, setAutoAccept] = useState(() => {
     return localStorage.getItem("truebox_auto_accept") === "true";
   });
@@ -178,14 +299,13 @@ const Orders = () => {
   }, []);
 
   const startLoopingSound = useCallback(() => {
-    if (soundIntervalRef.current) return; // already playing
+    if (soundIntervalRef.current) return;
     playBurst();
     soundIntervalRef.current = setInterval(() => {
       playBurst();
-    }, 3000); // repeat every 3 seconds
+    }, 3000);
   }, [playBurst]);
 
-  // Check if there are pending orders and manage sound
   useEffect(() => {
     const hasPending = orders.some((o) => o.status === "pending");
     if (hasPending && !autoAccept) {
@@ -195,7 +315,6 @@ const Orders = () => {
     }
   }, [orders, autoAccept, startLoopingSound, stopSound]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => stopSound();
   }, [stopSound]);
@@ -234,7 +353,6 @@ const Orders = () => {
         toast.success("🔔 Novo pedido recebido!");
         fetchOrders();
 
-        // Auto-accept if enabled
         if (autoAcceptRef.current && payload.new && (payload.new as any).id) {
           supabase
             .from("orders")
@@ -270,6 +388,20 @@ const Orders = () => {
     }
   };
 
+  const rejectOrder = async (order: OrderWithItems) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "cancelled" as any })
+      .eq("id", order.id);
+
+    if (error) {
+      toast.error("Erro ao rejeitar pedido");
+    } else {
+      toast.success(`Pedido #${order.order_number} rejeitado`);
+      fetchOrders();
+    }
+  };
+
   const advanceOrder = async (order: OrderWithItems) => {
     const nextStatus: Record<string, string> = {
       production: "ready",
@@ -288,6 +420,36 @@ const Orders = () => {
       toast.error("Erro ao atualizar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} → ${statusLabels[newStatus]}`);
+      fetchOrders();
+    }
+  };
+
+  const markDelivered = async (order: OrderWithItems) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "delivered" as any })
+      .eq("id", order.id);
+
+    if (error) {
+      toast.error("Erro ao finalizar pedido");
+    } else {
+      toast.success(`Pedido #${order.order_number} entregue! ✅`);
+      fetchOrders();
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelOrder) return;
+    const { error } = await supabase
+      .from("orders")
+      .update({ status: "cancelled" as any })
+      .eq("id", cancelOrder.id);
+
+    if (error) {
+      toast.error("Erro ao cancelar pedido");
+    } else {
+      toast.success(`Pedido #${cancelOrder.order_number} cancelado`);
+      setCancelOrder(null);
       fetchOrders();
     }
   };
@@ -339,7 +501,6 @@ const Orders = () => {
 
   return (
     <div className="space-y-4">
-      {/* Top bar with auto-accept toggle */}
       <div className="flex items-center justify-between bg-card border border-border rounded-lg p-3">
         <div className="flex items-center gap-2">
           {pendingCount > 0 && !autoAccept && (
@@ -378,8 +539,11 @@ const Orders = () => {
                       key={order.id}
                       order={order}
                       onAccept={acceptOrder}
+                      onReject={rejectOrder}
                       onAdvance={advanceOrder}
                       onSelectDelivery={handleSelectDelivery}
+                      onMarkDelivered={markDelivered}
+                      onCancel={(o) => setCancelOrder(o)}
                       isPending={order.status === "pending"}
                     />
                   ))
@@ -390,6 +554,7 @@ const Orders = () => {
         })}
       </div>
 
+      {/* Delivery person dialog */}
       <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
         <DialogContent>
           <DialogHeader>
@@ -417,6 +582,24 @@ const Orders = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel confirmation dialog */}
+      <AlertDialog open={!!cancelOrder} onOpenChange={(open) => !open && setCancelOrder(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Pedido #{cancelOrder?.order_number}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação não pode ser desfeita. O pedido de {cancelOrder?.customer_name} será cancelado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelOrder} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Cancelar Pedido
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
