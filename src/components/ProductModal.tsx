@@ -158,7 +158,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
             {hasGroups && (
               <div className="mb-4 space-y-3">
                 {extraGroups.map((group) => {
-                  const isExpanded = expandedGroups[group.id] !== false; // default expanded
+                  const isExpanded = !!expandedGroups[group.id];
                   const selectedCount = getGroupSelectedCount(group.id);
                   const isFull = selectedCount >= group.max_select;
 
