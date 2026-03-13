@@ -65,6 +65,11 @@ const App = () => (
               <Route path="delivery-persons" element={<DeliveryPersons />} />
             </Route>
 
+            {/* Waiter App */}
+            <Route path="/waiter/login" element={<WaiterLogin />} />
+            <Route path="/waiter" element={<WaiterDashboard />} />
+            <Route path="/waiter/new-order" element={<WaiterNewOrder />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
