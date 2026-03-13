@@ -151,23 +151,47 @@ const NewOrder = () => {
     }
   };
 
-  const toggleModalExtra = (extra: ExtraItem, groupId: string) => {
+  const getModalExtraQty = (extraId: string) => {
+    const found = modalExtras.find(e => e.id === extraId);
+    return found?.quantity || 0;
+  };
+
+  const getModalGroupCount = (groupId: string) => {
+    const group = extraGroups.find(g => g.id === groupId);
+    if (!group) return 0;
+    return modalExtras
+      .filter(se => group.extras.some(e => e.id === se.id))
+      .reduce((sum, se) => sum + se.quantity, 0);
+  };
+
+  const changeModalExtraQty = (extra: ExtraItem, groupId: string, delta: number) => {
     const group = extraGroups.find(g => g.id === groupId);
     if (!group) return;
-    setModalExtras(prev => {
-      const exists = prev.find(e => e.id === extra.id);
-      if (exists) return prev.filter(e => e.id !== extra.id);
-      const groupCount = prev.filter(e => {
-        const ext = extraGroups.flatMap(g => g.extras).find(x => x.id === e.id);
-        return ext?.group_id === groupId;
-      }).length;
-      if (groupCount >= group.max_select) {
-        toast.error(`Máximo de ${group.max_select} para ${group.name}`);
-        return prev;
-      }
-      return [...prev, { id: extra.id, name: extra.name, price: extra.price }];
-    });
+    const currentQty = getModalExtraQty(extra.id);
+    const newQty = currentQty + delta;
+    const maxPerItem = extra.max_quantity || 99;
+
+    if (newQty <= 0) {
+      setModalExtras(prev => prev.filter(e => e.id !== extra.id));
+      return;
+    }
+    if (newQty > maxPerItem) return;
+
+    if (delta > 0 && getModalGroupCount(groupId) >= group.max_select) {
+      toast.error(`Máximo de ${group.max_select} para ${group.name}`);
+      return;
+    }
+
+    if (currentQty === 0) {
+      setModalExtras(prev => [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }]);
+    } else {
+      setModalExtras(prev => prev.map(e => e.id === extra.id ? { ...e, quantity: newQty } : e));
+    }
   };
+
+  const hasModalUnmetRequirements = extrasModal ? getProductExtras(extrasModal).some(
+    g => g.is_required && getModalGroupCount(g.id) < g.max_select
+  ) : false;
 
   const updateQuantity = (uid: string, delta: number) => {
     setCart(prev => prev.map(c => {
