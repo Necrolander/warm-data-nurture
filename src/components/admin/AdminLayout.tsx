@@ -63,6 +63,38 @@ const AdminLayout = () => {
     if (data) setStoreOpen(data.value === "true");
   };
 
+  // Print queue listener - auto-prints when waiter sends print job
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-print-queue")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "print_queue" },
+        async (payload: any) => {
+          const record = payload.new;
+          if (record && !record.printed && record.content) {
+            // Open print window
+            const win = window.open("", "_blank", "width=320,height=700");
+            if (win) {
+              win.document.write(record.content);
+              win.document.close();
+              // Auto-print is triggered by the HTML content's onload script
+              // For order tickets (no onload script), trigger manually
+              if (!record.content.includes("window.print()")) {
+                setTimeout(() => win.print(), 500);
+              }
+            }
+            // Mark as printed
+            await supabase.from("print_queue" as any).update({ printed: true } as any).eq("id", record.id);
+            toast.success(`📠 Impressão: ${record.type === "bill" ? "Fechamento de conta" : "Comanda"}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
