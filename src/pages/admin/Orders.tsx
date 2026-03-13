@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare } from "lucide-react";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -57,6 +57,89 @@ const getMapLink = (order: Order) => {
   return null;
 };
 
+const printOrderTicket = (order: OrderWithItems) => {
+  const mapLink = getMapLink(order);
+  const printWindow = window.open("", "_blank", "width=400,height=600");
+  if (!printWindow) {
+    toast.error("Popup bloqueado! Permita popups para imprimir.");
+    return;
+  }
+
+  const itemsHtml = order.order_items?.map((item) => {
+    const extras = item.extras && Array.isArray(item.extras) && item.extras.length > 0
+      ? `<div style="font-size:11px;color:#666;margin-left:12px;">${(item.extras as any[]).map((e: any) => `+ ${e.name || e}`).join(", ")}</div>`
+      : "";
+    const obs = item.observation ? `<div style="font-size:11px;color:#666;margin-left:12px;font-style:italic;">📝 ${item.observation}</div>` : "";
+    return `
+      <div style="display:flex;justify-content:space-between;padding:2px 0;">
+        <span>${item.quantity}x ${item.product_name}</span>
+        <span>R$ ${(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
+      </div>
+      ${extras}${obs}
+    `;
+  }).join("") || "";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Comanda #${order.order_number}</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; font-size: 13px; width: 80mm; padding: 8px; }
+        .center { text-align: center; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 6px 0; }
+        .row { display: flex; justify-content: space-between; padding: 1px 0; }
+        .total { font-size: 16px; font-weight: bold; }
+        h1 { font-size: 18px; margin-bottom: 4px; }
+        h2 { font-size: 14px; margin: 4px 0; }
+        @media print { body { width: 80mm; } }
+      </style>
+    </head>
+    <body>
+      <div class="center">
+        <h1>COMANDA #${order.order_number}</h1>
+        <p>${new Date(order.created_at || "").toLocaleString("pt-BR")}</p>
+      </div>
+      <div class="divider"></div>
+      
+      <div>
+        <p class="bold">${order.customer_name}</p>
+        <p>📞 ${order.customer_phone}</p>
+        <p>📦 ${orderTypeLabels[order.order_type] || order.order_type}</p>
+        ${order.payment_method ? `<p>💳 ${paymentLabels[order.payment_method] || order.payment_method}</p>` : ""}
+        ${order.reference ? `<p>📍 ${order.reference}</p>` : ""}
+        ${mapLink ? `<p>🗺️ <a href="${mapLink}">${mapLink}</a></p>` : ""}
+        ${order.table_number ? `<p>🍽️ Mesa: ${order.table_number}</p>` : ""}
+        ${order.change_for && order.payment_method === "cash" ? `<p>💵 Troco para: R$ ${Number(order.change_for).toFixed(2).replace(".", ",")}</p>` : ""}
+      </div>
+      <div class="divider"></div>
+      
+      <h2>ITENS</h2>
+      ${itemsHtml}
+      
+      <div class="divider"></div>
+      ${Number(order.delivery_fee) > 0 ? `<div class="row"><span>Taxa entrega</span><span>R$ ${Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span></div>` : ""}
+      <div class="row"><span>Subtotal</span><span>R$ ${Number(order.subtotal).toFixed(2).replace(".", ",")}</span></div>
+      <div class="divider"></div>
+      <div class="row total"><span>TOTAL</span><span>R$ ${Number(order.total).toFixed(2).replace(".", ",")}</span></div>
+      
+      ${order.observation ? `<div class="divider"></div><p style="font-style:italic;">OBS: ${order.observation}</p>` : ""}
+      
+      <div class="divider"></div>
+      <p class="center" style="font-size:11px;margin-top:8px;">TrueBox Delivery</p>
+      
+      <script>window.onload = function() { window.print(); }</script>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+};
+
 const OrderCard = ({
   order,
   onAccept,
@@ -65,6 +148,7 @@ const OrderCard = ({
   onSelectDelivery,
   onMarkDelivered,
   onCancel,
+  onPrint,
   isPending,
 }: {
   order: OrderWithItems;
@@ -74,6 +158,7 @@ const OrderCard = ({
   onSelectDelivery: (order: OrderWithItems) => void;
   onMarkDelivered: (order: OrderWithItems) => void;
   onCancel: (order: OrderWithItems) => void;
+  onPrint: (order: OrderWithItems) => void;
   isPending: boolean;
 }) => {
   const nextStatus: Record<string, string> = {
@@ -89,7 +174,10 @@ const OrderCard = ({
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="font-bold text-primary">#{order.order_number}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onPrint(order)} title="Imprimir comanda">
+              <Printer className="h-3.5 w-3.5" />
+            </Button>
             <Badge className={statusColors[order.status]}>{statusLabels[order.status]}</Badge>
           </div>
         </div>
@@ -138,14 +226,10 @@ const OrderCard = ({
             </div>
           )}
           {order.change_for && order.payment_method === "cash" && (
-            <div className="text-xs text-muted-foreground">
-              💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}
-            </div>
+            <div className="text-xs text-muted-foreground">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
           )}
           {order.table_number && (
-            <div className="text-xs text-muted-foreground">
-              🍽️ Mesa: {order.table_number}
-            </div>
+            <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>
           )}
         </div>
 
@@ -153,12 +237,8 @@ const OrderCard = ({
           {order.order_items?.map((item) => (
             <div key={item.id} className="text-sm py-0.5">
               <div className="flex justify-between">
-                <span>
-                  {item.quantity}x {item.product_name}
-                </span>
-                <span className="text-muted-foreground">
-                  R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}
-                </span>
+                <span>{item.quantity}x {item.product_name}</span>
+                <span className="text-muted-foreground">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
               </div>
               {item.observation && (
                 <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
@@ -343,6 +423,18 @@ const Orders = () => {
     autoAcceptRef.current = autoAccept;
   }, [autoAccept]);
 
+  // Auto-print helper: fetch full order with items then print
+  const autoPrintOrder = useCallback(async (orderId: string) => {
+    const { data } = await supabase
+      .from("orders")
+      .select("*, order_items(*)")
+      .eq("id", orderId)
+      .single();
+    if (data) {
+      printOrderTicket(data as OrderWithItems);
+    }
+  }, []);
+
   useEffect(() => {
     fetchOrders();
     fetchDeliveryPersons();
@@ -362,6 +454,8 @@ const Orders = () => {
               if (!error) {
                 toast.success(`Pedido #${(payload.new as any).order_number} aceito automaticamente!`);
                 fetchOrders();
+                // Auto-print on auto-accept
+                autoPrintOrder((payload.new as any).id);
               }
             });
         }
@@ -372,7 +466,7 @@ const Orders = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
+  }, [autoPrintOrder]);
 
   const acceptOrder = async (order: OrderWithItems) => {
     const { error } = await supabase
@@ -384,6 +478,8 @@ const Orders = () => {
       toast.error("Erro ao aceitar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} aceito! → Em Produção`);
+      // Print ticket on accept
+      printOrderTicket(order);
       fetchOrders();
     }
   };
@@ -544,6 +640,7 @@ const Orders = () => {
                       onSelectDelivery={handleSelectDelivery}
                       onMarkDelivered={markDelivered}
                       onCancel={(o) => setCancelOrder(o)}
+                      onPrint={printOrderTicket}
                       isPending={order.status === "pending"}
                     />
                   ))
