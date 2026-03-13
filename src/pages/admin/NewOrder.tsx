@@ -266,7 +266,7 @@ const NewOrder = () => {
   };
 
   const getCartItemTotal = (item: CartItem) => {
-    const extrasTotal = item.extras.reduce((s, e) => s + Number(e.price), 0);
+    const extrasTotal = item.extras.reduce((s, e) => s + Number(e.price) * (e.quantity || 1), 0);
     return (Number(item.product.price) + extrasTotal) * item.quantity;
   };
 
