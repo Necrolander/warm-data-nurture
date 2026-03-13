@@ -17,18 +17,23 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
   const [quantity, setQuantity] = useState(1);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  if (!product) return null;
-
-  const extraGroups = product.extraGroups || [];
+  const extraGroups = product?.extraGroups || [];
   const hasGroups = extraGroups.length > 0;
 
   useEffect(() => {
+    if (!product) {
+      setExpandedGroups({});
+      return;
+    }
+
     const initialExpanded: Record<string, boolean> = {};
     extraGroups.forEach((group, index) => {
       initialExpanded[group.id] = index === 0;
     });
     setExpandedGroups(initialExpanded);
-  }, [product.id]);
+  }, [product?.id]);
+
+  if (!product) return null;
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
