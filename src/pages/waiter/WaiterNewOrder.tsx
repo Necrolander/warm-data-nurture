@@ -26,6 +26,8 @@ interface ExtraItem {
   id: string;
   name: string;
   price: number;
+  max_quantity: number;
+  description: string | null;
   image_url: string | null;
   group_id: string | null;
 }
@@ -43,6 +45,7 @@ interface SelectedExtra {
   id: string;
   name: string;
   price: number;
+  quantity: number;
 }
 
 interface CartItem {
@@ -101,7 +104,7 @@ const WaiterNewOrder = () => {
           applies_to_categories: g.applies_to_categories,
           extras: extrasRes.data
             .filter((e: any) => e.group_id === g.id)
-            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), image_url: e.image_url, group_id: e.group_id })),
+            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), max_quantity: e.max_quantity || 4, description: e.description || null, image_url: e.image_url, group_id: e.group_id })),
         })).filter((g: ExtraGroupData) => g.extras.length > 0);
         setExtraGroups(groups);
       }
@@ -184,27 +187,48 @@ const WaiterNewOrder = () => {
     }
   };
 
-  const toggleExtra = (extra: ExtraItem, groupId: string) => {
+  const getExtraQty = (extraId: string) => {
+    const found = selectedExtras.find(e => e.id === extraId);
+    return found?.quantity || 0;
+  };
+
+  const getGroupSelectedCount = (groupId: string) => {
+    const group = extraGroups.find(g => g.id === groupId);
+    if (!group) return 0;
+    return selectedExtras
+      .filter(se => group.extras.some(e => e.id === se.id))
+      .reduce((sum, se) => sum + se.quantity, 0);
+  };
+
+  const changeExtraQty = (extra: ExtraItem, groupId: string, delta: number) => {
     const group = extraGroups.find(g => g.id === groupId);
     if (!group) return;
+    const currentQty = getExtraQty(extra.id);
+    const newQty = currentQty + delta;
+    const maxPerItem = extra.max_quantity || 99;
 
-    setSelectedExtras(prev => {
-      const exists = prev.find(e => e.id === extra.id);
-      if (exists) {
-        return prev.filter(e => e.id !== extra.id);
-      }
-      // Check max_select for this group
-      const groupCount = prev.filter(e => {
-        const ext = extraGroups.flatMap(g => g.extras).find(x => x.id === e.id);
-        return ext?.group_id === groupId;
-      }).length;
-      if (groupCount >= group.max_select) {
-        toast.error(`Máximo de ${group.max_select} seleções para ${group.name}`);
-        return prev;
-      }
-      return [...prev, { id: extra.id, name: extra.name, price: extra.price }];
-    });
+    if (newQty <= 0) {
+      setSelectedExtras(prev => prev.filter(e => e.id !== extra.id));
+      return;
+    }
+    if (newQty > maxPerItem) return;
+
+    const groupCount = getGroupSelectedCount(groupId);
+    if (delta > 0 && groupCount >= group.max_select) {
+      toast.error(`Máximo de ${group.max_select} para ${group.name}`);
+      return;
+    }
+
+    if (currentQty === 0) {
+      setSelectedExtras(prev => [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }]);
+    } else {
+      setSelectedExtras(prev => prev.map(e => e.id === extra.id ? { ...e, quantity: newQty } : e));
+    }
   };
+
+  const hasUnmetRequirements = extrasModal ? getProductExtras(extrasModal).some(
+    g => g.is_required && getGroupSelectedCount(g.id) < g.max_select
+  ) : false;
 
   const updateQty = (uid: string, delta: number) => {
     setCart((prev) =>
@@ -217,7 +241,7 @@ const WaiterNewOrder = () => {
   };
 
   const subtotal = cart.reduce((s, i) => {
-    const extrasTotal = i.extras.reduce((es, e) => es + e.price, 0);
+    const extrasTotal = i.extras.reduce((es, e) => es + e.price * (e.quantity || 1), 0);
     return s + (i.product.price + extrasTotal) * i.quantity;
   }, 0);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
@@ -519,10 +543,8 @@ const WaiterNewOrder = () => {
               <p className="text-primary font-bold">R$ {extrasModal.price.toFixed(2).replace(".", ",")}</p>
 
               {getProductExtras(extrasModal).map((group) => {
-                const groupSelectedCount = selectedExtras.filter(se => {
-                  const ext = group.extras.find(e => e.id === se.id);
-                  return !!ext;
-                }).length;
+                const groupSelectedCount = getGroupSelectedCount(group.id);
+                const isFull = groupSelectedCount >= group.max_select;
 
                 return (
                   <div key={group.id} className="space-y-2 border-t border-border pt-3">
@@ -534,23 +556,39 @@ const WaiterNewOrder = () => {
                       </div>
                     </div>
                     {group.extras.map((extra) => {
-                      const isSelected = selectedExtras.some(e => e.id === extra.id);
+                      const qty = getExtraQty(extra.id);
+                      const maxPerItem = extra.max_quantity || 99;
                       return (
                         <div
                           key={extra.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${isSelected ? "border-primary bg-primary/5" : "border-border"}`}
-                          onClick={() => toggleExtra(extra, group.id)}
+                          className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${qty > 0 ? "border-primary bg-primary/5" : "border-border"}`}
                         >
-                          <Checkbox checked={isSelected} />
                           {extra.image_url && (
                             <img src={extra.image_url} alt={extra.name} className="w-10 h-10 rounded object-cover" />
                           )}
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground">{extra.name}</p>
+                            {extra.description && <p className="text-xs text-muted-foreground">{extra.description}</p>}
+                            {extra.price > 0 && (
+                              <p className="text-xs font-bold text-primary">R$ {extra.price.toFixed(2).replace(".", ",")}</p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground">Máx {maxPerItem}</p>
                           </div>
-                          {extra.price > 0 && (
-                            <span className="text-xs font-bold text-primary">+R$ {extra.price.toFixed(2).replace(".", ",")}</span>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {qty > 0 && (
+                              <button onClick={() => changeExtraQty(extra, group.id, -1)} className="w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center">
+                                <Minus className="w-3 h-3" />
+                              </button>
+                            )}
+                            {qty > 0 && <span className="text-sm font-bold w-5 text-center">{qty}</span>}
+                            <button
+                              onClick={() => changeExtraQty(extra, group.id, 1)}
+                              disabled={isFull || qty >= maxPerItem}
+                              className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -558,9 +596,12 @@ const WaiterNewOrder = () => {
                 );
               })}
 
-              <Button onClick={confirmExtras} className="w-full mt-4">
+              <Button onClick={confirmExtras} disabled={hasUnmetRequirements} className="w-full mt-4">
                 Adicionar ao pedido
               </Button>
+              {hasUnmetRequirements && (
+                <p className="text-xs text-destructive text-center mt-1">Selecione os itens obrigatórios</p>
+              )}
             </>
           )}
         </DialogContent>

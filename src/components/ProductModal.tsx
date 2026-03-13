@@ -41,10 +41,17 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
   const isExtraSelected = (extraId: string) => !!selectedExtras.find((e) => e.id === extraId);
 
+  const getExtraQuantity = (extraId: string) => {
+    const found = selectedExtras.find((e) => e.id === extraId);
+    return found?.quantity || 0;
+  };
+
   const getGroupSelectedCount = (groupId: string) => {
     const group = extraGroups.find((g) => g.id === groupId);
     if (!group) return 0;
-    return selectedExtras.filter((se) => group.extras.some((ge) => ge.id === se.id)).length;
+    return selectedExtras
+      .filter((se) => group.extras.some((ge) => ge.id === se.id))
+      .reduce((sum, se) => sum + (se.quantity || 1), 0);
   };
 
   const canSelectInGroup = (groupId: string) => {
@@ -53,18 +60,36 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
     return getGroupSelectedCount(groupId) < group.max_select;
   };
 
-  const handleToggleGroupExtra = (groupId: string, extra: { id: string; name: string; price: number }) => {
-    const isSelected = isExtraSelected(extra.id);
-    if (isSelected) {
+  const handleChangeExtraQty = (groupId: string, extra: { id: string; name: string; price: number; max_quantity: number }, delta: number) => {
+    const currentQty = getExtraQuantity(extra.id);
+    const newQty = currentQty + delta;
+    const maxPerItem = extra.max_quantity || 99;
+
+    if (newQty <= 0) {
       setSelectedExtras((prev) => prev.filter((e) => e.id !== extra.id));
-    } else if (canSelectInGroup(groupId)) {
-      setSelectedExtras((prev) => [...prev, { id: extra.id, name: extra.name, price: extra.price }]);
+      return;
+    }
+
+    if (newQty > maxPerItem) return;
+
+    if (delta > 0 && !canSelectInGroup(groupId)) return;
+
+    if (currentQty === 0) {
+      setSelectedExtras((prev) => [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }]);
+    } else {
+      setSelectedExtras((prev) =>
+        prev.map((e) => (e.id === extra.id ? { ...e, quantity: newQty } : e))
+      );
     }
   };
 
-  const extrasTotal = selectedExtras.reduce((s, e) => s + e.price, 0);
+  const extrasTotal = selectedExtras.reduce((s, e) => s + e.price * (e.quantity || 1), 0);
   const unitTotal = product.price + extrasTotal;
   const total = unitTotal * quantity;
+
+  const hasUnmetRequirements = extraGroups.some(
+    (g) => g.is_required && getGroupSelectedCount(g.id) < g.max_select
+  );
 
   const handleAdd = () => {
     for (let i = 0; i < quantity; i++) {
@@ -203,20 +228,14 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                           >
                             <div className="divide-y divide-border">
                               {group.extras.map((extra) => {
-                                const selected = isExtraSelected(extra.id);
-                                const disabled = !selected && isFull;
+                                const qty = getExtraQuantity(extra.id);
+                                const maxPerItem = extra.max_quantity || 99;
 
                                 return (
-                                  <button
+                                  <div
                                     key={extra.id}
-                                    onClick={() => handleToggleGroupExtra(group.id, extra)}
-                                    disabled={disabled}
                                     className={`w-full flex items-center justify-between p-3.5 transition-all ${
-                                      selected
-                                        ? "bg-primary/10"
-                                        : disabled
-                                        ? "opacity-50 cursor-not-allowed bg-background"
-                                        : "hover:bg-muted/30 bg-background"
+                                      qty > 0 ? "bg-primary/10" : "bg-background"
                                     }`}
                                   >
                                     <div className="flex items-center gap-3 text-left">
@@ -227,28 +246,40 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                                         />
                                       )}
-                                      {!extra.image_url && (
-                                        <div
-                                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                            selected ? "bg-primary border-primary" : "border-muted-foreground"
-                                          }`}
-                                        >
-                                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
-                                        </div>
-                                      )}
                                       <div>
                                         <span className="text-foreground font-medium text-sm">{extra.name}</span>
                                         {extra.description && (
                                           <p className="text-xs text-muted-foreground">{extra.description}</p>
                                         )}
+                                        {extra.price > 0 && (
+                                          <p className="text-primary font-bold text-xs">
+                                            R$ {extra.price.toFixed(2).replace(".", ",")}
+                                          </p>
+                                        )}
+                                        <p className="text-[10px] text-muted-foreground">Máx {maxPerItem}</p>
                                       </div>
                                     </div>
-                                    {extra.price > 0 && (
-                                      <span className="text-primary font-bold text-sm flex-shrink-0 ml-2">
-                                        R$ {extra.price.toFixed(2).replace(".", ",")}
-                                      </span>
-                                    )}
-                                  </button>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      {qty > 0 && (
+                                        <button
+                                          onClick={() => handleChangeExtraQty(group.id, extra, -1)}
+                                          className="w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center"
+                                        >
+                                          <Minus className="w-3 h-3 text-foreground" />
+                                        </button>
+                                      )}
+                                      {qty > 0 && (
+                                        <span className="text-sm font-bold text-foreground w-5 text-center">{qty}</span>
+                                      )}
+                                      <button
+                                        onClick={() => handleChangeExtraQty(group.id, extra, 1)}
+                                        disabled={isFull || qty >= maxPerItem}
+                                        className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
@@ -276,10 +307,13 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
             {/* Add to cart button */}
             <motion.div whileTap={{ scale: 0.97 }}>
-              <Button onClick={handleAdd} className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2" size="lg">
+              <Button onClick={handleAdd} disabled={hasUnmetRequirements} className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2 disabled:opacity-50" size="lg">
                 <ShoppingCart className="w-5 h-5" />
                 Adicionar {quantity > 1 ? `(${quantity})` : ""} — R$ {total.toFixed(2).replace(".", ",")}
               </Button>
+              {hasUnmetRequirements && (
+                <p className="text-xs text-destructive text-center mt-2">Selecione os itens obrigatórios para continuar</p>
+              )}
             </motion.div>
           </div>
         </motion.div>

@@ -50,7 +50,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
               <>
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
                   {items.map((item) => {
-                    const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+                    const extrasTotal = item.extras.reduce((s, e) => s + e.price * (e.quantity || 1), 0);
                     const itemTotal = (item.product.price + extrasTotal) * item.quantity;
                     return (
                       <div key={item.id} className="bg-muted rounded-xl p-4">
@@ -64,7 +64,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
                             <h4 className="font-bold text-foreground text-sm truncate">{item.product.name}</h4>
                             {item.extras.length > 0 && (
                               <p className="text-xs text-muted-foreground truncate">
-                                + {item.extras.map((e) => e.name).join(", ")}
+                                + {item.extras.map((e) => `${(e.quantity || 1) > 1 ? `${e.quantity}x ` : ""}${e.name}`).join(", ")}
                               </p>
                             )}
                             {item.observation && (
