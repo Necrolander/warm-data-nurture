@@ -23,11 +23,32 @@ export interface DbCategory {
 export interface DbExtra {
   id: string;
   name: string;
+  description: string | null;
   price: number;
+  group_id: string | null;
+  max_quantity: number | null;
+}
+
+export interface DbExtraGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  max_select: number;
+  is_required: boolean;
+  sort_order: number | null;
+}
+
+export interface ExtraGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  max_select: number;
+  is_required: boolean;
+  extras: { id: string; name: string; description: string | null; price: number; max_quantity: number }[];
 }
 
 // Map DB product to the Product interface used by components
-export function mapDbProduct(p: DbProduct, extras: DbExtra[]) {
+export function mapDbProduct(p: DbProduct, extraGroups: ExtraGroup[]) {
   return {
     id: p.id,
     name: p.name,
@@ -36,7 +57,9 @@ export function mapDbProduct(p: DbProduct, extras: DbExtra[]) {
     image: p.image_url || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&h=400&fit=crop",
     category: p.category,
     badges: p.badges || undefined,
-    extras: extras.map((e) => ({ id: e.id, name: e.name, price: Number(e.price) })),
+    extraGroups,
+    // Keep flat extras for backward compat
+    extras: extraGroups.flatMap((g) => g.extras.map((e) => ({ id: e.id, name: e.name, price: e.price }))),
   };
 }
 
@@ -85,6 +108,42 @@ export function useExtras() {
   });
 }
 
+export function useExtraGroups() {
+  return useQuery({
+    queryKey: ["public-extra-groups"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("extra_groups")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data as DbExtraGroup[];
+    },
+  });
+}
+
+export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbExtra[] | undefined): ExtraGroup[] {
+  if (!groups || !extras) return [];
+  
+  return groups.map((g) => ({
+    id: g.id,
+    name: g.name,
+    description: g.description,
+    max_select: g.max_select,
+    is_required: g.is_required,
+    extras: extras
+      .filter((e) => e.group_id === g.id)
+      .map((e) => ({
+        id: e.id,
+        name: e.name,
+        description: e.description,
+        price: Number(e.price),
+        max_quantity: e.max_quantity || 1,
+      })),
+  })).filter((g) => g.extras.length > 0);
+}
+
 export function useStoreSettings() {
   return useQuery({
     queryKey: ["public-store-settings"],
@@ -116,12 +175,10 @@ export function useStoreSchedule() {
 
 export function useIsStoreOpen(settings: Record<string, string> | undefined, schedule: any[] | undefined) {
   if (!settings || !schedule) return null;
-
-  // Check manual override
   if (settings.store_open === "false") return false;
 
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0=Sun
+  const dayOfWeek = now.getDay();
   const todaySchedule = schedule.find((s) => s.day_of_week === dayOfWeek);
 
   if (!todaySchedule || !todaySchedule.is_open) return false;

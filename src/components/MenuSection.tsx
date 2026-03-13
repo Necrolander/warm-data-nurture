@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { useProducts, useCategories, useExtras, mapDbProduct } from "@/hooks/usePublicData";
+import { useProducts, useCategories, useExtras, useExtraGroups, buildExtraGroups, mapDbProduct } from "@/hooks/usePublicData";
 import { Product } from "@/data/products";
 import ProductCard from "./ProductCard";
 import ProductModal from "./ProductModal";
@@ -11,6 +11,7 @@ const MenuSection = () => {
   const { data: dbProducts, isLoading: loadingProducts } = useProducts();
   const { data: dbCategories, isLoading: loadingCategories } = useCategories();
   const { data: dbExtras } = useExtras();
+  const { data: dbExtraGroups } = useExtraGroups();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -18,8 +19,8 @@ const MenuSection = () => {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const categoryBarRef = useRef<HTMLDivElement>(null);
 
-  const extras = dbExtras || [];
-  const products: Product[] = (dbProducts || []).map((p) => mapDbProduct(p, extras));
+  const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
+  const products: Product[] = (dbProducts || []).map((p) => mapDbProduct(p, extraGroups));
   const categories = (dbCategories || []).map((c) => ({
     id: c.slug,
     name: c.icon ? `${c.icon} ${c.name}` : c.name,

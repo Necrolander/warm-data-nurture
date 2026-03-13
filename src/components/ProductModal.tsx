@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Minus, ShoppingCart, Check } from "lucide-react";
+import { X, Plus, Minus, ShoppingCart, Check, ChevronDown } from "lucide-react";
 import { Product, Extra } from "@/data/products";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "./ui/button";
@@ -15,10 +15,16 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
   const [selectedExtras, setSelectedExtras] = useState<Extra[]>([]);
   const [observation, setObservation] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   if (!product) return null;
 
-  const availableExtras = product.extras || [];
+  const extraGroups = product.extraGroups || [];
+  const hasGroups = extraGroups.length > 0;
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
+  };
 
   const toggleExtra = (extra: Extra) => {
     setSelectedExtras((prev) =>
@@ -26,6 +32,29 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
         ? prev.filter((e) => e.id !== extra.id)
         : [...prev, extra]
     );
+  };
+
+  const isExtraSelected = (extraId: string) => !!selectedExtras.find((e) => e.id === extraId);
+
+  const getGroupSelectedCount = (groupId: string) => {
+    const group = extraGroups.find((g) => g.id === groupId);
+    if (!group) return 0;
+    return selectedExtras.filter((se) => group.extras.some((ge) => ge.id === se.id)).length;
+  };
+
+  const canSelectInGroup = (groupId: string) => {
+    const group = extraGroups.find((g) => g.id === groupId);
+    if (!group) return false;
+    return getGroupSelectedCount(groupId) < group.max_select;
+  };
+
+  const handleToggleGroupExtra = (groupId: string, extra: { id: string; name: string; price: number }) => {
+    const isSelected = isExtraSelected(extra.id);
+    if (isSelected) {
+      setSelectedExtras((prev) => prev.filter((e) => e.id !== extra.id));
+    } else if (canSelectInGroup(groupId)) {
+      setSelectedExtras((prev) => [...prev, { id: extra.id, name: extra.name, price: extra.price }]);
+    }
   };
 
   const extrasTotal = selectedExtras.reduce((s, e) => s + e.price, 0);
@@ -39,6 +68,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
     setSelectedExtras([]);
     setObservation("");
     setQuantity(1);
+    setExpandedGroups({});
     onClose();
   };
 
@@ -46,6 +76,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
     setSelectedExtras([]);
     setObservation("");
     setQuantity(1);
+    setExpandedGroups({});
     onClose();
   };
 
@@ -68,11 +99,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
         >
           {/* Image */}
           <div className="relative h-64 sm:h-72">
-            <img
-              src={product.image}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
+            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent" />
             <button
               onClick={handleClose}
@@ -83,10 +110,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
             {product.badges && product.badges.length > 0 && (
               <div className="absolute top-4 left-4 flex gap-1.5">
                 {product.badges.map((b) => (
-                  <span
-                    key={b}
-                    className="bg-secondary text-secondary-foreground text-xs font-bold px-2.5 py-1 rounded-full shadow-sm"
-                  >
+                  <span key={b} className="bg-secondary text-secondary-foreground text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
                     {b}
                   </span>
                 ))}
@@ -115,9 +139,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                 >
                   <Minus className="w-4 h-4 text-foreground" />
                 </button>
-                <span className="text-xl font-black text-foreground w-8 text-center">
-                  {quantity}
-                </span>
+                <span className="text-xl font-black text-foreground w-8 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
                   className="bg-primary text-primary-foreground rounded-full p-2 hover:brightness-110 transition-all"
@@ -127,53 +149,108 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
               </div>
             </div>
 
-            {/* Extras */}
-            {availableExtras.length > 0 && (
-              <div className="mb-4">
-                <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
-                  🧀 Adicionais
-                  <span className="text-xs font-normal text-muted-foreground">Opcional</span>
-                </h3>
-                <div className="space-y-2">
-                  {availableExtras.map((extra) => {
-                    const selected = selectedExtras.find((e) => e.id === extra.id);
-                    return (
-                      <motion.button
-                        key={extra.id}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => toggleExtra(extra)}
-                        className={`w-full flex items-center justify-between p-3.5 rounded-xl border-2 transition-all duration-200 ${
-                          selected
-                            ? "border-primary bg-primary/10 shadow-sm"
-                            : "border-border hover:border-muted-foreground bg-background"
-                        }`}
+            {/* Grouped Extras */}
+            {hasGroups && (
+              <div className="mb-4 space-y-3">
+                {extraGroups.map((group) => {
+                  const isExpanded = expandedGroups[group.id] !== false; // default expanded
+                  const selectedCount = getGroupSelectedCount(group.id);
+                  const isFull = selectedCount >= group.max_select;
+
+                  return (
+                    <div key={group.id} className="border border-border rounded-xl overflow-hidden">
+                      {/* Group header */}
+                      <button
+                        onClick={() => toggleGroup(group.id)}
+                        className="w-full flex items-center justify-between p-4 bg-muted/50 hover:bg-muted transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                              selected
-                                ? "bg-primary border-primary"
-                                : "border-muted-foreground"
-                            }`}
-                          >
-                            {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+                        <div className="text-left">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-foreground">{group.name}</h3>
+                            {group.is_required && (
+                              <span className="text-xs bg-destructive text-destructive-foreground px-2 py-0.5 rounded-full font-bold">
+                                Obrigatório
+                              </span>
+                            )}
                           </div>
-                          <span className="text-foreground font-medium">{extra.name}</span>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {group.description || `Escolha até ${group.max_select} ${group.max_select === 1 ? 'item' : 'itens'}`}
+                            {selectedCount > 0 && (
+                              <span className="text-primary font-bold ml-1">
+                                ({selectedCount}/{group.max_select})
+                              </span>
+                            )}
+                          </p>
                         </div>
-                        <span className="text-primary font-bold text-sm">
-                          + R$ {extra.price.toFixed(2).replace(".", ",")}
-                        </span>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+                        <ChevronDown
+                          className={`w-5 h-5 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                        />
+                      </button>
+
+                      {/* Group items */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0 }}
+                            animate={{ height: "auto" }}
+                            exit={{ height: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="divide-y divide-border">
+                              {group.extras.map((extra) => {
+                                const selected = isExtraSelected(extra.id);
+                                const disabled = !selected && isFull;
+
+                                return (
+                                  <button
+                                    key={extra.id}
+                                    onClick={() => handleToggleGroupExtra(group.id, extra)}
+                                    disabled={disabled}
+                                    className={`w-full flex items-center justify-between p-3.5 transition-all ${
+                                      selected
+                                        ? "bg-primary/10"
+                                        : disabled
+                                        ? "opacity-50 cursor-not-allowed bg-background"
+                                        : "hover:bg-muted/30 bg-background"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3 text-left">
+                                      <div
+                                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                          selected ? "bg-primary border-primary" : "border-muted-foreground"
+                                        }`}
+                                      >
+                                        {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                      </div>
+                                      <div>
+                                        <span className="text-foreground font-medium text-sm">{extra.name}</span>
+                                        {extra.description && (
+                                          <p className="text-xs text-muted-foreground">{extra.description}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {extra.price > 0 && (
+                                      <span className="text-primary font-bold text-sm flex-shrink-0 ml-2">
+                                        R$ {extra.price.toFixed(2).replace(".", ",")}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             {/* Observation */}
             <div className="mb-5">
               <label className="text-sm font-medium text-foreground mb-1.5 block">
-                📝 Alguma observação?
+                📝 Observações
               </label>
               <textarea
                 value={observation}
@@ -185,11 +262,7 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
             {/* Add to cart button */}
             <motion.div whileTap={{ scale: 0.97 }}>
-              <Button
-                onClick={handleAdd}
-                className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2"
-                size="lg"
-              >
+              <Button onClick={handleAdd} className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2" size="lg">
                 <ShoppingCart className="w-5 h-5" />
                 Adicionar {quantity > 1 ? `(${quantity})` : ""} — R$ {total.toFixed(2).replace(".", ",")}
               </Button>
