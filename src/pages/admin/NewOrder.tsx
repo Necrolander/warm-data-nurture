@@ -26,16 +26,34 @@ interface Category {
   icon: string | null;
 }
 
-interface Extra {
+interface ExtraItem {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+  group_id: string | null;
+}
+
+interface ExtraGroupData {
+  id: string;
+  name: string;
+  max_select: number;
+  is_required: boolean;
+  applies_to_categories: string[] | null;
+  extras: ExtraItem[];
+}
+
+interface SelectedExtra {
   id: string;
   name: string;
   price: number;
 }
 
 interface CartItem {
+  uid: string;
   product: Product;
   quantity: number;
-  extras: Extra[];
+  extras: SelectedExtra[];
   observation: string;
 }
 
