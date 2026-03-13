@@ -11,6 +11,7 @@ const MenuSection = () => {
   const { data: dbProducts, isLoading: loadingProducts } = useProducts();
   const { data: dbCategories, isLoading: loadingCategories } = useCategories();
   const { data: dbExtras } = useExtras();
+  const { data: dbExtraGroups } = useExtraGroups();
 
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -18,8 +19,8 @@ const MenuSection = () => {
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const categoryBarRef = useRef<HTMLDivElement>(null);
 
-  const extras = dbExtras || [];
-  const products: Product[] = (dbProducts || []).map((p) => mapDbProduct(p, extras));
+  const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
+  const products: Product[] = (dbProducts || []).map((p) => mapDbProduct(p, extraGroups));
   const categories = (dbCategories || []).map((c) => ({
     id: c.slug,
     name: c.icon ? `${c.icon} ${c.name}` : c.name,
