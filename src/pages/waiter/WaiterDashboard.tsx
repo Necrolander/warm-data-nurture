@@ -4,11 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { LogOut, Plus, Clock, CheckCircle, RefreshCw, Edit, Printer, Receipt, Percent } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Database } from "@/integrations/supabase/types";
 
 type Order = Database["public"]["Tables"]["orders"]["Row"] & { service_charge?: number };
@@ -41,6 +39,165 @@ const statusColors: Record<string, string> = {
   delivered: "bg-muted text-muted-foreground border-muted",
   cancelled: "bg-destructive/20 text-destructive border-destructive/30",
 };
+
+const paymentLabels: Record<string, string> = {
+  pix: "PIX",
+  credit_card: "Cartão Crédito",
+  debit_card: "Cartão Débito",
+  cash: "Dinheiro",
+};
+
+function generateOrderTicketHtml(order: OrderWithItems) {
+  const items = order.order_items || [];
+  return `<html><head><style>
+    body { font-family: monospace; font-size: 12px; width: 280px; margin: 0 auto; }
+    h2 { text-align: center; margin: 5px 0; }
+    hr { border: 1px dashed #000; }
+    .item { display: flex; justify-content: space-between; }
+    .total { font-weight: bold; font-size: 14px; }
+  </style></head><body>
+    <h2>🍽️ COMANDA #${order.order_number}</h2>
+    <p>Mesa: ${order.table_number || "-"} | ${order.customer_name}</p>
+    <p>${new Date(order.created_at!).toLocaleString("pt-BR")}</p>
+    <hr/>
+    ${items.map(i => {
+      const extras = Array.isArray(i.extras) ? (i.extras as any[]) : [];
+      const extrasText = extras.length > 0 ? `<br/><small style="color:#666; margin-left:12px">+ ${extras.map((e: any) => e.name).join(", ")}</small>` : "";
+      return `<div class="item"><span>${i.quantity}x ${i.product_name}${extrasText}</span><span>R$ ${(Number(i.product_price) * i.quantity).toFixed(2)}</span></div>`;
+    }).join("")}
+    <hr/>
+    <div class="item"><span>Subtotal</span><span>R$ ${Number(order.subtotal).toFixed(2)}</span></div>
+    ${Number(order.service_charge || 0) > 0 ? `<div class="item"><span>Taxa 10%</span><span>R$ ${Number(order.service_charge).toFixed(2)}</span></div>` : ""}
+    <div class="item total"><span>TOTAL</span><span>R$ ${Number(order.total).toFixed(2)}</span></div>
+    ${order.observation ? `<p>Obs: ${order.observation}</p>` : ""}
+  </body></html>`;
+}
+
+function generateBillHtml(order: OrderWithItems, paymentMethod: string) {
+  const items = order.order_items || [];
+  const serviceCharge = Number(order.service_charge || 0);
+  const now = new Date().toLocaleString("pt-BR");
+
+  let itemRows = "";
+  items.forEach((item) => {
+    const unitPrice = Number(item.product_price);
+    const lineTotal = unitPrice * item.quantity;
+    const extras = Array.isArray(item.extras) ? (item.extras as any[]) : [];
+
+    itemRows += `<tr>
+      <td style="text-align:left;padding:2px 0;">${item.quantity}x</td>
+      <td style="text-align:left;padding:2px 4px;">${item.product_name}</td>
+      <td style="text-align:right;padding:2px 0;">R$ ${unitPrice.toFixed(2)}</td>
+      <td style="text-align:right;padding:2px 0;">R$ ${lineTotal.toFixed(2)}</td>
+    </tr>`;
+
+    extras.forEach((e: any) => {
+      itemRows += `<tr>
+        <td></td>
+        <td style="text-align:left;padding:1px 4px;color:#666;font-size:10px;">+ ${e.name}</td>
+        <td style="text-align:right;padding:1px 0;color:#666;font-size:10px;">${Number(e.price) > 0 ? `R$ ${Number(e.price).toFixed(2)}` : ""}</td>
+        <td></td>
+      </tr>`;
+    });
+  });
+
+  return `<html><head><style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Courier New', monospace; font-size: 11px; width: 300px; margin: 0 auto; padding: 10px; }
+    h1 { text-align: center; font-size: 16px; margin: 5px 0; }
+    h2 { text-align: center; font-size: 13px; margin: 3px 0; font-weight: normal; }
+    .divider { border-top: 2px dashed #000; margin: 8px 0; }
+    .double-divider { border-top: 3px double #000; margin: 8px 0; }
+    table { width: 100%; border-collapse: collapse; }
+    .total-row td { font-weight: bold; font-size: 14px; padding-top: 4px; }
+    .footer { text-align: center; margin-top: 12px; font-size: 10px; color: #666; }
+    .big-total { text-align: center; font-size: 22px; font-weight: bold; margin: 8px 0; }
+  </style></head><body>
+    <h1>════════════════════</h1>
+    <h1>FECHAMENTO DE CONTA</h1>
+    <h1>════════════════════</h1>
+    
+    <div style="text-align:center; margin:8px 0;">
+      <strong>Truebox Hamburgueria</strong><br/>
+      ${order.table_number ? `Mesa: ${order.table_number}` : "Sem mesa"}<br/>
+      Cliente: ${order.customer_name}<br/>
+      Pedido #${order.order_number}
+    </div>
+    
+    <div class="divider"></div>
+    
+    <table>
+      <thead>
+        <tr style="border-bottom:1px solid #000;">
+          <th style="text-align:left;padding:2px 0;font-size:10px;">QTD</th>
+          <th style="text-align:left;padding:2px 4px;font-size:10px;">ITEM</th>
+          <th style="text-align:right;padding:2px 0;font-size:10px;">UNIT.</th>
+          <th style="text-align:right;padding:2px 0;font-size:10px;">TOTAL</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+    </table>
+    
+    <div class="double-divider"></div>
+    
+    <table>
+      <tr>
+        <td style="text-align:left;">Subtotal:</td>
+        <td style="text-align:right;">R$ ${Number(order.subtotal).toFixed(2)}</td>
+      </tr>
+      ${serviceCharge > 0 ? `<tr>
+        <td style="text-align:left;">Taxa de serviço (10%):</td>
+        <td style="text-align:right;">R$ ${serviceCharge.toFixed(2)}</td>
+      </tr>` : ""}
+      ${Number(order.delivery_fee) > 0 ? `<tr>
+        <td style="text-align:left;">Taxa de entrega:</td>
+        <td style="text-align:right;">R$ ${Number(order.delivery_fee).toFixed(2)}</td>
+      </tr>` : ""}
+    </table>
+    
+    <div class="divider"></div>
+    
+    <div class="big-total">
+      TOTAL: R$ ${Number(order.total).toFixed(2)}
+    </div>
+    
+    <div class="divider"></div>
+    
+    <div style="text-align:center; margin:6px 0;">
+      <strong>Forma de Pagamento:</strong><br/>
+      ${paymentLabels[paymentMethod] || paymentMethod}
+    </div>
+    
+    <div class="double-divider"></div>
+    
+    <div class="footer">
+      Emitido em: ${now}<br/>
+      Obrigado pela preferência! 🍔<br/>
+      Truebox Hamburgueria<br/>
+      ════════════════════
+    </div>
+    
+    <script>window.onload = function() { window.print(); }</script>
+  </body></html>`;
+}
+
+async function sendToPrintQueue(content: string, type: string, orderId: string) {
+  const { error } = await supabase.from("print_queue" as any).insert({
+    type,
+    order_id: orderId,
+    content,
+  } as any);
+  
+  if (error) {
+    console.error("Print queue error:", error);
+    toast.error("Erro ao enviar para impressão");
+    return false;
+  }
+  toast.success("📠 Enviado para impressão no painel!");
+  return true;
+}
 
 const WaiterDashboard = () => {
   const navigate = useNavigate();
@@ -103,7 +260,6 @@ const WaiterDashboard = () => {
     navigate("/waiter/login");
   };
 
-  // Determine which tables are occupied (have active dine_in orders)
   const activeOrders = orders.filter(o => !["delivered", "cancelled"].includes(o.status));
   const occupiedTableNumbers = new Set(
     activeOrders.filter(o => o.order_type === "dine_in" && o.table_number).map(o => o.table_number!)
@@ -132,34 +288,9 @@ const WaiterDashboard = () => {
     }
   };
 
-  const handlePrintOrder = (order: OrderWithItems) => {
-    const items = order.order_items || [];
-    const printContent = `
-      <html><head><style>
-        body { font-family: monospace; font-size: 12px; width: 280px; margin: 0 auto; }
-        h2 { text-align: center; margin: 5px 0; }
-        hr { border: 1px dashed #000; }
-        .item { display: flex; justify-content: space-between; }
-        .total { font-weight: bold; font-size: 14px; }
-      </style></head><body>
-        <h2>🍽️ COMANDA #${order.order_number}</h2>
-        <p>Mesa: ${order.table_number || "-"} | ${order.customer_name}</p>
-        <p>${new Date(order.created_at!).toLocaleString("pt-BR")}</p>
-        <hr/>
-        ${items.map(i => `<div class="item"><span>${i.quantity}x ${i.product_name}</span><span>R$ ${(Number(i.product_price) * i.quantity).toFixed(2)}</span></div>`).join("")}
-        <hr/>
-        <div class="item"><span>Subtotal</span><span>R$ ${Number(order.subtotal).toFixed(2)}</span></div>
-        ${Number(order.service_charge || 0) > 0 ? `<div class="item"><span>Taxa 10%</span><span>R$ ${Number(order.service_charge).toFixed(2)}</span></div>` : ""}
-        <div class="item total"><span>TOTAL</span><span>R$ ${Number(order.total).toFixed(2)}</span></div>
-        ${order.observation ? `<p>Obs: ${order.observation}</p>` : ""}
-      </body></html>
-    `;
-    const win = window.open("", "_blank", "width=320,height=600");
-    if (win) {
-      win.document.write(printContent);
-      win.document.close();
-      win.print();
-    }
+  const handlePrintOrder = async (order: OrderWithItems) => {
+    const html = generateOrderTicketHtml(order);
+    await sendToPrintQueue(html, "order", order.id);
   };
 
   const handleCloseBill = async (order: OrderWithItems, paymentMethod: string) => {
@@ -171,8 +302,10 @@ const WaiterDashboard = () => {
     if (error) {
       toast.error("Erro ao fechar conta");
     } else {
-      toast.success("Conta fechada! Imprimindo...");
-      handlePrintOrder(order);
+      // Send detailed bill to print queue
+      const billHtml = generateBillHtml(order, paymentMethod);
+      await sendToPrintQueue(billHtml, "bill", order.id);
+      toast.success("Conta fechada! Enviado para impressão no painel.");
       setSelectedOrder(null);
       setClosingBill(false);
       fetchData();
@@ -270,7 +403,6 @@ const WaiterDashboard = () => {
             </div>
           )}
 
-          {/* New Order Button (no table) */}
           <Button
             onClick={() => navigate("/waiter/new-order")}
             variant="outline"
@@ -290,11 +422,7 @@ const WaiterDashboard = () => {
           ) : (
             <div className="space-y-3">
               {activeOrders.map((order) => (
-                <OrderCard
-                  key={order.id}
-                  order={order}
-                  onTap={() => setSelectedOrder(order)}
-                />
+                <OrderCard key={order.id} order={order} onTap={() => setSelectedOrder(order)} />
               ))}
             </div>
           )}
@@ -336,12 +464,20 @@ const WaiterDashboard = () => {
 
                 {/* Items */}
                 <div className="space-y-1 border-t border-border pt-2">
-                  {(selectedOrder.order_items || []).map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span>{item.quantity}x {item.product_name}</span>
-                      <span className="font-medium">R$ {(Number(item.product_price) * item.quantity).toFixed(2).replace(".", ",")}</span>
-                    </div>
-                  ))}
+                  {(selectedOrder.order_items || []).map((item) => {
+                    const extras = Array.isArray(item.extras) ? (item.extras as any[]) : [];
+                    return (
+                      <div key={item.id}>
+                        <div className="flex justify-between text-sm">
+                          <span>{item.quantity}x {item.product_name}</span>
+                          <span className="font-medium">R$ {(Number(item.product_price) * item.quantity).toFixed(2).replace(".", ",")}</span>
+                        </div>
+                        {extras.length > 0 && (
+                          <p className="text-xs text-muted-foreground pl-4">+ {extras.map((e: any) => e.name).join(", ")}</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Totals */}
@@ -369,7 +505,7 @@ const WaiterDashboard = () => {
                       variant="outline"
                       size="sm"
                       className="gap-1"
-                      onClick={() => navigate(`/waiter/new-order?edit=${selectedOrder.id}`)}
+                      onClick={() => { setSelectedOrder(null); navigate(`/waiter/new-order?edit=${selectedOrder.id}`); }}
                     >
                       <Edit className="w-4 h-4" /> Editar
                     </Button>
@@ -379,7 +515,7 @@ const WaiterDashboard = () => {
                       className="gap-1"
                       onClick={() => handlePrintOrder(selectedOrder)}
                     >
-                      <Printer className="w-4 h-4" /> Imprimir
+                      <Printer className="w-4 h-4" /> Reimprimir
                     </Button>
                     <Button
                       variant="outline"
@@ -411,12 +547,37 @@ const WaiterDashboard = () => {
           {selectedOrder && (
             <>
               <DialogHeader>
-                <DialogTitle>💰 Fechar Conta - Mesa {selectedOrder.table_number}</DialogTitle>
+                <DialogTitle>💰 Fechar Conta {selectedOrder.table_number ? `- Mesa ${selectedOrder.table_number}` : ""}</DialogTitle>
               </DialogHeader>
-              <p className="text-2xl font-black text-center text-foreground py-4">
+
+              {/* Bill preview */}
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
+                {(selectedOrder.order_items || []).map((item) => {
+                  const extras = Array.isArray(item.extras) ? (item.extras as any[]) : [];
+                  return (
+                    <div key={item.id}>
+                      <div className="flex justify-between">
+                        <span>{item.quantity}x {item.product_name}</span>
+                        <span>R$ {(Number(item.product_price) * item.quantity).toFixed(2).replace(".", ",")}</span>
+                      </div>
+                      {extras.map((e: any, idx: number) => (
+                        <p key={idx} className="text-xs text-muted-foreground pl-4">+ {e.name} {Number(e.price) > 0 ? `R$ ${Number(e.price).toFixed(2)}` : ""}</p>
+                      ))}
+                    </div>
+                  );
+                })}
+                <div className="border-t border-border pt-1 mt-2">
+                  <div className="flex justify-between"><span>Subtotal</span><span>R$ {Number(selectedOrder.subtotal).toFixed(2).replace(".", ",")}</span></div>
+                  {Number(selectedOrder.service_charge || 0) > 0 && (
+                    <div className="flex justify-between text-primary"><span>Taxa 10%</span><span>R$ {Number(selectedOrder.service_charge).toFixed(2).replace(".", ",")}</span></div>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-2xl font-black text-center text-foreground py-2">
                 R$ {Number(selectedOrder.total).toFixed(2).replace(".", ",")}
               </p>
-              <p className="text-sm text-center text-muted-foreground mb-4">Selecione a forma de pagamento:</p>
+              <p className="text-sm text-center text-muted-foreground mb-2">Forma de pagamento:</p>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { value: "pix", label: "💠 PIX" },
