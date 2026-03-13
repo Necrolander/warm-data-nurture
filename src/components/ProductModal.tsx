@@ -41,10 +41,17 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
   const isExtraSelected = (extraId: string) => !!selectedExtras.find((e) => e.id === extraId);
 
+  const getExtraQuantity = (extraId: string) => {
+    const found = selectedExtras.find((e) => e.id === extraId);
+    return found?.quantity || 0;
+  };
+
   const getGroupSelectedCount = (groupId: string) => {
     const group = extraGroups.find((g) => g.id === groupId);
     if (!group) return 0;
-    return selectedExtras.filter((se) => group.extras.some((ge) => ge.id === se.id)).length;
+    return selectedExtras
+      .filter((se) => group.extras.some((ge) => ge.id === se.id))
+      .reduce((sum, se) => sum + (se.quantity || 1), 0);
   };
 
   const canSelectInGroup = (groupId: string) => {
@@ -53,12 +60,26 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
     return getGroupSelectedCount(groupId) < group.max_select;
   };
 
-  const handleToggleGroupExtra = (groupId: string, extra: { id: string; name: string; price: number }) => {
-    const isSelected = isExtraSelected(extra.id);
-    if (isSelected) {
+  const handleChangeExtraQty = (groupId: string, extra: { id: string; name: string; price: number; max_quantity: number }, delta: number) => {
+    const currentQty = getExtraQuantity(extra.id);
+    const newQty = currentQty + delta;
+    const maxPerItem = extra.max_quantity || 99;
+
+    if (newQty <= 0) {
       setSelectedExtras((prev) => prev.filter((e) => e.id !== extra.id));
-    } else if (canSelectInGroup(groupId)) {
-      setSelectedExtras((prev) => [...prev, { id: extra.id, name: extra.name, price: extra.price }]);
+      return;
+    }
+
+    if (newQty > maxPerItem) return;
+
+    if (delta > 0 && !canSelectInGroup(groupId)) return;
+
+    if (currentQty === 0) {
+      setSelectedExtras((prev) => [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }]);
+    } else {
+      setSelectedExtras((prev) =>
+        prev.map((e) => (e.id === extra.id ? { ...e, quantity: newQty } : e))
+      );
     }
   };
 
