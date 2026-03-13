@@ -1,14 +1,15 @@
-import { useProducts, useExtras, mapDbProduct } from "@/hooks/usePublicData";
+import { useProducts, useExtras, useExtraGroups, buildExtraGroups, mapDbProduct } from "@/hooks/usePublicData";
 import { useEffect, useRef, useState } from "react";
 
 const PromoBanner = () => {
   const { data: dbProducts } = useProducts();
   const { data: dbExtras } = useExtras();
+  const { data: dbExtraGroups } = useExtraGroups();
   const [isPaused, setIsPaused] = useState(false);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  const extras = dbExtras || [];
-  const products = (dbProducts || []).map((p) => mapDbProduct(p, extras));
+  const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
+  const products = (dbProducts || []).map((p) => mapDbProduct(p, extraGroups));
   const promoProducts = products.filter((p) => p.badges?.some((b) => b.includes("Economize")));
 
   useEffect(() => {

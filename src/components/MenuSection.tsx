@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { useProducts, useCategories, useExtras, mapDbProduct } from "@/hooks/usePublicData";
+import { useProducts, useCategories, useExtras, useExtraGroups, buildExtraGroups, mapDbProduct } from "@/hooks/usePublicData";
 import { Product } from "@/data/products";
 import ProductCard from "./ProductCard";
 import ProductModal from "./ProductModal";
