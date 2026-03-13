@@ -260,6 +260,7 @@ export type Database = {
           order_type: Database["public"]["Enums"]["order_type"]
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           reference: string | null
+          service_charge: number
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           table_number: number | null
@@ -281,6 +282,7 @@ export type Database = {
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           reference?: string | null
+          service_charge?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           table_number?: number | null
@@ -302,6 +304,7 @@ export type Database = {
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           reference?: string | null
+          service_charge?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           table_number?: number | null
