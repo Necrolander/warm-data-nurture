@@ -22,16 +22,16 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
   const extraGroups = product.extraGroups || [];
   const hasGroups = extraGroups.length > 0;
 
+  useEffect(() => {
+    const initialExpanded: Record<string, boolean> = {};
+    extraGroups.forEach((group, index) => {
+      initialExpanded[group.id] = index === 0;
+    });
+    setExpandedGroups(initialExpanded);
+  }, [product.id]);
+
   const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => ({ ...prev, [groupId]: !prev[groupId] }));
-  };
-
-  const toggleExtra = (extra: Extra) => {
-    setSelectedExtras((prev) =>
-      prev.find((e) => e.id === extra.id)
-        ? prev.filter((e) => e.id !== extra.id)
-        : [...prev, extra]
-    );
   };
 
   const isExtraSelected = (extraId: string) => !!selectedExtras.find((e) => e.id === extraId);
