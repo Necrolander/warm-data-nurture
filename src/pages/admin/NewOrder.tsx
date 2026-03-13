@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Minus, ShoppingCart, Trash2, Search, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Product {
   id: string;
@@ -26,16 +27,34 @@ interface Category {
   icon: string | null;
 }
 
-interface Extra {
+interface ExtraItem {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+  group_id: string | null;
+}
+
+interface ExtraGroupData {
+  id: string;
+  name: string;
+  max_select: number;
+  is_required: boolean;
+  applies_to_categories: string[] | null;
+  extras: ExtraItem[];
+}
+
+interface SelectedExtra {
   id: string;
   name: string;
   price: number;
 }
 
 interface CartItem {
+  uid: string;
   product: Product;
   quantity: number;
-  extras: Extra[];
+  extras: SelectedExtra[];
   observation: string;
 }
 
@@ -44,7 +63,7 @@ const fallbackImage = "https://images.unsplash.com/photo-1568901346375-23c9450c5
 const NewOrder = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [extras, setExtras] = useState<Extra[]>([]);
+  const [extraGroups, setExtraGroups] = useState<ExtraGroupData[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderType, setOrderType] = useState<"delivery" | "pickup" | "dine_in">("delivery");
   const [customerName, setCustomerName] = useState("");
@@ -58,16 +77,34 @@ const NewOrder = () => {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null);
 
+  // Extras modal
+  const [extrasModal, setExtrasModal] = useState<Product | null>(null);
+  const [modalExtras, setModalExtras] = useState<SelectedExtra[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
-      const [p, e, c] = await Promise.all([
+      const [p, groupRes, extrasRes, c] = await Promise.all([
         supabase.from("products").select("id, name, price, category, image_url, description").eq("is_active", true).order("sort_order"),
-        supabase.from("product_extras").select("id, name, price").eq("is_active", true).order("sort_order"),
+        supabase.from("extra_groups").select("*").eq("is_active", true).order("sort_order"),
+        supabase.from("product_extras").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("categories").select("id, slug, name, icon").eq("is_active", true).order("sort_order"),
       ]);
       if (p.data) setProducts(p.data);
-      if (e.data) setExtras(e.data);
       if (c.data) setCategories(c.data);
+
+      if (groupRes.data && extrasRes.data) {
+        const groups: ExtraGroupData[] = groupRes.data.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          max_select: g.max_select,
+          is_required: g.is_required,
+          applies_to_categories: g.applies_to_categories,
+          extras: extrasRes.data
+            .filter((e: any) => e.group_id === g.id)
+            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), image_url: e.image_url, group_id: e.group_id })),
+        })).filter((g: ExtraGroupData) => g.extras.length > 0);
+        setExtraGroups(groups);
+      }
     };
     fetchData();
   }, []);
@@ -84,39 +121,67 @@ const NewOrder = () => {
     return result;
   }, [products, search, activeCategory]);
 
-  const addToCart = (product: Product) => {
-    const existing = cart.find(c => c.product.id === product.id);
-    if (existing) {
-      setCart(cart.map(c => c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
-    } else {
-      setCart([...cart, { product, quantity: 1, extras: [], observation: "" }]);
-    }
-    toast.success(`${product.name} adicionado!`, { duration: 1500 });
+  const getProductExtras = (product: Product) => {
+    return extraGroups.filter(
+      g => !g.applies_to_categories || g.applies_to_categories.length === 0 || g.applies_to_categories.includes(product.category)
+    );
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const handleProductClick = (product: Product) => {
+    const productExtras = getProductExtras(product);
+    if (productExtras.length > 0) {
+      setExtrasModal(product);
+      setModalExtras([]);
+    } else {
+      const uid = `${product.id}-${Date.now()}`;
+      setCart(prev => [...prev, { uid, product, quantity: 1, extras: [], observation: "" }]);
+      toast.success(`${product.name} adicionado!`, { duration: 1500 });
+    }
+  };
+
+  const confirmModalExtras = () => {
+    if (extrasModal) {
+      const uid = `${extrasModal.id}-${Date.now()}`;
+      setCart(prev => [...prev, { uid, product: extrasModal, quantity: 1, extras: modalExtras, observation: "" }]);
+      toast.success(`${extrasModal.name} adicionado!`, { duration: 1500 });
+      setExtrasModal(null);
+      setModalExtras([]);
+    }
+  };
+
+  const toggleModalExtra = (extra: ExtraItem, groupId: string) => {
+    const group = extraGroups.find(g => g.id === groupId);
+    if (!group) return;
+    setModalExtras(prev => {
+      const exists = prev.find(e => e.id === extra.id);
+      if (exists) return prev.filter(e => e.id !== extra.id);
+      const groupCount = prev.filter(e => {
+        const ext = extraGroups.flatMap(g => g.extras).find(x => x.id === e.id);
+        return ext?.group_id === groupId;
+      }).length;
+      if (groupCount >= group.max_select) {
+        toast.error(`Máximo de ${group.max_select} para ${group.name}`);
+        return prev;
+      }
+      return [...prev, { id: extra.id, name: extra.name, price: extra.price }];
+    });
+  };
+
+  const updateQuantity = (uid: string, delta: number) => {
     setCart(prev => prev.map(c => {
-      if (c.product.id !== productId) return c;
+      if (c.uid !== uid) return c;
       const newQty = c.quantity + delta;
       return newQty > 0 ? { ...c, quantity: newQty } : c;
     }).filter(c => c.quantity > 0));
   };
 
-  const removeItem = (productId: string) => {
-    setCart(cart.filter(c => c.product.id !== productId));
-    if (expandedCartItem === productId) setExpandedCartItem(null);
+  const removeItem = (uid: string) => {
+    setCart(cart.filter(c => c.uid !== uid));
+    if (expandedCartItem === uid) setExpandedCartItem(null);
   };
 
-  const toggleExtra = (productId: string, extra: Extra) => {
-    setCart(cart.map(c => {
-      if (c.product.id !== productId) return c;
-      const has = c.extras.find(e => e.id === extra.id);
-      return { ...c, extras: has ? c.extras.filter(e => e.id !== extra.id) : [...c.extras, extra] };
-    }));
-  };
-
-  const updateItemObservation = (productId: string, obs: string) => {
-    setCart(cart.map(c => c.product.id === productId ? { ...c, observation: obs } : c));
+  const updateItemObservation = (uid: string, obs: string) => {
+    setCart(cart.map(c => c.uid === uid ? { ...c, observation: obs } : c));
   };
 
   const subtotal = cart.reduce((sum, c) => {
@@ -185,12 +250,7 @@ const NewOrder = () => {
         {/* Search */}
         <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar produto..."
-            className="pl-10 pr-10"
-          />
+          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar produto..." className="pl-10 pr-10" />
           {search && (
             <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
@@ -203,9 +263,7 @@ const NewOrder = () => {
           <button
             onClick={() => setActiveCategory("all")}
             className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-              activeCategory === "all"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "bg-muted text-muted-foreground hover:text-foreground"
+              activeCategory === "all" ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"
             }`}
           >
             Todos
@@ -215,9 +273,7 @@ const NewOrder = () => {
               key={cat.id}
               onClick={() => setActiveCategory(cat.slug)}
               className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                activeCategory === cat.slug
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
+                activeCategory === cat.slug ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
               {cat.icon} {cat.name}
@@ -230,7 +286,7 @@ const NewOrder = () => {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             <AnimatePresence mode="popLayout">
               {filteredProducts.map(product => {
-                const inCart = cart.find(c => c.product.id === product.id);
+                const inCartCount = cart.filter(c => c.product.id === product.id).reduce((s, c) => s + c.quantity, 0);
                 return (
                   <motion.div
                     key={product.id}
@@ -242,11 +298,10 @@ const NewOrder = () => {
                   >
                     <Card
                       className={`cursor-pointer overflow-hidden transition-all hover:shadow-md group relative ${
-                        inCart ? "ring-2 ring-primary" : "hover:border-primary/50"
+                        inCartCount > 0 ? "ring-2 ring-primary" : "hover:border-primary/50"
                       }`}
-                      onClick={() => addToCart(product)}
+                      onClick={() => handleProductClick(product)}
                     >
-                      {/* Image */}
                       <div className="relative h-24 sm:h-28 overflow-hidden bg-muted">
                         <img
                           src={product.image_url || fallbackImage}
@@ -255,22 +310,17 @@ const NewOrder = () => {
                           loading="lazy"
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-background/70 to-transparent" />
-
-                        {/* Cart quantity badge */}
-                        {inCart && (
+                        {inCartCount > 0 && (
                           <div className="absolute top-1.5 right-1.5 bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-lg">
-                            {inCart.quantity}
+                            {inCartCount}
                           </div>
                         )}
-
-                        {/* Price */}
                         <div className="absolute bottom-1.5 right-1.5">
                           <span className="bg-primary/90 backdrop-blur-sm text-primary-foreground font-bold text-xs px-2 py-0.5 rounded-md">
                             R$ {Number(product.price).toFixed(2).replace(".", ",")}
                           </span>
                         </div>
                       </div>
-
                       <CardContent className="p-2">
                         <p className="font-semibold text-xs sm:text-sm truncate text-foreground">{product.name}</p>
                         {product.description && (
@@ -297,14 +347,11 @@ const NewOrder = () => {
       <div className="lg:col-span-2 flex flex-col min-h-0">
         <Card className="flex flex-col flex-1 min-h-0">
           <CardContent className="p-4 flex flex-col flex-1 min-h-0">
-            {/* Header */}
             <div className="flex items-center justify-between mb-3 shrink-0">
               <h3 className="font-bold text-foreground flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4" />
                 Novo Pedido
-                {totalItems > 0 && (
-                  <Badge variant="secondary" className="text-xs">{totalItems}</Badge>
-                )}
+                {totalItems > 0 && <Badge variant="secondary" className="text-xs">{totalItems}</Badge>}
               </h3>
             </div>
 
@@ -319,9 +366,7 @@ const NewOrder = () => {
                   key={t.value}
                   onClick={() => setOrderType(t.value as any)}
                   className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                    orderType === t.value
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                    orderType === t.value ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.label}
@@ -333,12 +378,8 @@ const NewOrder = () => {
             <div className="space-y-2 mb-3 shrink-0">
               <Input placeholder="Nome do cliente *" value={customerName} onChange={e => setCustomerName(e.target.value)} className="h-9 text-sm" />
               <Input placeholder="Telefone" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} className="h-9 text-sm" />
-              {orderType === "delivery" && (
-                <Input placeholder="Endereço / Referência" value={reference} onChange={e => setReference(e.target.value)} className="h-9 text-sm" />
-              )}
-              {orderType === "dine_in" && (
-                <Input placeholder="Nº da mesa" type="number" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="h-9 text-sm" />
-              )}
+              {orderType === "delivery" && <Input placeholder="Endereço / Referência" value={reference} onChange={e => setReference(e.target.value)} className="h-9 text-sm" />}
+              {orderType === "dine_in" && <Input placeholder="Nº da mesa" type="number" value={tableNumber} onChange={e => setTableNumber(e.target.value)} className="h-9 text-sm" />}
             </div>
 
             {/* Payment */}
@@ -353,9 +394,7 @@ const NewOrder = () => {
                   key={p.value}
                   onClick={() => setPaymentMethod(p.value)}
                   className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                    paymentMethod === p.value
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
+                    paymentMethod === p.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {p.label}
@@ -363,7 +402,7 @@ const NewOrder = () => {
               ))}
             </div>
 
-            {/* Cart items - scrollable */}
+            {/* Cart items */}
             <div className="flex-1 overflow-y-auto min-h-0 border-t border-border pt-2 space-y-1.5">
               {cart.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
@@ -372,77 +411,44 @@ const NewOrder = () => {
                 </div>
               ) : (
                 cart.map(item => (
-                  <div key={item.product.id} className="bg-muted/50 rounded-lg p-2.5">
+                  <div key={item.uid} className="bg-muted/50 rounded-lg p-2.5">
                     <div className="flex items-center gap-2">
-                      {/* Mini image */}
-                      <img
-                        src={item.product.image_url || fallbackImage}
-                        alt={item.product.name}
-                        className="w-10 h-10 rounded-lg object-cover shrink-0"
-                      />
+                      <img src={item.product.image_url || fallbackImage} alt={item.product.name} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{item.product.name}</p>
-                        <p className="text-xs text-primary font-bold">
-                          R$ {getCartItemTotal(item).toFixed(2).replace(".", ",")}
-                        </p>
+                        <p className="text-xs text-primary font-bold">R$ {getCartItemTotal(item).toFixed(2).replace(".", ",")}</p>
+                        {item.extras.length > 0 && (
+                          <p className="text-[10px] text-muted-foreground truncate">+ {item.extras.map(e => e.name).join(", ")}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, -1)}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, -1)}>
                           <Minus className="h-3 w-3" />
                         </Button>
                         <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.product.id, 1)}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, 1)}>
                           <Plus className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeItem(item.product.id)}>
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeItem(item.uid)}>
                           <Trash2 className="h-3 w-3 text-destructive" />
                         </Button>
                       </div>
                     </div>
 
-                    {/* Expand for extras/obs */}
                     <button
-                      onClick={() => setExpandedCartItem(expandedCartItem === item.product.id ? null : item.product.id)}
+                      onClick={() => setExpandedCartItem(expandedCartItem === item.uid ? null : item.uid)}
                       className="text-[10px] text-muted-foreground hover:text-foreground mt-1 underline"
                     >
-                      {expandedCartItem === item.product.id ? "Fechar" : "Adicionais / Observação"}
+                      {expandedCartItem === item.uid ? "Fechar" : "Observação"}
                     </button>
 
                     <AnimatePresence>
-                      {expandedCartItem === item.product.id && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          className="overflow-hidden"
-                        >
-                          {/* Extras */}
-                          {extras.length > 0 && (
-                            <div className="flex gap-1 flex-wrap mt-2">
-                              {extras.map(extra => {
-                                const selected = item.extras.find(e => e.id === extra.id);
-                                return (
-                                  <button
-                                    key={extra.id}
-                                    onClick={() => toggleExtra(item.product.id, extra)}
-                                    className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-full border transition-all ${
-                                      selected
-                                        ? "border-primary bg-primary/10 text-primary font-bold"
-                                        : "border-border text-muted-foreground hover:border-primary/50"
-                                    }`}
-                                  >
-                                    {selected && <Check className="h-2.5 w-2.5" />}
-                                    {extra.name} +R${Number(extra.price).toFixed(0)}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                          {/* Observation */}
+                      {expandedCartItem === item.uid && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                           <Input
                             placeholder="Observação do item..."
                             value={item.observation}
-                            onChange={e => updateItemObservation(item.product.id, e.target.value)}
+                            onChange={e => updateItemObservation(item.uid, e.target.value)}
                             className="h-7 text-xs mt-2"
                           />
                         </motion.div>
@@ -453,29 +459,14 @@ const NewOrder = () => {
               )}
             </div>
 
-            {/* Observation */}
-            <Textarea
-              placeholder="Observação geral do pedido..."
-              value={observation}
-              onChange={e => setObservation(e.target.value)}
-              rows={2}
-              className="text-sm mt-2 shrink-0"
-            />
+            <Textarea placeholder="Observação geral do pedido..." value={observation} onChange={e => setObservation(e.target.value)} rows={2} className="text-sm mt-2 shrink-0" />
 
-            {/* Total + submit */}
             <div className="border-t border-border pt-3 mt-3 shrink-0">
               <div className="flex justify-between items-center mb-3">
                 <span className="font-bold text-foreground">Total</span>
-                <span className="text-xl font-black text-primary">
-                  R$ {subtotal.toFixed(2).replace(".", ",")}
-                </span>
+                <span className="text-xl font-black text-primary">R$ {subtotal.toFixed(2).replace(".", ",")}</span>
               </div>
-              <Button
-                onClick={placeOrder}
-                disabled={loading || cart.length === 0}
-                className="w-full h-12 text-base font-bold gap-2"
-                size="lg"
-              >
+              <Button onClick={placeOrder} disabled={loading || cart.length === 0} className="w-full h-12 text-base font-bold gap-2" size="lg">
                 <ShoppingCart className="h-5 w-5" />
                 {loading ? "Criando..." : `Criar Pedido (${totalItems} itens)`}
               </Button>
@@ -483,6 +474,56 @@ const NewOrder = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Extras Modal */}
+      <Dialog open={!!extrasModal} onOpenChange={(open) => !open && setExtrasModal(null)}>
+        <DialogContent className="max-w-md mx-auto max-h-[80vh] overflow-y-auto">
+          {extrasModal && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{extrasModal.name}</DialogTitle>
+              </DialogHeader>
+              <p className="text-primary font-bold">R$ {Number(extrasModal.price).toFixed(2).replace(".", ",")}</p>
+
+              {getProductExtras(extrasModal).map(group => {
+                const groupSelectedCount = modalExtras.filter(se => group.extras.some(e => e.id === se.id)).length;
+                return (
+                  <div key={group.id} className="space-y-2 border-t border-border pt-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-bold text-foreground text-sm">{group.name}</h3>
+                      <div className="flex items-center gap-1">
+                        {group.is_required && <Badge variant="destructive" className="text-xs">Obrigatório</Badge>}
+                        <Badge variant="outline" className="text-xs">{groupSelectedCount}/{group.max_select}</Badge>
+                      </div>
+                    </div>
+                    {group.extras.map(extra => {
+                      const isSelected = modalExtras.some(e => e.id === extra.id);
+                      return (
+                        <div
+                          key={extra.id}
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${isSelected ? "border-primary bg-primary/5" : "border-border"}`}
+                          onClick={() => toggleModalExtra(extra, group.id)}
+                        >
+                          <Checkbox checked={isSelected} />
+                          {extra.image_url && <img src={extra.image_url} alt={extra.name} className="w-10 h-10 rounded object-cover" />}
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-foreground">{extra.name}</p>
+                          </div>
+                          {extra.price > 0 && <span className="text-xs font-bold text-primary">+R$ {extra.price.toFixed(2).replace(".", ",")}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+
+              <Button onClick={confirmModalExtras} className="w-full mt-4">
+                Adicionar ao pedido
+              </Button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
