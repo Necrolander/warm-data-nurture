@@ -170,6 +170,36 @@ export type Database = {
         }
         Relationships: []
       }
+      extra_groups: {
+        Row: {
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_required: boolean
+          max_select: number
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean
+          max_select?: number
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean
+          max_select?: number
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -279,27 +309,44 @@ export type Database = {
       }
       product_extras: {
         Row: {
+          description: string | null
+          group_id: string | null
           id: string
           is_active: boolean | null
+          max_quantity: number | null
           name: string
           price: number
           sort_order: number | null
         }
         Insert: {
+          description?: string | null
+          group_id?: string | null
           id?: string
           is_active?: boolean | null
+          max_quantity?: number | null
           name: string
           price: number
           sort_order?: number | null
         }
         Update: {
+          description?: string | null
+          group_id?: string | null
           id?: string
           is_active?: boolean | null
+          max_quantity?: number | null
           name?: string
           price?: number
           sort_order?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "product_extras_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "extra_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {
