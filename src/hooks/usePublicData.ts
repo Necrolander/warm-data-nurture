@@ -139,6 +139,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
     description: g.description,
     max_select: g.max_select,
     is_required: g.is_required,
+    applies_to_categories: g.applies_to_categories || [],
     extras: extras
       .filter((e) => e.group_id === g.id)
       .map((e) => ({
@@ -147,6 +148,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
         description: e.description,
         price: Number(e.price),
         max_quantity: e.max_quantity || 1,
+        image_url: e.image_url || null,
       })),
   })).filter((g) => g.extras.length > 0);
 }
