@@ -241,7 +241,7 @@ const WaiterNewOrder = () => {
   };
 
   const subtotal = cart.reduce((s, i) => {
-    const extrasTotal = i.extras.reduce((es, e) => es + e.price, 0);
+    const extrasTotal = i.extras.reduce((es, e) => es + e.price * (e.quantity || 1), 0);
     return s + (i.product.price + extrasTotal) * i.quantity;
   }, 0);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
