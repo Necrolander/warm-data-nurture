@@ -140,6 +140,13 @@ const printOrderTicket = (order: OrderWithItems) => {
   printWindow.document.close();
 };
 
+const formatWhatsAppLink = (phone: string, message?: string) => {
+  const cleaned = phone.replace(/\D/g, "");
+  const num = cleaned.startsWith("55") ? cleaned : `55${cleaned}`;
+  const msg = message ? `?text=${encodeURIComponent(message)}` : "";
+  return `https://wa.me/${num}${msg}`;
+};
+
 const OrderCard = ({
   order,
   onAccept,
@@ -150,6 +157,7 @@ const OrderCard = ({
   onCancel,
   onPrint,
   isPending,
+  deliveryPersons,
 }: {
   order: OrderWithItems;
   onAccept: (order: OrderWithItems) => void;
@@ -160,6 +168,7 @@ const OrderCard = ({
   onCancel: (order: OrderWithItems) => void;
   onPrint: (order: OrderWithItems) => void;
   isPending: boolean;
+  deliveryPersons: DeliveryPerson[];
 }) => {
   const nextStatus: Record<string, string> = {
     production: "ready",
