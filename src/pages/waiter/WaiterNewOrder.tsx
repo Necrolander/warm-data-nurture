@@ -187,27 +187,48 @@ const WaiterNewOrder = () => {
     }
   };
 
-  const toggleExtra = (extra: ExtraItem, groupId: string) => {
+  const getExtraQty = (extraId: string) => {
+    const found = selectedExtras.find(e => e.id === extraId);
+    return found?.quantity || 0;
+  };
+
+  const getGroupSelectedCount = (groupId: string) => {
+    const group = extraGroups.find(g => g.id === groupId);
+    if (!group) return 0;
+    return selectedExtras
+      .filter(se => group.extras.some(e => e.id === se.id))
+      .reduce((sum, se) => sum + se.quantity, 0);
+  };
+
+  const changeExtraQty = (extra: ExtraItem, groupId: string, delta: number) => {
     const group = extraGroups.find(g => g.id === groupId);
     if (!group) return;
+    const currentQty = getExtraQty(extra.id);
+    const newQty = currentQty + delta;
+    const maxPerItem = extra.max_quantity || 99;
 
-    setSelectedExtras(prev => {
-      const exists = prev.find(e => e.id === extra.id);
-      if (exists) {
-        return prev.filter(e => e.id !== extra.id);
-      }
-      // Check max_select for this group
-      const groupCount = prev.filter(e => {
-        const ext = extraGroups.flatMap(g => g.extras).find(x => x.id === e.id);
-        return ext?.group_id === groupId;
-      }).length;
-      if (groupCount >= group.max_select) {
-        toast.error(`Máximo de ${group.max_select} seleções para ${group.name}`);
-        return prev;
-      }
-      return [...prev, { id: extra.id, name: extra.name, price: extra.price }];
-    });
+    if (newQty <= 0) {
+      setSelectedExtras(prev => prev.filter(e => e.id !== extra.id));
+      return;
+    }
+    if (newQty > maxPerItem) return;
+
+    const groupCount = getGroupSelectedCount(groupId);
+    if (delta > 0 && groupCount >= group.max_select) {
+      toast.error(`Máximo de ${group.max_select} para ${group.name}`);
+      return;
+    }
+
+    if (currentQty === 0) {
+      setSelectedExtras(prev => [...prev, { id: extra.id, name: extra.name, price: extra.price, quantity: 1 }]);
+    } else {
+      setSelectedExtras(prev => prev.map(e => e.id === extra.id ? { ...e, quantity: newQty } : e));
+    }
   };
+
+  const hasUnmetRequirements = extrasModal ? getProductExtras(extrasModal).some(
+    g => g.is_required && getGroupSelectedCount(g.id) < g.max_select
+  ) : false;
 
   const updateQty = (uid: string, delta: number) => {
     setCart((prev) =>
