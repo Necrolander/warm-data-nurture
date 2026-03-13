@@ -667,7 +667,7 @@ const ProductRow = ({ product, onEdit, onDelete, onToggle }: {
               </span>
             ))}
           </div>
-          {hasSchedule && <Clock className="h-3 w-3 text-muted-foreground" title="Horário específico" />}
+          {hasSchedule && <span title="Horário específico"><Clock className="h-3 w-3 text-muted-foreground" /></span>}
           {!allDays && <span className="text-[9px] text-muted-foreground" title="Dias específicos">📅</span>}
         </div>
       </div>
