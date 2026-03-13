@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Minus, ShoppingCart, Check, ChevronDown } from "lucide-react";
 import { Product, Extra } from "@/data/products";
