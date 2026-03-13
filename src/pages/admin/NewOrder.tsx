@@ -120,39 +120,67 @@ const NewOrder = () => {
     return result;
   }, [products, search, activeCategory]);
 
-  const addToCart = (product: Product) => {
-    const existing = cart.find(c => c.product.id === product.id);
-    if (existing) {
-      setCart(cart.map(c => c.product.id === product.id ? { ...c, quantity: c.quantity + 1 } : c));
-    } else {
-      setCart([...cart, { product, quantity: 1, extras: [], observation: "" }]);
-    }
-    toast.success(`${product.name} adicionado!`, { duration: 1500 });
+  const getProductExtras = (product: Product) => {
+    return extraGroups.filter(
+      (g) => !g.applies_to_categories || g.applies_to_categories.length === 0 || g.applies_to_categories.includes(product.category)
+    );
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
+  const handleProductClick = (product: Product) => {
+    const productExtras = getProductExtras(product);
+    if (productExtras.length > 0) {
+      setExtrasModal(product);
+      setModalExtras([]);
+    } else {
+      const uid = `${product.id}-${Date.now()}`;
+      setCart(prev => [...prev, { uid, product, quantity: 1, extras: [], observation: "" }]);
+      toast.success(`${product.name} adicionado!`, { duration: 1500 });
+    }
+  };
+
+  const confirmModalExtras = () => {
+    if (extrasModal) {
+      const uid = `${extrasModal.id}-${Date.now()}`;
+      setCart(prev => [...prev, { uid, product: extrasModal, quantity: 1, extras: modalExtras, observation: "" }]);
+      toast.success(`${extrasModal.name} adicionado!`, { duration: 1500 });
+      setExtrasModal(null);
+      setModalExtras([]);
+    }
+  };
+
+  const toggleModalExtra = (extra: ExtraItem, groupId: string) => {
+    const group = extraGroups.find(g => g.id === groupId);
+    if (!group) return;
+    setModalExtras(prev => {
+      const exists = prev.find(e => e.id === extra.id);
+      if (exists) return prev.filter(e => e.id !== extra.id);
+      const groupCount = prev.filter(e => {
+        const ext = extraGroups.flatMap(g => g.extras).find(x => x.id === e.id);
+        return ext?.group_id === groupId;
+      }).length;
+      if (groupCount >= group.max_select) {
+        toast.error(`Máximo de ${group.max_select} para ${group.name}`);
+        return prev;
+      }
+      return [...prev, { id: extra.id, name: extra.name, price: extra.price }];
+    });
+  };
+
+  const updateQuantity = (uid: string, delta: number) => {
     setCart(prev => prev.map(c => {
-      if (c.product.id !== productId) return c;
+      if (c.uid !== uid) return c;
       const newQty = c.quantity + delta;
       return newQty > 0 ? { ...c, quantity: newQty } : c;
     }).filter(c => c.quantity > 0));
   };
 
-  const removeItem = (productId: string) => {
-    setCart(cart.filter(c => c.product.id !== productId));
-    if (expandedCartItem === productId) setExpandedCartItem(null);
+  const removeItem = (uid: string) => {
+    setCart(cart.filter(c => c.uid !== uid));
+    if (expandedCartItem === uid) setExpandedCartItem(null);
   };
 
-  const toggleExtra = (productId: string, extra: Extra) => {
-    setCart(cart.map(c => {
-      if (c.product.id !== productId) return c;
-      const has = c.extras.find(e => e.id === extra.id);
-      return { ...c, extras: has ? c.extras.filter(e => e.id !== extra.id) : [...c.extras, extra] };
-    }));
-  };
-
-  const updateItemObservation = (productId: string, obs: string) => {
-    setCart(cart.map(c => c.product.id === productId ? { ...c, observation: obs } : c));
+  const updateItemObservation = (uid: string, obs: string) => {
+    setCart(cart.map(c => c.uid === uid ? { ...c, observation: obs } : c));
   };
 
   const subtotal = cart.reduce((sum, c) => {
