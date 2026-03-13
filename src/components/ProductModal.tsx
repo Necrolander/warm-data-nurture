@@ -228,20 +228,14 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                           >
                             <div className="divide-y divide-border">
                               {group.extras.map((extra) => {
-                                const selected = isExtraSelected(extra.id);
-                                const disabled = !selected && isFull;
+                                const qty = getExtraQuantity(extra.id);
+                                const maxPerItem = extra.max_quantity || 99;
 
                                 return (
-                                  <button
+                                  <div
                                     key={extra.id}
-                                    onClick={() => handleToggleGroupExtra(group.id, extra)}
-                                    disabled={disabled}
                                     className={`w-full flex items-center justify-between p-3.5 transition-all ${
-                                      selected
-                                        ? "bg-primary/10"
-                                        : disabled
-                                        ? "opacity-50 cursor-not-allowed bg-background"
-                                        : "hover:bg-muted/30 bg-background"
+                                      qty > 0 ? "bg-primary/10" : "bg-background"
                                     }`}
                                   >
                                     <div className="flex items-center gap-3 text-left">
@@ -252,28 +246,40 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                                           className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                                         />
                                       )}
-                                      {!extra.image_url && (
-                                        <div
-                                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                            selected ? "bg-primary border-primary" : "border-muted-foreground"
-                                          }`}
-                                        >
-                                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
-                                        </div>
-                                      )}
                                       <div>
                                         <span className="text-foreground font-medium text-sm">{extra.name}</span>
                                         {extra.description && (
                                           <p className="text-xs text-muted-foreground">{extra.description}</p>
                                         )}
+                                        {extra.price > 0 && (
+                                          <p className="text-primary font-bold text-xs">
+                                            R$ {extra.price.toFixed(2).replace(".", ",")}
+                                          </p>
+                                        )}
+                                        <p className="text-[10px] text-muted-foreground">Máx {maxPerItem}</p>
                                       </div>
                                     </div>
-                                    {extra.price > 0 && (
-                                      <span className="text-primary font-bold text-sm flex-shrink-0 ml-2">
-                                        R$ {extra.price.toFixed(2).replace(".", ",")}
-                                      </span>
-                                    )}
-                                  </button>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      {qty > 0 && (
+                                        <button
+                                          onClick={() => handleChangeExtraQty(group.id, extra, -1)}
+                                          className="w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center"
+                                        >
+                                          <Minus className="w-3 h-3 text-foreground" />
+                                        </button>
+                                      )}
+                                      {qty > 0 && (
+                                        <span className="text-sm font-bold text-foreground w-5 text-center">{qty}</span>
+                                      )}
+                                      <button
+                                        onClick={() => handleChangeExtraQty(group.id, extra, 1)}
+                                        disabled={isFull || qty >= maxPerItem}
+                                        className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 );
                               })}
                             </div>
