@@ -220,13 +220,22 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
                                     }`}
                                   >
                                     <div className="flex items-center gap-3 text-left">
-                                      <div
-                                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                          selected ? "bg-primary border-primary" : "border-muted-foreground"
-                                        }`}
-                                      >
-                                        {selected && <Check className="w-3 h-3 text-primary-foreground" />}
-                                      </div>
+                                      {extra.image_url && (
+                                        <img
+                                          src={extra.image_url}
+                                          alt={extra.name}
+                                          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                                        />
+                                      )}
+                                      {!extra.image_url && (
+                                        <div
+                                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                            selected ? "bg-primary border-primary" : "border-muted-foreground"
+                                          }`}
+                                        >
+                                          {selected && <Check className="w-3 h-3 text-primary-foreground" />}
+                                        </div>
+                                      )}
                                       <div>
                                         <span className="text-foreground font-medium text-sm">{extra.name}</span>
                                         {extra.description && (

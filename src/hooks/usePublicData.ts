@@ -27,6 +27,7 @@ export interface DbExtra {
   price: number;
   group_id: string | null;
   max_quantity: number | null;
+  image_url: string | null;
 }
 
 export interface DbExtraGroup {
@@ -36,6 +37,7 @@ export interface DbExtraGroup {
   max_select: number;
   is_required: boolean;
   sort_order: number | null;
+  applies_to_categories: string[] | null;
 }
 
 export interface ExtraGroup {
@@ -44,11 +46,17 @@ export interface ExtraGroup {
   description: string | null;
   max_select: number;
   is_required: boolean;
-  extras: { id: string; name: string; description: string | null; price: number; max_quantity: number }[];
+  applies_to_categories: string[];
+  extras: { id: string; name: string; description: string | null; price: number; max_quantity: number; image_url: string | null }[];
 }
 
 // Map DB product to the Product interface used by components
-export function mapDbProduct(p: DbProduct, extraGroups: ExtraGroup[]) {
+export function mapDbProduct(p: DbProduct, allExtraGroups: ExtraGroup[]) {
+  // Filter extra groups by product category
+  const extraGroups = allExtraGroups.filter((g) =>
+    g.applies_to_categories.length === 0 || g.applies_to_categories.includes(p.category)
+  );
+  
   return {
     id: p.id,
     name: p.name,
@@ -58,7 +66,6 @@ export function mapDbProduct(p: DbProduct, extraGroups: ExtraGroup[]) {
     category: p.category,
     badges: p.badges || undefined,
     extraGroups,
-    // Keep flat extras for backward compat
     extras: extraGroups.flatMap((g) => g.extras.map((e) => ({ id: e.id, name: e.name, price: e.price }))),
   };
 }
@@ -132,6 +139,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
     description: g.description,
     max_select: g.max_select,
     is_required: g.is_required,
+    applies_to_categories: g.applies_to_categories || [],
     extras: extras
       .filter((e) => e.group_id === g.id)
       .map((e) => ({
@@ -140,6 +148,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
         description: e.description,
         price: Number(e.price),
         max_quantity: e.max_quantity || 1,
+        image_url: e.image_url || null,
       })),
   })).filter((g) => g.extras.length > 0);
 }

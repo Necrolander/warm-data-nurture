@@ -10,7 +10,7 @@ export interface ExtraGroup {
   description: string | null;
   max_select: number;
   is_required: boolean;
-  extras: { id: string; name: string; description: string | null; price: number; max_quantity: number }[];
+  extras: { id: string; name: string; description: string | null; price: number; max_quantity: number; image_url: string | null }[];
 }
 
 export interface Product {

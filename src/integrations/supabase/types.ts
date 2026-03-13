@@ -172,6 +172,7 @@ export type Database = {
       }
       extra_groups: {
         Row: {
+          applies_to_categories: string[] | null
           description: string | null
           id: string
           is_active: boolean | null
@@ -181,6 +182,7 @@ export type Database = {
           sort_order: number | null
         }
         Insert: {
+          applies_to_categories?: string[] | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -190,6 +192,7 @@ export type Database = {
           sort_order?: number | null
         }
         Update: {
+          applies_to_categories?: string[] | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -312,6 +315,7 @@ export type Database = {
           description: string | null
           group_id: string | null
           id: string
+          image_url: string | null
           is_active: boolean | null
           max_quantity: number | null
           name: string
@@ -322,6 +326,7 @@ export type Database = {
           description?: string | null
           group_id?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           max_quantity?: number | null
           name: string
@@ -332,6 +337,7 @@ export type Database = {
           description?: string | null
           group_id?: string | null
           id?: string
+          image_url?: string | null
           is_active?: boolean | null
           max_quantity?: number | null
           name?: string
