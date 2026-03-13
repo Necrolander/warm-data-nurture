@@ -64,7 +64,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
                             <h4 className="font-bold text-foreground text-sm truncate">{item.product.name}</h4>
                             {item.extras.length > 0 && (
                               <p className="text-xs text-muted-foreground truncate">
-                                + {item.extras.map((e) => e.name).join(", ")}
+                                + {item.extras.map((e) => `${(e.quantity || 1) > 1 ? `${e.quantity}x ` : ""}${e.name}`).join(", ")}
                               </p>
                             )}
                             {item.observation && (
