@@ -543,10 +543,8 @@ const WaiterNewOrder = () => {
               <p className="text-primary font-bold">R$ {extrasModal.price.toFixed(2).replace(".", ",")}</p>
 
               {getProductExtras(extrasModal).map((group) => {
-                const groupSelectedCount = selectedExtras.filter(se => {
-                  const ext = group.extras.find(e => e.id === se.id);
-                  return !!ext;
-                }).length;
+                const groupSelectedCount = getGroupSelectedCount(group.id);
+                const isFull = groupSelectedCount >= group.max_select;
 
                 return (
                   <div key={group.id} className="space-y-2 border-t border-border pt-3">
@@ -558,23 +556,39 @@ const WaiterNewOrder = () => {
                       </div>
                     </div>
                     {group.extras.map((extra) => {
-                      const isSelected = selectedExtras.some(e => e.id === extra.id);
+                      const qty = getExtraQty(extra.id);
+                      const maxPerItem = extra.max_quantity || 99;
                       return (
                         <div
                           key={extra.id}
-                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${isSelected ? "border-primary bg-primary/5" : "border-border"}`}
-                          onClick={() => toggleExtra(extra, group.id)}
+                          className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${qty > 0 ? "border-primary bg-primary/5" : "border-border"}`}
                         >
-                          <Checkbox checked={isSelected} />
                           {extra.image_url && (
                             <img src={extra.image_url} alt={extra.name} className="w-10 h-10 rounded object-cover" />
                           )}
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-foreground">{extra.name}</p>
+                            {extra.description && <p className="text-xs text-muted-foreground">{extra.description}</p>}
+                            {extra.price > 0 && (
+                              <p className="text-xs font-bold text-primary">R$ {extra.price.toFixed(2).replace(".", ",")}</p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground">Máx {maxPerItem}</p>
                           </div>
-                          {extra.price > 0 && (
-                            <span className="text-xs font-bold text-primary">+R$ {extra.price.toFixed(2).replace(".", ",")}</span>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {qty > 0 && (
+                              <button onClick={() => changeExtraQty(extra, group.id, -1)} className="w-7 h-7 rounded-full bg-background border border-border flex items-center justify-center">
+                                <Minus className="w-3 h-3" />
+                              </button>
+                            )}
+                            {qty > 0 && <span className="text-sm font-bold w-5 text-center">{qty}</span>}
+                            <button
+                              onClick={() => changeExtraQty(extra, group.id, 1)}
+                              disabled={isFull || qty >= maxPerItem}
+                              className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -582,9 +596,12 @@ const WaiterNewOrder = () => {
                 );
               })}
 
-              <Button onClick={confirmExtras} className="w-full mt-4">
+              <Button onClick={confirmExtras} disabled={hasUnmetRequirements} className="w-full mt-4">
                 Adicionar ao pedido
               </Button>
+              {hasUnmetRequirements && (
+                <p className="text-xs text-destructive text-center mt-1">Selecione os itens obrigatórios</p>
+              )}
             </>
           )}
         </DialogContent>
