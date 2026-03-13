@@ -50,7 +50,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
               <>
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
                   {items.map((item) => {
-                    const extrasTotal = item.extras.reduce((s, e) => s + e.price, 0);
+                    const extrasTotal = item.extras.reduce((s, e) => s + e.price * (e.quantity || 1), 0);
                     const itemTotal = (item.product.price + extrasTotal) * item.quantity;
                     return (
                       <div key={item.id} className="bg-muted rounded-xl p-4">
