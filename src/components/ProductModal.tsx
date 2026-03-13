@@ -307,10 +307,13 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
 
             {/* Add to cart button */}
             <motion.div whileTap={{ scale: 0.97 }}>
-              <Button onClick={handleAdd} className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2" size="lg">
+              <Button onClick={handleAdd} disabled={hasUnmetRequirements} className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/30 gap-2 disabled:opacity-50" size="lg">
                 <ShoppingCart className="w-5 h-5" />
                 Adicionar {quantity > 1 ? `(${quantity})` : ""} — R$ {total.toFixed(2).replace(".", ",")}
               </Button>
+              {hasUnmetRequirements && (
+                <p className="text-xs text-destructive text-center mt-2">Selecione os itens obrigatórios para continuar</p>
+              )}
             </motion.div>
           </div>
         </motion.div>
