@@ -62,7 +62,9 @@ const fallbackImage = "https://images.unsplash.com/photo-1568901346375-23c9450c5
 const NewOrder = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [extras, setExtras] = useState<Extra[]>([]);
+  const [extraGroups, setExtraGroups] = useState<ExtraGroupData[]>([]);
+  const [extrasModal, setExtrasModal] = useState<Product | null>(null);
+  const [modalExtras, setModalExtras] = useState<SelectedExtra[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderType, setOrderType] = useState<"delivery" | "pickup" | "dine_in">("delivery");
   const [customerName, setCustomerName] = useState("");
