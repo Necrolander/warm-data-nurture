@@ -83,9 +83,13 @@ const ProductModal = ({ product, onClose }: ProductModalProps) => {
     }
   };
 
-  const extrasTotal = selectedExtras.reduce((s, e) => s + e.price, 0);
+  const extrasTotal = selectedExtras.reduce((s, e) => s + e.price * (e.quantity || 1), 0);
   const unitTotal = product.price + extrasTotal;
   const total = unitTotal * quantity;
+
+  const hasUnmetRequirements = extraGroups.some(
+    (g) => g.is_required && getGroupSelectedCount(g.id) < g.max_select
+  );
 
   const handleAdd = () => {
     for (let i = 0; i < quantity; i++) {
