@@ -76,16 +76,34 @@ const NewOrder = () => {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null);
 
+  const [extraGroups, setExtraGroups] = useState<ExtraGroupData[]>([]);
+  const [extrasModal, setExtrasModal] = useState<Product | null>(null);
+  const [modalExtras, setModalExtras] = useState<SelectedExtra[]>([]);
+
   useEffect(() => {
     const fetchData = async () => {
-      const [p, e, c] = await Promise.all([
+      const [p, groupRes, extrasRes, c] = await Promise.all([
         supabase.from("products").select("id, name, price, category, image_url, description").eq("is_active", true).order("sort_order"),
-        supabase.from("product_extras").select("id, name, price").eq("is_active", true).order("sort_order"),
+        supabase.from("extra_groups").select("*").eq("is_active", true).order("sort_order"),
+        supabase.from("product_extras").select("*").eq("is_active", true).order("sort_order"),
         supabase.from("categories").select("id, slug, name, icon").eq("is_active", true).order("sort_order"),
       ]);
       if (p.data) setProducts(p.data);
-      if (e.data) setExtras(e.data);
       if (c.data) setCategories(c.data);
+
+      if (groupRes.data && extrasRes.data) {
+        const groups: ExtraGroupData[] = groupRes.data.map((g: any) => ({
+          id: g.id,
+          name: g.name,
+          max_select: g.max_select,
+          is_required: g.is_required,
+          applies_to_categories: g.applies_to_categories,
+          extras: extrasRes.data
+            .filter((e: any) => e.group_id === g.id)
+            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), image_url: e.image_url, group_id: e.group_id })),
+        })).filter((g: ExtraGroupData) => g.extras.length > 0);
+        setExtraGroups(groups);
+      }
     };
     fetchData();
   }, []);
