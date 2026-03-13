@@ -25,6 +25,9 @@ import DeliveryFees from "./pages/admin/DeliveryFees";
 import DigitalMenu from "./pages/admin/DigitalMenu";
 import Establishment from "./pages/admin/Establishment";
 import DeliveryPersons from "./pages/admin/DeliveryPersons";
+import WaiterLogin from "./pages/WaiterLogin";
+import WaiterDashboard from "./pages/waiter/WaiterDashboard";
+import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -61,6 +64,11 @@ const App = () => (
               <Route path="establishment" element={<Establishment />} />
               <Route path="delivery-persons" element={<DeliveryPersons />} />
             </Route>
+
+            {/* Waiter App */}
+            <Route path="/waiter/login" element={<WaiterLogin />} />
+            <Route path="/waiter" element={<WaiterDashboard />} />
+            <Route path="/waiter/new-order" element={<WaiterNewOrder />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
