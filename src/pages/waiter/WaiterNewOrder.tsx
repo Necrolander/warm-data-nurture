@@ -104,7 +104,7 @@ const WaiterNewOrder = () => {
           applies_to_categories: g.applies_to_categories,
           extras: extrasRes.data
             .filter((e: any) => e.group_id === g.id)
-            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), image_url: e.image_url, group_id: e.group_id })),
+            .map((e: any) => ({ id: e.id, name: e.name, price: Number(e.price), max_quantity: e.max_quantity || 4, description: e.description || null, image_url: e.image_url, group_id: e.group_id })),
         })).filter((g: ExtraGroupData) => g.extras.length > 0);
         setExtraGroups(groups);
       }
