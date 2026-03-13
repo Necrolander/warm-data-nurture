@@ -34,7 +34,7 @@ interface ExtraItem {
   image_url: string | null;
   max_quantity: number;
   description: string | null;
-  group_id: string | null;
+}
 
 interface ExtraGroupData {
   id: string;
@@ -49,6 +49,7 @@ interface SelectedExtra {
   id: string;
   name: string;
   price: number;
+  quantity: number;
 }
 
 interface CartItem {
