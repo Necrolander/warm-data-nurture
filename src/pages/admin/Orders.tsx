@@ -573,6 +573,7 @@ const Orders = () => {
       toast.error("Erro ao finalizar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} entregue! ✅`);
+      notifyCustomerStatus(order.id, "delivered");
       fetchOrders();
     }
   };
