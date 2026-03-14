@@ -228,7 +228,7 @@ const DriverDashboard = () => {
     if (!currentOrder) return;
     await supabase
       .from("orders")
-      .update({ status: newStatus })
+      .update({ status: newStatus as any })
       .eq("id", currentOrder.id);
 
     await supabase.functions.invoke("whatsapp-bot", {
