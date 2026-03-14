@@ -53,10 +53,13 @@ export interface ExtraGroup {
 
 // Map DB product to the Product interface used by components
 export function mapDbProduct(p: DbProduct, allExtraGroups: ExtraGroup[]) {
-  // Filter extra groups by product category
-  const extraGroups = allExtraGroups.filter((g) =>
-    g.applies_to_categories.length === 0 || g.applies_to_categories.includes(p.category)
-  );
+  // Filter extra groups: if applies_to_products is set, match by product ID; otherwise match by category
+  const extraGroups = allExtraGroups.filter((g) => {
+    if (g.applies_to_products.length > 0) {
+      return g.applies_to_products.includes(p.id);
+    }
+    return g.applies_to_categories.length === 0 || g.applies_to_categories.includes(p.category);
+  });
   
   return {
     id: p.id,
