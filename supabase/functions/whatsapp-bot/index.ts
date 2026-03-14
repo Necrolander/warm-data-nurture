@@ -367,6 +367,9 @@ async function handlePayment(supabase: any, session: any, msg: string, settings:
   let text = "📋 *Resumo do Pedido:*\n\n";
   text += buildCartSummary(cart);
   text += `\n\n📍 *Entrega:* ${session.delivery_address}`;
+  if (session.delivery_lat && session.delivery_lng) {
+    text += `\n🗺️ *Localização:* https://maps.google.com/?q=${session.delivery_lat},${session.delivery_lng}`;
+  }
   text += `\n💳 *Pagamento:* ${payment.label}`;
   text += `\n💰 *Total: R$ ${total.toFixed(2).replace(".", ",")}*`;
 
