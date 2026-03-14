@@ -558,6 +558,7 @@ const Orders = () => {
       toast.error("Erro ao atualizar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} → ${statusLabels[newStatus]}`);
+      notifyCustomerStatus(order.id, newStatus);
       fetchOrders();
     }
   };
