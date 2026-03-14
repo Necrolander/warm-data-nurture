@@ -38,6 +38,7 @@ export interface DbExtraGroup {
   is_required: boolean;
   sort_order: number | null;
   applies_to_categories: string[] | null;
+  applies_to_products: string[] | null;
 }
 
 export interface ExtraGroup {
@@ -47,15 +48,19 @@ export interface ExtraGroup {
   max_select: number;
   is_required: boolean;
   applies_to_categories: string[];
+  applies_to_products: string[];
   extras: { id: string; name: string; description: string | null; price: number; max_quantity: number; image_url: string | null }[];
 }
 
 // Map DB product to the Product interface used by components
 export function mapDbProduct(p: DbProduct, allExtraGroups: ExtraGroup[]) {
-  // Filter extra groups by product category
-  const extraGroups = allExtraGroups.filter((g) =>
-    g.applies_to_categories.length === 0 || g.applies_to_categories.includes(p.category)
-  );
+  // Filter extra groups: if applies_to_products is set, match by product ID; otherwise match by category
+  const extraGroups = allExtraGroups.filter((g) => {
+    if (g.applies_to_products.length > 0) {
+      return g.applies_to_products.includes(p.id);
+    }
+    return g.applies_to_categories.length === 0 || g.applies_to_categories.includes(p.category);
+  });
   
   return {
     id: p.id,
@@ -140,6 +145,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
     max_select: g.max_select,
     is_required: g.is_required,
     applies_to_categories: g.applies_to_categories || [],
+    applies_to_products: g.applies_to_products || [],
     extras: extras
       .filter((e) => e.group_id === g.id)
       .map((e) => ({
