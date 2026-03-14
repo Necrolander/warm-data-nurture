@@ -489,15 +489,20 @@ export type Database = {
       }
       orders: {
         Row: {
+          arrived_at_destination: boolean | null
           change_for: number | null
+          checklist_confirmed: boolean | null
           created_at: string | null
           customer_name: string
           customer_phone: string
+          delay_notified: boolean | null
           delivery_code: string | null
           delivery_fee: number
           delivery_lat: number | null
           delivery_lng: number | null
           delivery_person_id: string | null
+          estimated_delivery_minutes: number | null
+          estimated_prep_minutes: number | null
           id: string
           observation: string | null
           order_number: number
@@ -512,15 +517,20 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          arrived_at_destination?: boolean | null
           change_for?: number | null
+          checklist_confirmed?: boolean | null
           created_at?: string | null
           customer_name: string
           customer_phone: string
+          delay_notified?: boolean | null
           delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_person_id?: string | null
+          estimated_delivery_minutes?: number | null
+          estimated_prep_minutes?: number | null
           id?: string
           observation?: string | null
           order_number?: number
@@ -535,15 +545,20 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          arrived_at_destination?: boolean | null
           change_for?: number | null
+          checklist_confirmed?: boolean | null
           created_at?: string | null
           customer_name?: string
           customer_phone?: string
+          delay_notified?: boolean | null
           delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
           delivery_person_id?: string | null
+          estimated_delivery_minutes?: number | null
+          estimated_prep_minutes?: number | null
           id?: string
           observation?: string | null
           order_number?: number
