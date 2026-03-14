@@ -77,6 +77,9 @@ const App = () => (
             {/* Table QR Print */}
             <Route path="/table-qr/:tableNumber" element={<TableQRPrint />} />
 
+            {/* Delivery Tracking */}
+            <Route path="/tracking/:token" element={<DeliveryTracking />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
