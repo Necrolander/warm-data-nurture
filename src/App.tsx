@@ -57,6 +57,7 @@ const App = () => (
               <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="bot" element={<BotManager />} />
+              <Route path="bot-conversations" element={<BotConversations />} />
               <Route path="salon" element={<SalonManager />} />
               <Route path="salon-settings" element={<SalonSettings />} />
               <Route path="contacts" element={<Contacts />} />
