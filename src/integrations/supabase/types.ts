@@ -216,26 +216,83 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_issues: {
+        Row: {
+          created_at: string | null
+          delivery_person_id: string
+          id: string
+          issue_type: string
+          notes: string | null
+          order_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_person_id: string
+          id?: string
+          issue_type: string
+          notes?: string | null
+          order_id: string
+        }
+        Update: {
+          created_at?: string | null
+          delivery_person_id?: string
+          id?: string
+          issue_type?: string
+          notes?: string | null
+          order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_issues_delivery_person_id_fkey"
+            columns: ["delivery_person_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_persons: {
         Row: {
           created_at: string | null
+          current_lat: number | null
+          current_lng: number | null
           id: string
           is_active: boolean | null
+          is_online: boolean | null
+          location_updated_at: string | null
           name: string
+          password_hash: string | null
           phone: string
         }
         Insert: {
           created_at?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
           id?: string
           is_active?: boolean | null
+          is_online?: boolean | null
+          location_updated_at?: string | null
           name: string
+          password_hash?: string | null
           phone: string
         }
         Update: {
           created_at?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
           id?: string
           is_active?: boolean | null
+          is_online?: boolean | null
+          location_updated_at?: string | null
           name?: string
+          password_hash?: string | null
           phone?: string
         }
         Relationships: []
@@ -436,6 +493,7 @@ export type Database = {
           created_at: string | null
           customer_name: string
           customer_phone: string
+          delivery_code: string | null
           delivery_fee: number
           delivery_lat: number | null
           delivery_lng: number | null
@@ -458,6 +516,7 @@ export type Database = {
           created_at?: string | null
           customer_name: string
           customer_phone: string
+          delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
@@ -480,6 +539,7 @@ export type Database = {
           created_at?: string | null
           customer_name?: string
           customer_phone?: string
+          delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
           delivery_lng?: number | null
