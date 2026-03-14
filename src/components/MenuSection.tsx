@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { useProducts, useCategories, useExtras, useExtraGroups, buildExtraGroups, mapDbProduct } from "@/hooks/usePublicData";
+import { useProducts, useCategories, useExtras, useExtraGroups, buildExtraGroups, mapDbProduct, isProductAvailableNow } from "@/hooks/usePublicData";
 import { Product } from "@/data/products";
 import ProductCard from "./ProductCard";
 import ProductModal from "./ProductModal";
@@ -20,7 +20,8 @@ const MenuSection = () => {
   const categoryBarRef = useRef<HTMLDivElement>(null);
 
   const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
-  const products: Product[] = (dbProducts || []).map((p) => mapDbProduct(p, extraGroups));
+  const availableDbProducts = (dbProducts || []).filter(isProductAvailableNow);
+  const products: Product[] = availableDbProducts.map((p) => mapDbProduct(p, extraGroups));
   const categories = (dbCategories || []).map((c) => ({
     id: c.slug,
     name: c.icon ? `${c.icon} ${c.name}` : c.name,
