@@ -11,6 +11,7 @@ import {
   Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import logo from "@/assets/logo-truebox-new.png";
 
@@ -42,8 +43,17 @@ const AdminLayout = () => {
   const [storeOpen, setStoreOpen] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [urgencyAlert, setUrgencyAlert] = useState<any>(null);
+  const [pendingAlerts, setPendingAlerts] = useState(0);
   const urgencyAudioRef = useRef<HTMLAudioElement | null>(null);
   const urgencyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchPendingAlerts = async () => {
+    const [{ count: alertCount }, { count: issueCount }] = await Promise.all([
+      supabase.from("kitchen_alerts").select("*", { count: "exact", head: true }).eq("acknowledged", false),
+      supabase.from("delivery_issues").select("*", { count: "exact", head: true }),
+    ]);
+    setPendingAlerts((alertCount || 0) + (issueCount || 0));
+  };
 
   const fetchStoreStatus = async () => {
     const { data } = await supabase.from("store_settings").select("value").eq("key", "store_open").single();
@@ -103,22 +113,25 @@ const AdminLayout = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Kitchen urgency alerts listener
+  // Kitchen urgency alerts listener + badge counter
   useEffect(() => {
+    fetchPendingAlerts();
     const channel = supabase
       .channel("admin-kitchen-alerts")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "kitchen_alerts" },
+      .on("postgres_changes", { event: "*", schema: "public", table: "kitchen_alerts" },
         (payload: any) => {
-          const alert = payload.new;
+          fetchPendingAlerts();
+          const alert = payload.eventType === "INSERT" ? payload.new : null;
           if (alert && !alert.acknowledged) {
             setUrgencyAlert(alert);
-            // Play alarm immediately and repeat every 3s
             playUrgencySound();
             if (urgencyIntervalRef.current) clearInterval(urgencyIntervalRef.current);
             urgencyIntervalRef.current = setInterval(playUrgencySound, 3000);
             toast.error(`🚨 URGÊNCIA: ${alert.message}`, { duration: 15000 });
           }
         })
+      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_issues" },
+        () => { fetchPendingAlerts(); })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -187,9 +200,14 @@ const AdminLayout = () => {
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild>
-                        <NavLink to={item.url} end={item.url === "/admin"} className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
+                        <NavLink to={item.url} end={item.url === "/admin"} className="hover:bg-muted/50 flex items-center" activeClassName="bg-muted text-primary font-medium">
                           <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.title}</span>
+                          <span className="flex-1">{item.title}</span>
+                          {item.url === "/admin/delivery-alerts" && pendingAlerts > 0 && (
+                            <Badge variant="destructive" className="ml-auto h-5 min-w-5 flex items-center justify-center text-[10px] px-1.5 animate-pulse">
+                              {pendingAlerts}
+                            </Badge>
+                          )}
                         </NavLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
