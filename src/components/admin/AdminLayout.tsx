@@ -113,22 +113,25 @@ const AdminLayout = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  // Kitchen urgency alerts listener
+  // Kitchen urgency alerts listener + badge counter
   useEffect(() => {
+    fetchPendingAlerts();
     const channel = supabase
       .channel("admin-kitchen-alerts")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "kitchen_alerts" },
+      .on("postgres_changes", { event: "*", schema: "public", table: "kitchen_alerts" },
         (payload: any) => {
-          const alert = payload.new;
+          fetchPendingAlerts();
+          const alert = payload.eventType === "INSERT" ? payload.new : null;
           if (alert && !alert.acknowledged) {
             setUrgencyAlert(alert);
-            // Play alarm immediately and repeat every 3s
             playUrgencySound();
             if (urgencyIntervalRef.current) clearInterval(urgencyIntervalRef.current);
             urgencyIntervalRef.current = setInterval(playUrgencySound, 3000);
             toast.error(`🚨 URGÊNCIA: ${alert.message}`, { duration: 15000 });
           }
         })
+      .on("postgres_changes", { event: "*", schema: "public", table: "delivery_issues" },
+        () => { fetchPendingAlerts(); })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
