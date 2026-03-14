@@ -16,6 +16,7 @@ import DriverOrderView from "@/components/driver/DriverOrderView";
 import DriverHistory from "@/components/driver/DriverHistory";
 import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
 import DriverChecklist from "@/components/driver/DriverChecklist";
+import DriverChat from "@/components/driver/DriverChat";
 
 // Haversine distance in meters
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
