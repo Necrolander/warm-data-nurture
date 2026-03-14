@@ -38,6 +38,7 @@ export interface DbExtraGroup {
   is_required: boolean;
   sort_order: number | null;
   applies_to_categories: string[] | null;
+  applies_to_products: string[] | null;
 }
 
 export interface ExtraGroup {
