@@ -31,6 +31,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [emergencyActive, setEmergencyActive] = useState(false);
+  const emergencyActiveRef = useRef(false);
   const emergencyIntervalRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [unread, setUnread] = useState(0);
@@ -65,10 +66,8 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
         const msg = payload.new as Message;
         setMessages(prev => [...prev, msg]);
         if (msg.sender === "admin") {
-          // Mark as read
           supabase.from("driver_messages").update({ read_by_driver: true } as any).eq("id", msg.id);
-          // If admin responded, stop emergency
-          if (emergencyActive) {
+          if (emergencyActiveRef.current) {
             stopEmergency();
             toast.success("🏪 A loja respondeu!");
           }
@@ -105,6 +104,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
 
   const startEmergency = async () => {
     setEmergencyActive(true);
+    emergencyActiveRef.current = true;
     // Send emergency message
     await supabase.from("driver_messages").insert({
       driver_id: driverId,
@@ -148,6 +148,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
 
   const stopEmergency = () => {
     setEmergencyActive(false);
+    emergencyActiveRef.current = false;
     if (emergencyIntervalRef.current) {
       clearInterval(emergencyIntervalRef.current);
       emergencyIntervalRef.current = null;
