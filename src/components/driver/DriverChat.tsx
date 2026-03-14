@@ -148,6 +148,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
 
   const stopEmergency = () => {
     setEmergencyActive(false);
+    emergencyActiveRef.current = false;
     if (emergencyIntervalRef.current) {
       clearInterval(emergencyIntervalRef.current);
       emergencyIntervalRef.current = null;
