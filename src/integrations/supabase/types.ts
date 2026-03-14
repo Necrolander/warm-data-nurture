@@ -173,6 +173,7 @@ export type Database = {
       extra_groups: {
         Row: {
           applies_to_categories: string[] | null
+          applies_to_products: string[] | null
           description: string | null
           id: string
           is_active: boolean | null
@@ -183,6 +184,7 @@ export type Database = {
         }
         Insert: {
           applies_to_categories?: string[] | null
+          applies_to_products?: string[] | null
           description?: string | null
           id?: string
           is_active?: boolean | null
@@ -193,6 +195,7 @@ export type Database = {
         }
         Update: {
           applies_to_categories?: string[] | null
+          applies_to_products?: string[] | null
           description?: string | null
           id?: string
           is_active?: boolean | null
