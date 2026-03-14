@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, QrCode } from "lucide-react";
+import { Plus, Pencil, Trash2, QrCode, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface SalonTable {
   id: string;
@@ -21,6 +21,7 @@ const SalonManager = () => {
   const [tables, setTables] = useState<SalonTable[]>([]);
   const [editingTable, setEditingTable] = useState<Partial<SalonTable> | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
   const fetchTables = async () => {
     const { data } = await supabase.from("salon_tables").select("*").order("table_number");
@@ -32,9 +33,8 @@ const SalonManager = () => {
   const saveTable = async () => {
     if (!editingTable?.table_number) { toast.error("Preencha o número da mesa"); return; }
 
-    // Generate QR code URL using a free API
     const menuUrl = `${window.location.origin}/?mesa=${editingTable.table_number}`;
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(menuUrl)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(menuUrl)}`;
 
     const data = {
       table_number: editingTable.table_number,
@@ -87,13 +87,23 @@ const SalonManager = () => {
               <p className="text-sm text-muted-foreground">{table.seats} lugares</p>
 
               {table.qr_code_url && (
-                <a href={table.qr_code_url} target="_blank" rel="noopener noreferrer">
-                  <img src={table.qr_code_url} alt={`QR Mesa ${table.table_number}`} className="w-24 h-24 mx-auto rounded" />
-                </a>
+                <img src={table.qr_code_url} alt={`QR Mesa ${table.table_number}`} className="w-24 h-24 mx-auto rounded" />
               )}
 
-              <div className="flex items-center justify-center gap-2">
+              <p className="text-xs text-muted-foreground break-all">
+                /?mesa={table.table_number}
+              </p>
+
+              <div className="flex items-center justify-center gap-1">
                 <Switch checked={table.is_active} onCheckedChange={v => toggleTable(table.id, v)} />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  title="Imprimir QR Code"
+                  onClick={() => window.open(`/table-qr/${table.table_number}`, "_blank")}
+                >
+                  <Printer className="h-4 w-4" />
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => { setEditingTable(table); setIsDialogOpen(true); }}>
                   <Pencil className="h-4 w-4" />
                 </Button>
