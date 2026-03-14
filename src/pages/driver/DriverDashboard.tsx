@@ -74,7 +74,7 @@ const DriverDashboard = () => {
       } catch {
         // Fallback for mobile: use registration if available
         navigator.serviceWorker?.ready?.then((reg) => {
-          reg.showNotification(title, { body, icon: "/favicon.ico", vibrate: [200, 100, 200], tag: "new-order", renotify: true });
+          reg.showNotification(title, { body, icon: "/favicon.ico", tag: "new-order", renotify: true } as NotificationOptions);
         }).catch(() => {});
       }
     }
