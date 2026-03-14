@@ -7,7 +7,12 @@ import { Skeleton } from "./ui/skeleton";
 import { Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MenuSection = () => {
+interface MenuSectionProps {
+  channel?: string;
+  tableNumber?: number | null;
+}
+
+const MenuSection = ({ channel = "delivery", tableNumber }: MenuSectionProps) => {
   const { data: dbProducts, isLoading: loadingProducts } = useProducts();
   const { data: dbCategories, isLoading: loadingCategories } = useCategories();
   const { data: dbExtras } = useExtras();
