@@ -399,6 +399,9 @@ async function handleConfirm(supabase: any, session: any, msg: string, settings:
     total: total,
     payment_method: session.payment_method,
     observation: `Endereço: ${session.delivery_address}`,
+    reference: session.delivery_address,
+    delivery_lat: session.delivery_lat || null,
+    delivery_lng: session.delivery_lng || null,
   }).select().single();
 
   if (orderError || !order) {
