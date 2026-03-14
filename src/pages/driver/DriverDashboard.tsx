@@ -43,6 +43,7 @@ const DriverDashboard = () => {
   const [showProblem, setShowProblem] = useState(false);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
