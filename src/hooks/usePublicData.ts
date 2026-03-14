@@ -144,6 +144,7 @@ export function buildExtraGroups(groups: DbExtraGroup[] | undefined, extras: DbE
     max_select: g.max_select,
     is_required: g.is_required,
     applies_to_categories: g.applies_to_categories || [],
+    applies_to_products: (g as any).applies_to_products || [],
     extras: extras
       .filter((e) => e.group_id === g.id)
       .map((e) => ({
