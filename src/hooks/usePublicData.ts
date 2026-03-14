@@ -13,6 +13,7 @@ export interface DbProduct {
   available_days: number[] | null;
   available_start_time: string | null;
   available_end_time: string | null;
+  visibility_channels: string[] | null;
 }
 
 export function isProductAvailableNow(p: DbProduct): boolean {
