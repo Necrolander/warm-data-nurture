@@ -203,6 +203,44 @@ export type Database = {
         }
         Relationships: []
       }
+      kitchen_alerts: {
+        Row: {
+          acknowledged: boolean
+          created_at: string | null
+          id: string
+          message: string
+          order_id: string | null
+          table_number: number | null
+          waiter_name: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          created_at?: string | null
+          id?: string
+          message?: string
+          order_id?: string | null
+          table_number?: number | null
+          waiter_name?: string
+        }
+        Update: {
+          acknowledged?: boolean
+          created_at?: string | null
+          id?: string
+          message?: string
+          order_id?: string | null
+          table_number?: number | null
+          waiter_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kitchen_alerts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           created_at: string | null
