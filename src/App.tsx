@@ -71,6 +71,9 @@ const App = () => (
             <Route path="/waiter" element={<WaiterDashboard />} />
             <Route path="/waiter/new-order" element={<WaiterNewOrder />} />
 
+            {/* Table QR Print */}
+            <Route path="/table-qr/:tableNumber" element={<TableQRPrint />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
