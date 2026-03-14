@@ -104,6 +104,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
 
   const startEmergency = async () => {
     setEmergencyActive(true);
+    emergencyActiveRef.current = true;
     // Send emergency message
     await supabase.from("driver_messages").insert({
       driver_id: driverId,
