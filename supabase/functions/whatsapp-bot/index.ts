@@ -9,13 +9,55 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Store default coordinates
+const STORE_DEFAULT_COORDS = { lat: -16.014293069314565, lng: -48.05929532023717 };
+
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function getDeliveryFee(supabase: any, lat: number, lng: number, settings: Record<string, string>): Promise<{ fee: number; distance: number } | null> {
+  const storeLat = settings.store_lat ? parseFloat(settings.store_lat) : STORE_DEFAULT_COORDS.lat;
+  const storeLng = settings.store_lng ? parseFloat(settings.store_lng) : STORE_DEFAULT_COORDS.lng;
+  const distance = calculateDistance(storeLat, storeLng, lat, lng);
+
+  const { data: fees } = await supabase
+    .from("delivery_fees")
+    .select("max_km, fee")
+    .order("max_km", { ascending: true });
+
+  if (!fees || fees.length === 0) return null;
+
+  const maxKm = Math.max(...fees.map((f: any) => Number(f.max_km)));
+  if (distance > maxKm) return null;
+
+  for (const tier of fees) {
+    if (distance <= Number(tier.max_km)) {
+      return { fee: Number(tier.fee), distance };
+    }
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   try {
-    const { phone, message, customer_name } = await req.json();
+    const body = await req.json();
+
+    // Handle order status notification
+    if (body.action === "notify_status") {
+      return await handleStatusNotification(supabase, body);
+    }
+
+    const { phone, message, customer_name } = body;
     if (!phone || !message) {
       return new Response(JSON.stringify({ error: "phone and message required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -93,6 +135,120 @@ serve(async (req) => {
   }
 });
 
+// ==================== STATUS NOTIFICATION ====================
+
+async function handleStatusNotification(supabase: any, body: any) {
+  const { order_id, new_status } = body;
+  if (!order_id || !new_status) {
+    return new Response(JSON.stringify({ error: "order_id and new_status required" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Get order details
+  const { data: order } = await supabase.from("orders").select("*").eq("id", order_id).single();
+  if (!order) {
+    return new Response(JSON.stringify({ error: "Order not found" }), {
+      status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Get order items
+  const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order_id);
+
+  // Build status notification message
+  const statusMessages: Record<string, string> = {
+    production: `🍳 *Pedido #${order.order_number} em preparo!*\n\nSeu pedido foi aceito e já está sendo preparado! 🎉\n\n⏱️ Previsão: 30-45 minutos`,
+    ready: `✅ *Pedido #${order.order_number} está pronto!*\n\nSeu pedido está prontinho e aguardando o motoboy! 🏍️`,
+    out_for_delivery: await buildDeliveryMessage(supabase, order),
+    delivered: `📦 *Pedido #${order.order_number} entregue!*\n\nEsperamos que você goste! 😋\n\nObrigado por escolher a *Truebox Hamburgueria*! ❤️\n\nDigite *1* para fazer um novo pedido.`,
+    cancelled: `❌ *Pedido #${order.order_number} cancelado*\n\nInfelizmente seu pedido foi cancelado.\n\nDigite *5* para falar com um atendente ou *1* para fazer um novo pedido.`,
+  };
+
+  let notification = statusMessages[new_status];
+  if (!notification) {
+    return new Response(JSON.stringify({ error: "No notification for this status" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Add order summary for production status (first update)
+  if (new_status === "production" && items && items.length > 0) {
+    notification += "\n\n📋 *Seus itens:*\n";
+    items.forEach((item: any) => {
+      notification += `• ${item.quantity}x ${item.product_name} — R$ ${(Number(item.product_price) * item.quantity).toFixed(2).replace(".", ",")}\n`;
+    });
+    notification += `\n💰 *Total: R$ ${Number(order.total).toFixed(2).replace(".", ",")}*`;
+    if (order.delivery_fee > 0) {
+      notification += `\n🚚 (inclui frete: R$ ${Number(order.delivery_fee).toFixed(2).replace(".", ",")})`;
+    }
+  }
+
+  // Find or create active session for this phone
+  let { data: session } = await supabase
+    .from("chat_sessions")
+    .select("*")
+    .eq("phone", order.customer_phone)
+    .eq("is_active", true)
+    .single();
+
+  if (!session) {
+    const { data: newSession } = await supabase
+      .from("chat_sessions")
+      .insert({
+        phone: order.customer_phone,
+        customer_name: order.customer_name,
+        state: "greeting",
+        order_id: order.id,
+      })
+      .select()
+      .single();
+    session = newSession;
+  }
+
+  if (session) {
+    // Log the notification as outgoing message
+    await supabase.from("chat_messages").insert({
+      session_id: session.id,
+      direction: "outgoing",
+      message: notification,
+    });
+  }
+
+  return new Response(JSON.stringify({
+    notification,
+    phone: order.customer_phone,
+    order_number: order.order_number,
+  }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function buildDeliveryMessage(supabase: any, order: any): Promise<string> {
+  let msg = `🛵 *Pedido #${order.order_number} saiu para entrega!*\n\nO motoboy está a caminho! 🏍️💨`;
+
+  // Check for tracking link
+  const { data: tracking } = await supabase
+    .from("delivery_tracking")
+    .select("tracking_token")
+    .eq("order_id", order.id)
+    .eq("is_active", true)
+    .single();
+
+  if (tracking) {
+    msg += `\n\n📍 *Acompanhe em tempo real:*\n${SUPABASE_URL.replace('.supabase.co', '.lovable.app')}/rastreio/${tracking.tracking_token}`;
+  }
+
+  if (order.delivery_lat && order.delivery_lng) {
+    msg += `\n\n📍 *Seu endereço:*\n${order.observation || order.reference || "Endereço informado"}`;
+  }
+
+  msg += "\n\nDigite *4* para acompanhar o status.";
+  return msg;
+}
+
+// ==================== CONVERSATION ENGINE ====================
+
 async function processMessage(
   supabase: any, session: any, message: string,
   categories: any[], products: any[], settings: Record<string, string>,
@@ -100,7 +256,6 @@ async function processMessage(
 ): Promise<string> {
   const msg = message.trim().toLowerCase();
   const state = session.state;
-  const cart: any[] = session.cart || [];
 
   // Global commands (work in any state)
   if (["0", "voltar", "inicio", "menu", "oi", "olá", "ola", "hi"].includes(msg)) {
@@ -127,7 +282,7 @@ async function processMessage(
     case "address":
       return await handleAddress(supabase, session, msg);
     case "location":
-      return await handleLocation(supabase, session, msg);
+      return await handleLocation(supabase, session, msg, settings);
     case "payment":
       return await handlePayment(supabase, session, msg, settings);
     case "confirm":
@@ -150,16 +305,16 @@ async function handleGreeting(
   categories: any[], products: any[], settings: Record<string, string>, isStoreOpen: boolean
 ): Promise<string> {
   switch (msg) {
-    case "1": // Fazer pedido
+    case "1":
       if (!isStoreOpen) return "😕 Estamos fechados no momento. Volte no nosso horário de funcionamento!\n\nDigite *0* para voltar.";
       await updateSession(supabase, session.id, { state: "menu_categories", cart: [] });
       return buildCategoryMenu(categories);
-    case "2": // Ver cardápio
+    case "2":
       await updateSession(supabase, session.id, { state: "menu_categories" });
       return buildCategoryMenu(categories);
-    case "3": // Promoções
+    case "3":
       return "🔥 *Promoções do dia:*\n\n🍔 Quarta do Clone - Compre 1 e ganhe outro!\n🎉 Combos a partir de R$49,90\n\nDigite *1* para fazer um pedido ou *0* para voltar.";
-    case "4": // Acompanhar pedido
+    case "4":
       if (session.order_id) {
         const { data: order } = await supabase.from("orders").select("*").eq("id", session.order_id).single();
         if (order) {
@@ -171,7 +326,19 @@ async function handleGreeting(
             delivered: "📦 Entregue",
             cancelled: "❌ Cancelado",
           };
-          return `📋 *Pedido #${order.order_number}*\n\nStatus: ${statusMap[order.status] || order.status}\n\nDigite *0* para voltar.`;
+          let trackingInfo = "";
+          if (order.status === "out_for_delivery") {
+            const { data: tracking } = await supabase
+              .from("delivery_tracking")
+              .select("tracking_token")
+              .eq("order_id", order.id)
+              .eq("is_active", true)
+              .single();
+            if (tracking) {
+              trackingInfo = `\n\n📍 *Rastreio:* ${SUPABASE_URL.replace('.supabase.co', '.lovable.app')}/rastreio/${tracking.tracking_token}`;
+            }
+          }
+          return `📋 *Pedido #${order.order_number}*\n\nStatus: ${statusMap[order.status] || order.status}${trackingInfo}\n\nDigite *0* para voltar.`;
         }
       }
       return "🤔 Não encontrei nenhum pedido recente.\n\nDigite *1* para fazer um novo pedido ou *0* para voltar.";
@@ -181,9 +348,8 @@ async function handleGreeting(
 }
 
 function buildCategoryMenu(categories: any[]): string {
-  const deliveryCategories = categories.filter((c: any) => true); // All categories for now
   let text = "📋 *Nosso Cardápio*\n\nEscolha uma categoria:\n\n";
-  deliveryCategories.forEach((cat: any, i: number) => {
+  categories.forEach((cat: any, i: number) => {
     text += `${i + 1}️⃣ ${cat.icon || ""} ${cat.name}\n`;
   });
   text += "\nDigite o *número* da categoria ou *0* para voltar.";
@@ -253,7 +419,6 @@ async function handleMenuItems(
 async function handleItemQuantity(
   supabase: any, session: any, msg: string, products: any[]
 ): Promise<string> {
-  // Redirect to cart review
   await updateSession(supabase, session.id, { state: "cart_review" });
   return await handleCartReview(supabase, session, msg, [], products, {});
 }
@@ -267,7 +432,44 @@ function buildCartSummary(cart: any[]): string {
     total += subtotal;
     text += `${i + 1}. ${item.quantity}x ${item.name} — R$ ${subtotal.toFixed(2).replace(".", ",")}\n`;
   });
-  text += `\n💰 *Total: R$ ${total.toFixed(2).replace(".", ",")}*`;
+  text += `\n💰 *Subtotal: R$ ${total.toFixed(2).replace(".", ",")}*`;
+  return text;
+}
+
+function buildFullOrderSummary(cart: any[], deliveryFee: number, address: string | null, lat: number | null, lng: number | null, paymentLabel: string | null): string {
+  let text = "📋 *═══ RESUMO DO PEDIDO ═══*\n\n";
+  let subtotal = 0;
+
+  cart.forEach((item: any, i: number) => {
+    const itemTotal = item.price * item.quantity;
+    subtotal += itemTotal;
+    text += `${i + 1}. ${item.quantity}x *${item.name}*\n`;
+    text += `   R$ ${itemTotal.toFixed(2).replace(".", ",")}\n`;
+  });
+
+  text += `\n━━━━━━━━━━━━━━━`;
+  text += `\n💰 Subtotal: R$ ${subtotal.toFixed(2).replace(".", ",")}`;
+  
+  if (deliveryFee > 0) {
+    text += `\n🚚 Frete: R$ ${deliveryFee.toFixed(2).replace(".", ",")}`;
+  } else if (deliveryFee === 0 && lat) {
+    text += `\n🚚 Frete: *GRÁTIS* 🎉`;
+  }
+
+  const total = subtotal + deliveryFee;
+  text += `\n💵 *TOTAL: R$ ${total.toFixed(2).replace(".", ",")}*`;
+
+  if (address) {
+    text += `\n\n📍 *Entrega:* ${address}`;
+  }
+  if (lat && lng) {
+    text += `\n🗺️ *Mapa:* https://maps.google.com/?q=${lat},${lng}`;
+  }
+  if (paymentLabel) {
+    text += `\n💳 *Pagamento:* ${paymentLabel}`;
+  }
+
+  text += `\n\n*═══════════════════*`;
   return text;
 }
 
@@ -318,26 +520,51 @@ async function handleAddress(supabase: any, session: any, msg: string): Promise<
   return `📍 Endereço salvo: *${msg}*\n\n📌 *Agora envie sua localização (GPS)*\n\nNo WhatsApp, toque no 📎 (clipe) → *Localização* → *Enviar localização atual*.\n\nIsso ajuda o motoboy a encontrar você mais rápido! 🛵\n\nOu digite *pular* para continuar sem enviar a localização.`;
 }
 
-async function handleLocation(supabase: any, session: any, msg: string): Promise<string> {
-  // Check if user sent coordinates (format: lat,lng or "latitude longitude")
+async function handleLocation(supabase: any, session: any, msg: string, settings: Record<string, string>): Promise<string> {
   const coordsMatch = msg.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/);
-  
+
   if (msg === "pular" || msg === "skip") {
-    await updateSession(supabase, session.id, { state: "payment" });
-    return `📍 *Endereço:* ${session.delivery_address}\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
+    await updateSession(supabase, session.id, { state: "payment", delivery_lat: null, delivery_lng: null });
+    return `📍 *Endereço:* ${session.delivery_address}\n\n⚠️ Sem localização GPS, o frete não pode ser calculado automaticamente.\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
   }
 
   if (coordsMatch) {
     const lat = parseFloat(coordsMatch[1]);
     const lng = parseFloat(coordsMatch[2]);
-    
+
     if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
-      await updateSession(supabase, session.id, { 
-        state: "payment", 
-        delivery_lat: lat, 
-        delivery_lng: lng 
+      // Calculate delivery fee automatically
+      const feeResult = await getDeliveryFee(supabase, lat, lng, settings);
+
+      let feeText = "";
+      let deliveryFee = 0;
+
+      if (feeResult) {
+        deliveryFee = feeResult.fee;
+        feeText = `\n🚚 *Distância:* ${feeResult.distance.toFixed(1)} km`;
+        if (deliveryFee > 0) {
+          feeText += `\n💸 *Taxa de entrega:* R$ ${deliveryFee.toFixed(2).replace(".", ",")}`;
+        } else {
+          feeText += `\n💸 *Taxa de entrega:* GRÁTIS! 🎉`;
+        }
+      } else {
+        feeText = "\n⚠️ Infelizmente não entregamos nessa região. Consulte um atendente digitando *5*.";
+        await updateSession(supabase, session.id, { delivery_lat: lat, delivery_lng: lng });
+        return `📍 Localização recebida!${feeText}`;
+      }
+
+      // Store fee in session for order creation
+      await updateSession(supabase, session.id, {
+        state: "payment",
+        delivery_lat: lat,
+        delivery_lng: lng,
       });
-      return `✅ Localização recebida!\n\n📍 *Endereço:* ${session.delivery_address}\n🗺️ *GPS:* ${lat.toFixed(6)}, ${lng.toFixed(6)}\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
+
+      // Store fee temporarily - we'll use session cart total + fee
+      const cart = session.cart || [];
+      const subtotal = cart.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+
+      return `✅ Localização recebida!\n\n📍 *Endereço:* ${session.delivery_address}\n🗺️ *GPS:* ${lat.toFixed(6)}, ${lng.toFixed(6)}${feeText}\n\n💰 *Subtotal:* R$ ${subtotal.toFixed(2).replace(".", ",")}\n💵 *Total com frete:* R$ ${(subtotal + deliveryFee).toFixed(2).replace(".", ",")}\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
     }
   }
 
@@ -359,19 +586,18 @@ async function handlePayment(supabase: any, session: any, msg: string, settings:
     return "⚠️ Opção inválida.\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro";
   }
 
+  // Calculate delivery fee
+  let deliveryFee = 0;
+  if (session.delivery_lat && session.delivery_lng) {
+    const feeResult = await getDeliveryFee(supabase, session.delivery_lat, session.delivery_lng, settings);
+    if (feeResult) deliveryFee = feeResult.fee;
+  }
+
   await updateSession(supabase, session.id, { state: "confirm", payment_method: payment.key });
 
   const cart = session.cart || [];
-  const total = cart.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
-
-  let text = "📋 *Resumo do Pedido:*\n\n";
-  text += buildCartSummary(cart);
-  text += `\n\n📍 *Entrega:* ${session.delivery_address}`;
-  if (session.delivery_lat && session.delivery_lng) {
-    text += `\n🗺️ *Localização:* https://maps.google.com/?q=${session.delivery_lat},${session.delivery_lng}`;
-  }
-  text += `\n💳 *Pagamento:* ${payment.label}`;
-  text += `\n💰 *Total: R$ ${total.toFixed(2).replace(".", ",")}*`;
+  
+  let text = buildFullOrderSummary(cart, deliveryFee, session.delivery_address, session.delivery_lat, session.delivery_lng, payment.label);
 
   if (payment.key === "pix") {
     const pixKey = settings.pix_key || "truebox@pix.com";
@@ -389,7 +615,16 @@ async function handleConfirm(supabase: any, session: any, msg: string, settings:
   }
 
   const cart = session.cart || [];
-  const total = cart.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+  const subtotal = cart.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+
+  // Calculate delivery fee
+  let deliveryFee = 0;
+  if (session.delivery_lat && session.delivery_lng) {
+    const feeResult = await getDeliveryFee(supabase, session.delivery_lat, session.delivery_lng, settings);
+    if (feeResult) deliveryFee = feeResult.fee;
+  }
+
+  const total = subtotal + deliveryFee;
 
   // Create order
   const { data: order, error: orderError } = await supabase.from("orders").insert({
@@ -397,8 +632,8 @@ async function handleConfirm(supabase: any, session: any, msg: string, settings:
     customer_phone: session.phone,
     order_type: "delivery",
     status: "pending",
-    subtotal: total,
-    delivery_fee: 0,
+    subtotal: subtotal,
+    delivery_fee: deliveryFee,
     total: total,
     payment_method: session.payment_method,
     observation: `Endereço: ${session.delivery_address}`,
@@ -439,11 +674,23 @@ async function handleConfirm(supabase: any, session: any, msg: string, settings:
     order_id: order.id,
   });
 
-  return `🎉 *Pedido #${order.order_number} confirmado!*\n\n` +
-    `Vamos preparar com carinho! 🍔\n\n` +
-    `Você receberá atualizações sobre o status do seu pedido.\n\n` +
-    `Para acompanhar, digite *4* a qualquer momento.\n\n` +
-    `Obrigado por escolher a Truebox! ❤️`;
+  // Build confirmation with full order details
+  const paymentLabels: Record<string, string> = {
+    pix: "PIX", credit_card: "Cartão na entrega", debit_card: "Débito", cash: "Dinheiro",
+  };
+
+  let confirmMsg = `🎉 *Pedido #${order.order_number} confirmado!*\n\n`;
+  confirmMsg += buildFullOrderSummary(
+    cart, deliveryFee, session.delivery_address,
+    session.delivery_lat, session.delivery_lng,
+    paymentLabels[session.payment_method] || session.payment_method
+  );
+  confirmMsg += `\n\n⏳ Aguarde! Você receberá atualizações:\n`;
+  confirmMsg += `🍳 Em preparo → ✅ Pronto → 🛵 Saiu para entrega → 📦 Entregue\n\n`;
+  confirmMsg += `Para acompanhar, digite *4* a qualquer momento.\n\n`;
+  confirmMsg += `Obrigado por escolher a *Truebox Hamburgueria*! ❤️`;
+
+  return confirmMsg;
 }
 
 async function updateSession(supabase: any, sessionId: string, data: any) {
