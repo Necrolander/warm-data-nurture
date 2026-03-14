@@ -74,6 +74,100 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          created_at: string | null
+          direction: string
+          id: string
+          message: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          direction?: string
+          id?: string
+          message: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          id?: string
+          message?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "chat_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_sessions: {
+        Row: {
+          cart: Json
+          created_at: string | null
+          customer_name: string | null
+          delivery_address: string | null
+          delivery_lat: number | null
+          delivery_lng: number | null
+          id: string
+          is_active: boolean
+          last_message_at: string | null
+          order_id: string | null
+          payment_method: string | null
+          phone: string
+          selected_category: string | null
+          state: string
+          updated_at: string | null
+        }
+        Insert: {
+          cart?: Json
+          created_at?: string | null
+          customer_name?: string | null
+          delivery_address?: string | null
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          id?: string
+          is_active?: boolean
+          last_message_at?: string | null
+          order_id?: string | null
+          payment_method?: string | null
+          phone: string
+          selected_category?: string | null
+          state?: string
+          updated_at?: string | null
+        }
+        Update: {
+          cart?: Json
+          created_at?: string | null
+          customer_name?: string | null
+          delivery_address?: string | null
+          delivery_lat?: number | null
+          delivery_lng?: number | null
+          id?: string
+          is_active?: boolean
+          last_message_at?: string | null
+          order_id?: string | null
+          payment_method?: string | null
+          phone?: string
+          selected_category?: string | null
+          state?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_sessions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string | null
@@ -169,6 +263,57 @@ export type Database = {
           sort_order?: number | null
         }
         Relationships: []
+      }
+      delivery_tracking: {
+        Row: {
+          created_at: string | null
+          current_lat: number | null
+          current_lng: number | null
+          delivery_person_id: string | null
+          id: string
+          is_active: boolean
+          order_id: string
+          tracking_token: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          delivery_person_id?: string | null
+          id?: string
+          is_active?: boolean
+          order_id: string
+          tracking_token?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_lat?: number | null
+          current_lng?: number | null
+          delivery_person_id?: string | null
+          id?: string
+          is_active?: boolean
+          order_id?: string
+          tracking_token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_tracking_delivery_person_id_fkey"
+            columns: ["delivery_person_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_tracking_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       extra_groups: {
         Row: {
