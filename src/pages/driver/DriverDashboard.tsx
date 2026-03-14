@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Bike, MapPin, Phone, Package, Navigation, CheckCircle,
-  AlertTriangle, Clock, LogOut, History, DollarSign, X
+  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,6 +16,7 @@ import DriverOrderView from "@/components/driver/DriverOrderView";
 import DriverHistory from "@/components/driver/DriverHistory";
 import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
 import DriverChecklist from "@/components/driver/DriverChecklist";
+import DriverChat from "@/components/driver/DriverChat";
 
 // Haversine distance in meters
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -42,6 +43,7 @@ const DriverDashboard = () => {
   const [showProblem, setShowProblem] = useState(false);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
   const [showChecklist, setShowChecklist] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
@@ -421,6 +423,9 @@ const DriverDashboard = () => {
               </span>
               <Switch checked={isOnline} onCheckedChange={toggleOnline} />
             </div>
+            <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
+              <MessageSquare className="h-5 w-5" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
               <History className="h-5 w-5" />
             </Button>
@@ -515,6 +520,18 @@ const DriverDashboard = () => {
             <DialogTitle>Histórico de Entregas</DialogTitle>
           </DialogHeader>
           <DriverHistory driverId={driverId!} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat drawer */}
+      <Dialog open={showChat} onOpenChange={setShowChat}>
+        <DialogContent className="max-w-sm h-[80vh] p-0 flex flex-col">
+          <DriverChat
+            driverId={driverId!}
+            driverName={driverName || "Entregador"}
+            currentOrderId={currentOrder?.id}
+            onClose={() => setShowChat(false)}
+          />
         </DialogContent>
       </Dialog>
 

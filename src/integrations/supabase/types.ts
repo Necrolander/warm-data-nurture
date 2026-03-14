@@ -372,6 +372,50 @@ export type Database = {
           },
         ]
       }
+      driver_messages: {
+        Row: {
+          created_at: string
+          driver_id: string
+          id: string
+          is_emergency: boolean
+          message: string
+          order_id: string | null
+          read_by_admin: boolean
+          read_by_driver: boolean
+          sender: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          id?: string
+          is_emergency?: boolean
+          message: string
+          order_id?: string | null
+          read_by_admin?: boolean
+          read_by_driver?: boolean
+          sender?: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          id?: string
+          is_emergency?: boolean
+          message?: string
+          order_id?: string | null
+          read_by_admin?: boolean
+          read_by_driver?: boolean
+          sender?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_messages_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extra_groups: {
         Row: {
           applies_to_categories: string[] | null
