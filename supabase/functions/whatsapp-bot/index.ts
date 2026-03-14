@@ -126,6 +126,8 @@ async function processMessage(
       return await handleCartReview(supabase, session, msg, categories, products, settings);
     case "address":
       return await handleAddress(supabase, session, msg);
+    case "location":
+      return await handleLocation(supabase, session, msg);
     case "payment":
       return await handlePayment(supabase, session, msg, settings);
     case "confirm":
