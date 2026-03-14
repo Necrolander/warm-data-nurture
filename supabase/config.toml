@@ -1,1 +1,7 @@
 project_id = "yxmirlnvrrintrvicqic"
+
+[functions.whatsapp-bot]
+verify_jwt = false
+
+[functions.manage-waiter-auth]
+verify_jwt = true
