@@ -535,6 +535,7 @@ const Orders = () => {
       toast.error("Erro ao rejeitar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} rejeitado`);
+      notifyCustomerStatus(order.id, "cancelled");
       fetchOrders();
     }
   };
