@@ -36,8 +36,10 @@ const DeliveryAlerts = () => {
   const [tab, setTab] = useState("delays");
   const [actionIssue, setActionIssue] = useState<any>(null);
   const [replyMessage, setReplyMessage] = useState("");
+  const [driverMessage, setDriverMessage] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<"customer" | "driver" | "both">("customer");
 
   const fetchDelayAlerts = async () => {
     const { data } = await supabase
@@ -103,8 +105,7 @@ const DeliveryAlerts = () => {
     const driverPhone = actionIssue.delivery_persons?.phone;
 
     // Send message to customer via WhatsApp bot
-    if (replyMessage.trim() && actionIssue.orders?.customer_phone) {
-      // Create a chat message for the customer
+    if (replyMessage.trim() && (replyTarget === "customer" || replyTarget === "both") && actionIssue.orders?.customer_phone) {
       let { data: session } = await supabase
         .from("chat_sessions")
         .select("*")
@@ -136,6 +137,40 @@ const DeliveryAlerts = () => {
       }
     }
 
+    // Send message to driver via WhatsApp bot (create/find session by driver phone)
+    const driverMsg = (replyTarget === "driver") ? replyMessage.trim() : driverMessage.trim();
+    if (driverMsg && (replyTarget === "driver" || replyTarget === "both") && driverPhone) {
+      let { data: driverSession } = await supabase
+        .from("chat_sessions")
+        .select("*")
+        .eq("phone", driverPhone)
+        .eq("is_active", true)
+        .single();
+
+      if (!driverSession) {
+        const { data: newDriverSession } = await supabase
+          .from("chat_sessions")
+          .insert({
+            phone: driverPhone,
+            customer_name: `🏍️ ${actionIssue.delivery_persons?.name || "Entregador"}`,
+            state: "greeting",
+            order_id: orderId,
+          })
+          .select()
+          .single();
+        driverSession = newDriverSession;
+      }
+
+      if (driverSession) {
+        await supabase.from("chat_messages").insert({
+          session_id: driverSession.id,
+          direction: "outgoing",
+          message: `📋 *Msg do Restaurante — Pedido #${actionIssue.orders?.order_number}*\n\n${driverMsg}`,
+        });
+        toast.success("Mensagem enviada ao entregador!");
+      }
+    }
+
     // Update order status if changed
     if (newStatus && orderId && newStatus !== actionIssue.orders?.status) {
       await supabase
@@ -143,7 +178,6 @@ const DeliveryAlerts = () => {
         .update({ status: newStatus as any })
         .eq("id", orderId);
 
-      // Notify customer of status change
       await supabase.functions.invoke("whatsapp-bot", {
         body: { action: "notify_status", order_id: orderId, new_status: newStatus },
       });
@@ -151,18 +185,21 @@ const DeliveryAlerts = () => {
       toast.success(`Status alterado para: ${statusOptions.find(s => s.value === newStatus)?.label}`);
     }
 
-    // Save admin response as note on the issue
-    if (replyMessage.trim()) {
+    // Save admin response as note
+    const noteMsg = [replyMessage.trim() && `Cliente: ${replyMessage.trim()}`, driverMsg && `Entregador: ${driverMsg}`].filter(Boolean).join(" | ");
+    if (noteMsg) {
       await supabase
         .from("delivery_issues")
-        .update({ notes: `[Admin] ${replyMessage.trim()}${newStatus ? ` | Status → ${newStatus}` : ""}` } as any)
+        .update({ notes: `[Admin] ${noteMsg}${newStatus ? ` | Status → ${newStatus}` : ""}` } as any)
         .eq("id", actionIssue.id);
     }
 
     setSending(false);
     setActionIssue(null);
     setReplyMessage("");
+    setDriverMessage("");
     setNewStatus("");
+    setReplyTarget("customer");
     fetchIssues();
   };
 
@@ -304,7 +341,7 @@ const DeliveryAlerts = () => {
       </Tabs>
 
       {/* Action dialog */}
-      <Dialog open={!!actionIssue} onOpenChange={(o) => { if (!o) { setActionIssue(null); setReplyMessage(""); setNewStatus(""); } }}>
+      <Dialog open={!!actionIssue} onOpenChange={(o) => { if (!o) { setActionIssue(null); setReplyMessage(""); setDriverMessage(""); setNewStatus(""); setReplyTarget("customer"); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -316,8 +353,20 @@ const DeliveryAlerts = () => {
             {/* Current info */}
             <div className="bg-muted rounded-xl p-3 space-y-1 text-sm">
               <p><strong>Problema:</strong> {issueLabels[actionIssue?.issue_type]?.icon} {issueLabels[actionIssue?.issue_type]?.label}</p>
-              <p><strong>Entregador:</strong> {actionIssue?.delivery_persons?.name || "—"}</p>
+              <p><strong>Entregador:</strong> {actionIssue?.delivery_persons?.name || "—"} {actionIssue?.delivery_persons?.phone ? `(${actionIssue.delivery_persons.phone})` : ""}</p>
               <p><strong>Cliente:</strong> {actionIssue?.orders?.customer_name} ({actionIssue?.orders?.customer_phone})</p>
+            </div>
+
+            {/* Reply target selector */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Enviar para:</label>
+              <div className="flex gap-2">
+                {(["customer", "driver", "both"] as const).map((t) => (
+                  <Button key={t} size="sm" variant={replyTarget === t ? "default" : "outline"} onClick={() => setReplyTarget(t)} className="flex-1 text-xs">
+                    {t === "customer" ? "👤 Cliente" : t === "driver" ? "🏍️ Entregador" : "👥 Ambos"}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             {/* Change status */}
@@ -335,18 +384,47 @@ const DeliveryAlerts = () => {
               </Select>
             </div>
 
-            {/* Reply message */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-foreground">Mensagem para o cliente (WhatsApp):</label>
-              <Textarea
-                value={replyMessage}
-                onChange={(e) => setReplyMessage(e.target.value)}
-                placeholder="Ex: Estamos resolvendo o problema, aguarde um momento..."
-                rows={3}
-              />
-            </div>
+            {/* Message to customer */}
+            {(replyTarget === "customer" || replyTarget === "both") && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">
+                  {replyTarget === "both" ? "Mensagem para o cliente:" : "Mensagem (WhatsApp):"}
+                </label>
+                <Textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Ex: Estamos resolvendo o problema, aguarde..."
+                  rows={3}
+                />
+              </div>
+            )}
 
-            <Button onClick={handleSendReply} disabled={sending || (!replyMessage.trim() && newStatus === actionIssue?.orders?.status)} className="w-full gap-2">
+            {/* Message to driver */}
+            {replyTarget === "driver" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Mensagem para o entregador (WhatsApp):</label>
+                <Textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Ex: Retorne ao restaurante para pegar item faltante..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            {replyTarget === "both" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Mensagem para o entregador:</label>
+                <Textarea
+                  value={driverMessage}
+                  onChange={(e) => setDriverMessage(e.target.value)}
+                  placeholder="Ex: Retorne ao restaurante para pegar item faltante..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            <Button onClick={handleSendReply} disabled={sending || (!replyMessage.trim() && !driverMessage.trim() && newStatus === actionIssue?.orders?.status)} className="w-full gap-2">
               <Send className="h-4 w-4" />
               {sending ? "Enviando..." : "Enviar Resposta"}
             </Button>
