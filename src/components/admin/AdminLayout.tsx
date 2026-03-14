@@ -11,6 +11,7 @@ import {
   Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import logo from "@/assets/logo-truebox-new.png";
 
