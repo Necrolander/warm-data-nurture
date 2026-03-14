@@ -26,6 +26,7 @@ import DeliveryFees from "./pages/admin/DeliveryFees";
 import DigitalMenu from "./pages/admin/DigitalMenu";
 import Establishment from "./pages/admin/Establishment";
 import DeliveryPersons from "./pages/admin/DeliveryPersons";
+import DeliveryAlerts from "./pages/admin/DeliveryAlerts";
 import WaiterLogin from "./pages/WaiterLogin";
 import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="digital-menu" element={<DigitalMenu />} />
               <Route path="establishment" element={<Establishment />} />
               <Route path="delivery-persons" element={<DeliveryPersons />} />
+              <Route path="delivery-alerts" element={<DeliveryAlerts />} />
             </Route>
 
             {/* Waiter App */}
