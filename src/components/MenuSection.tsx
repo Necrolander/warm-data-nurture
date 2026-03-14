@@ -7,7 +7,12 @@ import { Skeleton } from "./ui/skeleton";
 import { Search, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const MenuSection = () => {
+interface MenuSectionProps {
+  channel?: string;
+  tableNumber?: number | null;
+}
+
+const MenuSection = ({ channel = "delivery", tableNumber }: MenuSectionProps) => {
   const { data: dbProducts, isLoading: loadingProducts } = useProducts();
   const { data: dbCategories, isLoading: loadingCategories } = useCategories();
   const { data: dbExtras } = useExtras();
@@ -20,7 +25,7 @@ const MenuSection = () => {
   const categoryBarRef = useRef<HTMLDivElement>(null);
 
   const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
-  const availableDbProducts = (dbProducts || []).filter(p => isProductAvailableNow(p, "delivery"));
+  const availableDbProducts = (dbProducts || []).filter(p => isProductAvailableNow(p, channel));
   const products: Product[] = availableDbProducts.map((p) => mapDbProduct(p, extraGroups));
   const categories = (dbCategories || []).map((c) => ({
     id: c.slug,

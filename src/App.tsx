@@ -28,6 +28,7 @@ import DeliveryPersons from "./pages/admin/DeliveryPersons";
 import WaiterLogin from "./pages/WaiterLogin";
 import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
+import TableQRPrint from "./pages/TableQRPrint";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,9 @@ const App = () => (
             <Route path="/waiter/login" element={<WaiterLogin />} />
             <Route path="/waiter" element={<WaiterDashboard />} />
             <Route path="/waiter/new-order" element={<WaiterNewOrder />} />
+
+            {/* Table QR Print */}
+            <Route path="/table-qr/:tableNumber" element={<TableQRPrint />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
