@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.manage-waiter-auth]
 verify_jwt = true
+
+[functions.check-delivery-delays]
+verify_jwt = false
