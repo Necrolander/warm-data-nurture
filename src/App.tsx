@@ -70,6 +70,7 @@ const App = () => (
               <Route path="digital-menu" element={<DigitalMenu />} />
               <Route path="establishment" element={<Establishment />} />
               <Route path="delivery-persons" element={<DeliveryPersons />} />
+              <Route path="delivery-alerts" element={<DeliveryAlerts />} />
             </Route>
 
             {/* Waiter App */}
