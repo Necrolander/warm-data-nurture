@@ -47,6 +47,7 @@ export interface ExtraGroup {
   max_select: number;
   is_required: boolean;
   applies_to_categories: string[];
+  applies_to_products: string[];
   extras: { id: string; name: string; description: string | null; price: number; max_quantity: number; image_url: string | null }[];
 }
 
