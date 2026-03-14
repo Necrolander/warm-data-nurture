@@ -156,6 +156,35 @@ async function handleStatusNotification(supabase: any, body: any) {
   // Get order items
   const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order_id);
 
+  // Handle delivery code notification
+  if (new_status === "delivery_code") {
+    const code = body.delivery_code;
+    const notification = `🔐 *Código de confirmação da entrega*\n\nPedido #${order.order_number}\n\n🔑 Seu código: *${code}*\n\n⚠️ *IMPORTANTE:* Informe este código APENAS ao entregador no momento da entrega. Ele vai pedir para confirmar o recebimento.\n\nNão compartilhe este código com mais ninguém!`;
+
+    let { data: session } = await supabase
+      .from("chat_sessions")
+      .select("*")
+      .eq("phone", order.customer_phone)
+      .eq("is_active", true)
+      .single();
+
+    if (!session) {
+      const { data: newSession } = await supabase
+        .from("chat_sessions")
+        .insert({ phone: order.customer_phone, customer_name: order.customer_name, state: "greeting", order_id: order.id })
+        .select().single();
+      session = newSession;
+    }
+
+    if (session) {
+      await supabase.from("chat_messages").insert({ session_id: session.id, direction: "outgoing", message: notification });
+    }
+
+    return new Response(JSON.stringify({ notification, phone: order.customer_phone }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   // Build status notification message
   const statusMessages: Record<string, string> = {
     production: `🍳 *Pedido #${order.order_number} em preparo!*\n\nSeu pedido foi aceito e já está sendo preparado! 🎉\n\n⏱️ Previsão: 30-45 minutos`,
