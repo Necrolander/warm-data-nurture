@@ -589,6 +589,7 @@ const Orders = () => {
       toast.error("Erro ao cancelar pedido");
     } else {
       toast.success(`Pedido #${cancelOrder.order_number} cancelado`);
+      notifyCustomerStatus(cancelOrder.id, "cancelled");
       setCancelOrder(null);
       fetchOrders();
     }
