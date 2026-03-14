@@ -341,7 +341,7 @@ const DeliveryAlerts = () => {
       </Tabs>
 
       {/* Action dialog */}
-      <Dialog open={!!actionIssue} onOpenChange={(o) => { if (!o) { setActionIssue(null); setReplyMessage(""); setNewStatus(""); } }}>
+      <Dialog open={!!actionIssue} onOpenChange={(o) => { if (!o) { setActionIssue(null); setReplyMessage(""); setDriverMessage(""); setNewStatus(""); setReplyTarget("customer"); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -353,8 +353,20 @@ const DeliveryAlerts = () => {
             {/* Current info */}
             <div className="bg-muted rounded-xl p-3 space-y-1 text-sm">
               <p><strong>Problema:</strong> {issueLabels[actionIssue?.issue_type]?.icon} {issueLabels[actionIssue?.issue_type]?.label}</p>
-              <p><strong>Entregador:</strong> {actionIssue?.delivery_persons?.name || "—"}</p>
+              <p><strong>Entregador:</strong> {actionIssue?.delivery_persons?.name || "—"} {actionIssue?.delivery_persons?.phone ? `(${actionIssue.delivery_persons.phone})` : ""}</p>
               <p><strong>Cliente:</strong> {actionIssue?.orders?.customer_name} ({actionIssue?.orders?.customer_phone})</p>
+            </div>
+
+            {/* Reply target selector */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-foreground">Enviar para:</label>
+              <div className="flex gap-2">
+                {(["customer", "driver", "both"] as const).map((t) => (
+                  <Button key={t} size="sm" variant={replyTarget === t ? "default" : "outline"} onClick={() => setReplyTarget(t)} className="flex-1 text-xs">
+                    {t === "customer" ? "👤 Cliente" : t === "driver" ? "🏍️ Entregador" : "👥 Ambos"}
+                  </Button>
+                ))}
+              </div>
             </div>
 
             {/* Change status */}
@@ -372,18 +384,47 @@ const DeliveryAlerts = () => {
               </Select>
             </div>
 
-            {/* Reply message */}
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-foreground">Mensagem para o cliente (WhatsApp):</label>
-              <Textarea
-                value={replyMessage}
-                onChange={(e) => setReplyMessage(e.target.value)}
-                placeholder="Ex: Estamos resolvendo o problema, aguarde um momento..."
-                rows={3}
-              />
-            </div>
+            {/* Message to customer */}
+            {(replyTarget === "customer" || replyTarget === "both") && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">
+                  {replyTarget === "both" ? "Mensagem para o cliente:" : "Mensagem (WhatsApp):"}
+                </label>
+                <Textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Ex: Estamos resolvendo o problema, aguarde..."
+                  rows={3}
+                />
+              </div>
+            )}
 
-            <Button onClick={handleSendReply} disabled={sending || (!replyMessage.trim() && newStatus === actionIssue?.orders?.status)} className="w-full gap-2">
+            {/* Message to driver */}
+            {replyTarget === "driver" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Mensagem para o entregador (WhatsApp):</label>
+                <Textarea
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  placeholder="Ex: Retorne ao restaurante para pegar item faltante..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            {replyTarget === "both" && (
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-foreground">Mensagem para o entregador:</label>
+                <Textarea
+                  value={driverMessage}
+                  onChange={(e) => setDriverMessage(e.target.value)}
+                  placeholder="Ex: Retorne ao restaurante para pegar item faltante..."
+                  rows={3}
+                />
+              </div>
+            )}
+
+            <Button onClick={handleSendReply} disabled={sending || (!replyMessage.trim() && !driverMessage.trim() && newStatus === actionIssue?.orders?.status)} className="w-full gap-2">
               <Send className="h-4 w-4" />
               {sending ? "Enviando..." : "Enviar Resposta"}
             </Button>
