@@ -16,6 +16,7 @@ import NewOrder from "./pages/admin/NewOrder";
 import MenuManager from "./pages/admin/MenuManager";
 import Invoices from "./pages/admin/Invoices";
 import BotManager from "./pages/admin/BotManager";
+import BotConversations from "./pages/admin/BotConversations";
 import SalonManager from "./pages/admin/SalonManager";
 import SalonSettings from "./pages/admin/SalonSettings";
 import Contacts from "./pages/admin/Contacts";
@@ -29,6 +30,7 @@ import WaiterLogin from "./pages/WaiterLogin";
 import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
 import TableQRPrint from "./pages/TableQRPrint";
+import DeliveryTracking from "./pages/DeliveryTracking";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -55,6 +57,7 @@ const App = () => (
               <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="bot" element={<BotManager />} />
+              <Route path="bot-conversations" element={<BotConversations />} />
               <Route path="salon" element={<SalonManager />} />
               <Route path="salon-settings" element={<SalonSettings />} />
               <Route path="contacts" element={<Contacts />} />
@@ -73,6 +76,9 @@ const App = () => (
 
             {/* Table QR Print */}
             <Route path="/table-qr/:tableNumber" element={<TableQRPrint />} />
+
+            {/* Delivery Tracking */}
+            <Route path="/tracking/:token" element={<DeliveryTracking />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

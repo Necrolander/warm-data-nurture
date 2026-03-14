@@ -8,7 +8,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
-  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X,
+  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -20,6 +20,7 @@ const menuItems = [
   { title: "Gestor de Cardápio", url: "/admin/menu-manager", icon: UtensilsCrossed },
   { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
   { title: "Robô", url: "/admin/bot", icon: Bot },
+  { title: "Conversas Bot", url: "/admin/bot-conversations", icon: MessageSquare },
   { title: "Gestão Salão", url: "/admin/salon", icon: Armchair },
   { title: "Config. Salão", url: "/admin/salon-settings", icon: Settings },
   { title: "Contatos", url: "/admin/contacts", icon: Users },
