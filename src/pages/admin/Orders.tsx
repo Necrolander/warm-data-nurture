@@ -19,6 +19,17 @@ interface OrderWithItems extends Order {
   order_items: OrderItem[];
 }
 
+// Send bot notification when order status changes
+async function notifyCustomerStatus(orderId: string, newStatus: string) {
+  try {
+    await supabase.functions.invoke("whatsapp-bot", {
+      body: { action: "notify_status", order_id: orderId, new_status: newStatus },
+    });
+  } catch (e) {
+    console.error("Failed to send status notification:", e);
+  }
+}
+
 const statusLabels: Record<string, string> = {
   pending: "Pendente",
   production: "Em Produção",
