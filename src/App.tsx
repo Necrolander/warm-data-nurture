@@ -26,6 +26,7 @@ import DeliveryFees from "./pages/admin/DeliveryFees";
 import DigitalMenu from "./pages/admin/DigitalMenu";
 import Establishment from "./pages/admin/Establishment";
 import DeliveryPersons from "./pages/admin/DeliveryPersons";
+import DeliveryAlerts from "./pages/admin/DeliveryAlerts";
 import WaiterLogin from "./pages/WaiterLogin";
 import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
