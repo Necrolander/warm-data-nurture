@@ -523,6 +523,18 @@ const DriverDashboard = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Chat drawer */}
+      <Dialog open={showChat} onOpenChange={setShowChat}>
+        <DialogContent className="max-w-sm h-[80vh] p-0 flex flex-col">
+          <DriverChat
+            driverId={driverId!}
+            driverName={driverName || "Entregador"}
+            currentOrderId={currentOrder?.id}
+            onClose={() => setShowChat(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Problem dialog */}
       <DriverProblemDialog
         open={showProblem}
