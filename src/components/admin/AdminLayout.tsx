@@ -28,6 +28,7 @@ const menuItems = [
   { title: "Relatórios", url: "/admin/reports", icon: BarChart3 },
   { title: "Frete", url: "/admin/delivery-fees", icon: Truck },
   { title: "Entregadores", url: "/admin/delivery-persons", icon: Bike },
+  { title: "Alertas Entrega", url: "/admin/delivery-alerts", icon: AlertTriangle },
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
 ];
