@@ -530,6 +530,8 @@ const DriverDashboard = () => {
             driverId={driverId!}
             driverName={driverName || "Entregador"}
             currentOrderId={currentOrder?.id}
+            customerPhone={currentOrder?.customer_phone}
+            customerName={currentOrder?.customer_name}
             onClose={() => setShowChat(false)}
           />
         </DialogContent>
