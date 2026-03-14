@@ -1,0 +1,3 @@
+
+ALTER TABLE public.waiters ADD COLUMN IF NOT EXISTS user_id UUID;
+ALTER TABLE public.waiters ADD COLUMN IF NOT EXISTS email TEXT;
