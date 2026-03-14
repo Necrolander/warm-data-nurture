@@ -423,6 +423,9 @@ const DriverDashboard = () => {
               </span>
               <Switch checked={isOnline} onCheckedChange={toggleOnline} />
             </div>
+            <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
+              <MessageSquare className="h-5 w-5" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
               <History className="h-5 w-5" />
             </Button>
