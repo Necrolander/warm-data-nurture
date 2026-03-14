@@ -234,13 +234,6 @@ async function handleMenuItems(
   }
 
   const product = catProducts[idx];
-  // Store selected product in session temporarily
-  await updateSession(supabase, session.id, {
-    state: "item_quantity",
-    selected_category: JSON.stringify({ ...JSON.parse(session.selected_category || "{}"), product_id: product.id, product_name: product.name, product_price: Number(product.price) }),
-  });
-
-  // Actually, let's simplify - just store the product selection inline
   const cart = session.cart || [];
   cart.push({
     product_id: product.id,
@@ -249,7 +242,7 @@ async function handleMenuItems(
     quantity: 1,
   });
 
-  await updateSession(supabase, session.id, { cart, state: "cart_review", selected_category: session.selected_category });
+  await updateSession(supabase, session.id, { cart, state: "cart_review" });
 
   return `✅ *${product.name}* adicionado!\n\n` + buildCartSummary(cart) +
     "\n\nO que deseja fazer?\n\n➕ Digite *mais* para adicionar outro item\n❌ Digite *remover [número]* para remover item\n✅ Digite *finalizar* para fechar o pedido\n0️⃣ Digite *0* para cancelar tudo";
