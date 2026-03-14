@@ -10,6 +10,24 @@ export interface DbProduct {
   category: string;
   badges: string[] | null;
   sort_order: number | null;
+  available_days: number[] | null;
+  available_start_time: string | null;
+  available_end_time: string | null;
+}
+
+export function isProductAvailableNow(p: DbProduct): boolean {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
+  if (p.available_days && p.available_days.length > 0 && p.available_days.length < 7) {
+    if (!p.available_days.includes(dayOfWeek)) return false;
+  }
+
+  if (p.available_start_time && currentTime < p.available_start_time) return false;
+  if (p.available_end_time && currentTime > p.available_end_time) return false;
+
+  return true;
 }
 
 export interface DbCategory {
