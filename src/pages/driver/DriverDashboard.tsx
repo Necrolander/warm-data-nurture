@@ -45,11 +45,53 @@ const DriverDashboard = () => {
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
+  // Request notification permission on mount
   useEffect(() => {
     if (!driverId) { navigate("/driver/login"); return; }
     loadCurrentOrder();
     loadDriverStatus();
+
+    // Ask for notification permission
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
   }, [driverId]);
+
+  const sendPushNotification = useCallback((title: string, body: string) => {
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        const notification = new Notification(title, {
+          body,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: "new-order",
+          renotify: true,
+        } as NotificationOptions);
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      } catch {
+        // Fallback for mobile: use registration if available
+        navigator.serviceWorker?.ready?.then((reg) => {
+          reg.showNotification(title, { body, icon: "/favicon.ico", tag: "new-order", renotify: true } as NotificationOptions);
+        }).catch(() => {});
+      }
+    }
+    // Also play a sound
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      osc.type = "sine";
+      gain.gain.value = 0.4;
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch {}
+  }, []);
 
   // Realtime listeners
   useEffect(() => {
@@ -68,17 +110,47 @@ const DriverDashboard = () => {
     const availChannel = supabase
       .channel("available-orders")
       .on("postgres_changes", {
-        event: "*",
+        event: "UPDATE",
         schema: "public",
         table: "orders",
-      }, () => { if (isOnline) loadAvailableOrders(); })
+      }, (payload: any) => {
+        if (isOnline) {
+          loadAvailableOrders();
+          // Notify if order just became "ready" with no driver assigned
+          const newRow = payload.new;
+          if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
+            sendPushNotification(
+              "🛵 Novo Pedido Disponível!",
+              `Pedido #${newRow.order_number} • R$ ${Number(newRow.delivery_fee || 0).toFixed(2).replace(".", ",")}`
+            );
+            toast("🛵 Novo pedido disponível!", { duration: 8000 });
+          }
+        }
+      })
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "orders",
+      }, (payload: any) => {
+        if (isOnline) {
+          loadAvailableOrders();
+          const newRow = payload.new;
+          if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
+            sendPushNotification(
+              "🛵 Novo Pedido Disponível!",
+              `Pedido #${newRow.order_number} • R$ ${Number(newRow.delivery_fee || 0).toFixed(2).replace(".", ",")}`
+            );
+            toast("🛵 Novo pedido disponível!", { duration: 8000 });
+          }
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(availChannel);
     };
-  }, [driverId, isOnline]);
+  }, [driverId, isOnline, sendPushNotification]);
 
   const loadDriverStatus = async () => {
     const { data } = await supabase
