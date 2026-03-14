@@ -31,6 +31,8 @@ import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
 import TableQRPrint from "./pages/TableQRPrint";
 import DeliveryTracking from "./pages/DeliveryTracking";
+import DriverLogin from "./pages/driver/DriverLogin";
+import DriverDashboard from "./pages/driver/DriverDashboard";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
