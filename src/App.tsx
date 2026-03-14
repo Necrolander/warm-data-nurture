@@ -82,6 +82,10 @@ const App = () => (
             {/* Delivery Tracking */}
             <Route path="/tracking/:token" element={<DeliveryTracking />} />
 
+            {/* Driver App */}
+            <Route path="/driver/login" element={<DriverLogin />} />
+            <Route path="/driver" element={<DriverDashboard />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

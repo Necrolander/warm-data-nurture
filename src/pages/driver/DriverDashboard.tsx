@@ -185,7 +185,7 @@ const DriverDashboard = () => {
   const acceptOrder = async (order: any) => {
     await supabase
       .from("orders")
-      .update({ delivery_person_id: driverId, status: "out_for_delivery" })
+      .update({ delivery_person_id: driverId, status: "out_for_delivery" as const })
       .eq("id", order.id);
 
     // Create tracking record
