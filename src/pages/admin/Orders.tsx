@@ -519,7 +519,7 @@ const Orders = () => {
       toast.error("Erro ao aceitar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} aceito! → Em Produção`);
-      // Print ticket on accept
+      notifyCustomerStatus(order.id, "production");
       printOrderTicket(order);
       fetchOrders();
     }
