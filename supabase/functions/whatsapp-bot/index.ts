@@ -313,9 +313,35 @@ async function handleAddress(supabase: any, session: any, msg: string): Promise<
     return "⚠️ Endereço muito curto. Por favor, envie o endereço completo (Rua, Número, Bairro):";
   }
 
-  await updateSession(supabase, session.id, { state: "payment", delivery_address: msg });
+  await updateSession(supabase, session.id, { state: "location", delivery_address: msg });
 
-  return `📍 Endereço salvo: *${msg}*\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
+  return `📍 Endereço salvo: *${msg}*\n\n📌 *Agora envie sua localização (GPS)*\n\nNo WhatsApp, toque no 📎 (clipe) → *Localização* → *Enviar localização atual*.\n\nIsso ajuda o motoboy a encontrar você mais rápido! 🛵\n\nOu digite *pular* para continuar sem enviar a localização.`;
+}
+
+async function handleLocation(supabase: any, session: any, msg: string): Promise<string> {
+  // Check if user sent coordinates (format: lat,lng or "latitude longitude")
+  const coordsMatch = msg.match(/(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)/);
+  
+  if (msg === "pular" || msg === "skip") {
+    await updateSession(supabase, session.id, { state: "payment" });
+    return `📍 *Endereço:* ${session.delivery_address}\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
+  }
+
+  if (coordsMatch) {
+    const lat = parseFloat(coordsMatch[1]);
+    const lng = parseFloat(coordsMatch[2]);
+    
+    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+      await updateSession(supabase, session.id, { 
+        state: "payment", 
+        delivery_lat: lat, 
+        delivery_lng: lng 
+      });
+      return `✅ Localização recebida!\n\n📍 *Endereço:* ${session.delivery_address}\n🗺️ *GPS:* ${lat.toFixed(6)}, ${lng.toFixed(6)}\n\n💳 *Como deseja pagar?*\n\n1️⃣ PIX\n2️⃣ Cartão na entrega\n3️⃣ Dinheiro\n\nDigite o *número* da opção.`;
+    }
+  }
+
+  return "⚠️ Não consegui captar a localização.\n\nEnvie sua *localização pelo WhatsApp* (📎 → Localização) ou digite as coordenadas (ex: -16.014, -48.059).\n\nOu digite *pular* para continuar sem localização.";
 }
 
 async function handlePayment(supabase: any, session: any, msg: string, settings: Record<string, string>): Promise<string> {
