@@ -1,34 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, Outlet, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { NavLink } from "@/components/NavLink";
 import {
-  ClipboardList,
-  PlusCircle,
-  UtensilsCrossed,
-  Receipt,
-  Bot,
-  Armchair,
-  Settings,
-  Users,
-  Gift,
-  BarChart3,
-  Truck,
-  LogOut,
-  Smartphone,
-  Store,
-  Bike,
+  ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
+  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -51,73 +31,113 @@ const menuItems = [
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
 ];
 
+const URGENCY_SOUND_URL = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==";
+
 const AdminLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [storeOpen, setStoreOpen] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [urgencyAlert, setUrgencyAlert] = useState<any>(null);
+  const urgencyAudioRef = useRef<HTMLAudioElement | null>(null);
+  const urgencyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchStoreStatus = async () => {
     const { data } = await supabase.from("store_settings").select("value").eq("key", "store_open").single();
     if (data) setStoreOpen(data.value === "true");
   };
 
-  // Print queue listener - auto-prints when waiter sends print job
+  const playUrgencySound = () => {
+    // Use Web Audio API for a loud alarm
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playBeep = (freq: number, startTime: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "square";
+        gain.gain.value = 0.5;
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+      // Alarm pattern: 3 rapid beeps
+      for (let i = 0; i < 3; i++) {
+        playBeep(880, ctx.currentTime + i * 0.3, 0.15);
+        playBeep(1200, ctx.currentTime + i * 0.3 + 0.15, 0.15);
+      }
+    } catch (e) {
+      console.error("Audio error:", e);
+    }
+  };
+
+  const acknowledgeUrgency = async (alertId: string) => {
+    if (urgencyIntervalRef.current) { clearInterval(urgencyIntervalRef.current); urgencyIntervalRef.current = null; }
+    await supabase.from("kitchen_alerts" as any).update({ acknowledged: true } as any).eq("id", alertId);
+    setUrgencyAlert(null);
+  };
+
+  // Print queue listener
   useEffect(() => {
     const channel = supabase
       .channel("admin-print-queue")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "print_queue" },
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "print_queue" },
         async (payload: any) => {
           const record = payload.new;
           if (record && !record.printed && record.content) {
-            // Open print window
             const win = window.open("", "_blank", "width=320,height=700");
             if (win) {
               win.document.write(record.content);
               win.document.close();
-              // Auto-print is triggered by the HTML content's onload script
-              // For order tickets (no onload script), trigger manually
-              if (!record.content.includes("window.print()")) {
-                setTimeout(() => win.print(), 500);
-              }
+              if (!record.content.includes("window.print()")) { setTimeout(() => win.print(), 500); }
             }
-            // Mark as printed
             await supabase.from("print_queue" as any).update({ printed: true } as any).eq("id", record.id);
             toast.success(`📠 Impressão: ${record.type === "bill" ? "Fechamento de conta" : "Comanda"}`);
           }
-        }
-      )
+        })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // Kitchen urgency alerts listener
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-kitchen-alerts")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "kitchen_alerts" },
+        (payload: any) => {
+          const alert = payload.new;
+          if (alert && !alert.acknowledged) {
+            setUrgencyAlert(alert);
+            // Play alarm immediately and repeat every 3s
+            playUrgencySound();
+            if (urgencyIntervalRef.current) clearInterval(urgencyIntervalRef.current);
+            urgencyIntervalRef.current = setInterval(playUrgencySound, 3000);
+            toast.error(`🚨 URGÊNCIA: ${alert.message}`, { duration: 15000 });
+          }
+        })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+      if (urgencyIntervalRef.current) clearInterval(urgencyIntervalRef.current);
+    };
   }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { navigate("/admin/login"); return; }
-
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", session.user.id);
-
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
       const hasAccess = roles?.some(r => r.role === "admin" || r.role === "staff");
       if (!hasAccess) { await supabase.auth.signOut(); navigate("/admin/login"); return; }
-
       setLoading(false);
       fetchStoreStatus();
     };
-
     checkAuth();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") navigate("/admin/login");
     });
-
     return () => subscription.unsubscribe();
   }, [navigate]);
 
@@ -149,36 +169,23 @@ const AdminLayout = () => {
       <div className="min-h-screen flex w-full">
         <Sidebar collapsible="icon">
           <SidebarContent className="pt-4">
-            {/* Logo + Store status */}
             <div className="px-4 mb-4">
               <div className="flex items-center justify-center gap-2">
                 <img src={logo} alt="Truebox" className="h-10" />
-                <button
-                  onClick={toggleStore}
-                  disabled={toggling}
-                  className="relative flex-shrink-0"
-                  title={storeOpen ? "Loja ABERTA — clique para fechar" : "Loja FECHADA — clique para abrir"}
-                >
+                <button onClick={toggleStore} disabled={toggling} className="relative flex-shrink-0"
+                  title={storeOpen ? "Loja ABERTA — clique para fechar" : "Loja FECHADA — clique para abrir"}>
                   <span className={`block w-4 h-4 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"} ${storeOpen ? "animate-pulse" : ""}`} />
                 </button>
               </div>
-              <p className="text-center text-xs text-muted-foreground mt-1">
-                {storeOpen ? "Aberta" : "Fechada"}
-              </p>
+              <p className="text-center text-xs text-muted-foreground mt-1">{storeOpen ? "Aberta" : "Fechada"}</p>
             </div>
-
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild>
-                        <NavLink
-                          to={item.url}
-                          end={item.url === "/admin"}
-                          className="hover:bg-muted/50"
-                          activeClassName="bg-muted text-primary font-medium"
-                        >
+                        <NavLink to={item.url} end={item.url === "/admin"} className="hover:bg-muted/50" activeClassName="bg-muted text-primary font-medium">
                           <item.icon className="mr-2 h-4 w-4" />
                           <span>{item.title}</span>
                         </NavLink>
@@ -201,21 +208,10 @@ const AdminLayout = () => {
           <header className="h-14 flex items-center border-b border-border px-4">
             <SidebarTrigger className="mr-4" />
             <h1 className="text-lg font-semibold text-foreground flex-1">
-              {menuItems.find(i =>
-                i.url === "/admin"
-                  ? location.pathname === "/admin"
-                  : location.pathname.startsWith(i.url)
-              )?.title || "Painel"}
+              {menuItems.find(i => i.url === "/admin" ? location.pathname === "/admin" : location.pathname.startsWith(i.url))?.title || "Painel"}
             </h1>
-            <button
-              onClick={toggleStore}
-              disabled={toggling}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                storeOpen
-                  ? "bg-green-500/20 text-green-400 hover:bg-green-500/30"
-                  : "bg-red-500/20 text-red-400 hover:bg-red-500/30"
-              }`}
-            >
+            <button onClick={toggleStore} disabled={toggling}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${storeOpen ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}>
               <span className={`w-2.5 h-2.5 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"}`} />
               {storeOpen ? "Aberta" : "Fechada"}
             </button>
@@ -224,6 +220,28 @@ const AdminLayout = () => {
             <Outlet />
           </main>
         </div>
+
+        {/* Urgency Alert Overlay */}
+        {urgencyAlert && (
+          <div className="fixed inset-0 z-[100] bg-red-900/80 backdrop-blur-sm flex items-center justify-center animate-pulse"
+            style={{ animation: "pulse 1s ease-in-out infinite" }}>
+            <div className="bg-card rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 text-center space-y-4 border-4 border-red-500">
+              <div className="text-6xl">🚨</div>
+              <h2 className="text-2xl font-black text-destructive">URGÊNCIA NA COZINHA!</h2>
+              <p className="text-lg font-bold text-foreground">{urgencyAlert.message}</p>
+              <p className="text-sm text-muted-foreground">
+                Garçom: {urgencyAlert.waiter_name || "Desconhecido"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {new Date(urgencyAlert.created_at).toLocaleTimeString("pt-BR")}
+              </p>
+              <Button size="lg" variant="destructive" className="w-full h-14 text-lg font-bold gap-2"
+                onClick={() => acknowledgeUrgency(urgencyAlert.id)}>
+                <X className="w-5 h-5" /> OK - Entendido
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </SidebarProvider>
   );
