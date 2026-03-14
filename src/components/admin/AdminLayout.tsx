@@ -30,6 +30,7 @@ const menuItems = [
   { title: "Frete", url: "/admin/delivery-fees", icon: Truck },
   { title: "Entregadores", url: "/admin/delivery-persons", icon: Bike },
   { title: "Alertas Entrega", url: "/admin/delivery-alerts", icon: AlertTriangle },
+  { title: "Chat Entregadores", url: "/admin/driver-chat", icon: MessageSquare },
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
 ];
