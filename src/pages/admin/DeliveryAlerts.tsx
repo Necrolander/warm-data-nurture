@@ -105,8 +105,7 @@ const DeliveryAlerts = () => {
     const driverPhone = actionIssue.delivery_persons?.phone;
 
     // Send message to customer via WhatsApp bot
-    if (replyMessage.trim() && actionIssue.orders?.customer_phone) {
-      // Create a chat message for the customer
+    if (replyMessage.trim() && (replyTarget === "customer" || replyTarget === "both") && actionIssue.orders?.customer_phone) {
       let { data: session } = await supabase
         .from("chat_sessions")
         .select("*")
@@ -138,6 +137,40 @@ const DeliveryAlerts = () => {
       }
     }
 
+    // Send message to driver via WhatsApp bot (create/find session by driver phone)
+    const driverMsg = (replyTarget === "driver") ? replyMessage.trim() : driverMessage.trim();
+    if (driverMsg && (replyTarget === "driver" || replyTarget === "both") && driverPhone) {
+      let { data: driverSession } = await supabase
+        .from("chat_sessions")
+        .select("*")
+        .eq("phone", driverPhone)
+        .eq("is_active", true)
+        .single();
+
+      if (!driverSession) {
+        const { data: newDriverSession } = await supabase
+          .from("chat_sessions")
+          .insert({
+            phone: driverPhone,
+            customer_name: `🏍️ ${actionIssue.delivery_persons?.name || "Entregador"}`,
+            state: "greeting",
+            order_id: orderId,
+          })
+          .select()
+          .single();
+        driverSession = newDriverSession;
+      }
+
+      if (driverSession) {
+        await supabase.from("chat_messages").insert({
+          session_id: driverSession.id,
+          direction: "outgoing",
+          message: `📋 *Msg do Restaurante — Pedido #${actionIssue.orders?.order_number}*\n\n${driverMsg}`,
+        });
+        toast.success("Mensagem enviada ao entregador!");
+      }
+    }
+
     // Update order status if changed
     if (newStatus && orderId && newStatus !== actionIssue.orders?.status) {
       await supabase
@@ -145,7 +178,6 @@ const DeliveryAlerts = () => {
         .update({ status: newStatus as any })
         .eq("id", orderId);
 
-      // Notify customer of status change
       await supabase.functions.invoke("whatsapp-bot", {
         body: { action: "notify_status", order_id: orderId, new_status: newStatus },
       });
@@ -153,18 +185,21 @@ const DeliveryAlerts = () => {
       toast.success(`Status alterado para: ${statusOptions.find(s => s.value === newStatus)?.label}`);
     }
 
-    // Save admin response as note on the issue
-    if (replyMessage.trim()) {
+    // Save admin response as note
+    const noteMsg = [replyMessage.trim() && `Cliente: ${replyMessage.trim()}`, driverMsg && `Entregador: ${driverMsg}`].filter(Boolean).join(" | ");
+    if (noteMsg) {
       await supabase
         .from("delivery_issues")
-        .update({ notes: `[Admin] ${replyMessage.trim()}${newStatus ? ` | Status → ${newStatus}` : ""}` } as any)
+        .update({ notes: `[Admin] ${noteMsg}${newStatus ? ` | Status → ${newStatus}` : ""}` } as any)
         .eq("id", actionIssue.id);
     }
 
     setSending(false);
     setActionIssue(null);
     setReplyMessage("");
+    setDriverMessage("");
     setNewStatus("");
+    setReplyTarget("customer");
     fetchIssues();
   };
 
