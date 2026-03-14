@@ -28,6 +28,7 @@ import DeliveryPersons from "./pages/admin/DeliveryPersons";
 import WaiterLogin from "./pages/WaiterLogin";
 import WaiterDashboard from "./pages/waiter/WaiterDashboard";
 import WaiterNewOrder from "./pages/waiter/WaiterNewOrder";
+import TableQRPrint from "./pages/TableQRPrint";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
