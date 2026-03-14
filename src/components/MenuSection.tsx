@@ -20,7 +20,7 @@ const MenuSection = () => {
   const categoryBarRef = useRef<HTMLDivElement>(null);
 
   const extraGroups = buildExtraGroups(dbExtraGroups, dbExtras);
-  const availableDbProducts = (dbProducts || []).filter(isProductAvailableNow);
+  const availableDbProducts = (dbProducts || []).filter(p => isProductAvailableNow(p, "delivery"));
   const products: Product[] = availableDbProducts.map((p) => mapDbProduct(p, extraGroups));
   const categories = (dbCategories || []).map((c) => ({
     id: c.slug,

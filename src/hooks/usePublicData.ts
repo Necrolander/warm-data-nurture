@@ -13,9 +13,15 @@ export interface DbProduct {
   available_days: number[] | null;
   available_start_time: string | null;
   available_end_time: string | null;
+  visibility_channels: string[] | null;
 }
 
-export function isProductAvailableNow(p: DbProduct): boolean {
+export function isProductAvailableNow(p: DbProduct, channel: string = "delivery"): boolean {
+  // Check visibility channel
+  if (p.visibility_channels && p.visibility_channels.length > 0) {
+    if (!p.visibility_channels.includes(channel)) return false;
+  }
+
   const now = new Date();
   const dayOfWeek = now.getDay();
   const currentTime = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
