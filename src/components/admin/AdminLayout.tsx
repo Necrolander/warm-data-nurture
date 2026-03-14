@@ -43,8 +43,17 @@ const AdminLayout = () => {
   const [storeOpen, setStoreOpen] = useState(true);
   const [toggling, setToggling] = useState(false);
   const [urgencyAlert, setUrgencyAlert] = useState<any>(null);
+  const [pendingAlerts, setPendingAlerts] = useState(0);
   const urgencyAudioRef = useRef<HTMLAudioElement | null>(null);
   const urgencyIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchPendingAlerts = async () => {
+    const [{ count: alertCount }, { count: issueCount }] = await Promise.all([
+      supabase.from("kitchen_alerts").select("*", { count: "exact", head: true }).eq("acknowledged", false),
+      supabase.from("delivery_issues").select("*", { count: "exact", head: true }),
+    ]);
+    setPendingAlerts((alertCount || 0) + (issueCount || 0));
+  };
 
   const fetchStoreStatus = async () => {
     const { data } = await supabase.from("store_settings").select("value").eq("key", "store_open").single();
