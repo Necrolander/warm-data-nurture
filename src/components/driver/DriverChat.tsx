@@ -66,10 +66,8 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
         const msg = payload.new as Message;
         setMessages(prev => [...prev, msg]);
         if (msg.sender === "admin") {
-          // Mark as read
           supabase.from("driver_messages").update({ read_by_driver: true } as any).eq("id", msg.id);
-          // If admin responded, stop emergency
-          if (emergencyActive) {
+          if (emergencyActiveRef.current) {
             stopEmergency();
             toast.success("🏪 A loja respondeu!");
           }
