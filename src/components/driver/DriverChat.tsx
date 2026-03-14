@@ -3,14 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { Send, AlertTriangle, MessageSquare, X } from "lucide-react";
+import { Send, AlertTriangle, MessageSquare, X, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 interface DriverChatProps {
   driverId: string;
   driverName: string;
   currentOrderId?: string | null;
+  customerPhone?: string | null;
+  customerName?: string | null;
   onClose: () => void;
 }
 
@@ -26,7 +27,7 @@ interface Message {
   created_at: string;
 }
 
-const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverChatProps) => {
+const DriverChat = ({ driverId, driverName, currentOrderId, customerPhone, customerName, onClose }: DriverChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -34,18 +35,22 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
   const emergencyActiveRef = useRef(false);
   const emergencyIntervalRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [unread, setUnread] = useState(0);
 
   const fetchMessages = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from("driver_messages")
       .select("*")
       .eq("driver_id", driverId)
       .order("created_at", { ascending: true })
       .limit(100);
+
+    if (currentOrderId) {
+      query = query.eq("order_id", currentOrderId);
+    }
+
+    const { data } = await query;
     if (data) {
       setMessages(data as any as Message[]);
-      // Mark admin messages as read by driver
       const unreadIds = (data as any[]).filter((m: any) => m.sender === "admin" && !m.read_by_driver).map((m: any) => m.id);
       if (unreadIds.length > 0) {
         await supabase.from("driver_messages").update({ read_by_driver: true } as any).in("id", unreadIds);
@@ -56,7 +61,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
   useEffect(() => {
     fetchMessages();
     const channel = supabase
-      .channel("driver-chat-" + driverId)
+      .channel("driver-chat-" + driverId + "-" + (currentOrderId || "general"))
       .on("postgres_changes", {
         event: "INSERT",
         schema: "public",
@@ -64,6 +69,8 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
         filter: `driver_id=eq.${driverId}`,
       }, (payload: any) => {
         const msg = payload.new as Message;
+        // Only show messages for this order
+        if (currentOrderId && msg.order_id !== currentOrderId) return;
         setMessages(prev => [...prev, msg]);
         if (msg.sender === "admin") {
           supabase.from("driver_messages").update({ read_by_driver: true } as any).eq("id", msg.id);
@@ -76,16 +83,10 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [driverId]);
+  }, [driverId, currentOrderId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Count unread from admin
-  useEffect(() => {
-    const cnt = messages.filter(m => m.sender === "admin" && !m.read_by_driver).length;
-    setUnread(cnt);
   }, [messages]);
 
   const sendMessage = async () => {
@@ -105,7 +106,6 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
   const startEmergency = async () => {
     setEmergencyActive(true);
     emergencyActiveRef.current = true;
-    // Send emergency message
     await supabase.from("driver_messages").insert({
       driver_id: driverId,
       order_id: currentOrderId || null,
@@ -116,7 +116,6 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
 
     toast("🚨 Emergência ativada! Apitando até a loja responder...");
 
-    // Start alarm sound loop
     const playAlarm = () => {
       try {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -161,17 +160,36 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
     };
   }, []);
 
+  const openWhatsApp = () => {
+    if (!customerPhone) return;
+    const phone = customerPhone.replace(/\D/g, "");
+    window.open(`https://wa.me/${phone}`, "_blank");
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border bg-card">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-primary" />
-          <span className="font-bold text-sm text-foreground">Chat com a Loja</span>
+          <div>
+            <span className="font-bold text-sm text-foreground">Chat com a Loja</span>
+            {customerName && (
+              <p className="text-xs text-muted-foreground">Cliente: {customerName}</p>
+            )}
+          </div>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {customerPhone && (
+            <Button variant="ghost" size="sm" onClick={openWhatsApp} className="text-green-500 gap-1">
+              <Phone className="h-4 w-4" />
+              <span className="text-xs">WhatsApp</span>
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
