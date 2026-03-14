@@ -36,8 +36,10 @@ const DeliveryAlerts = () => {
   const [tab, setTab] = useState("delays");
   const [actionIssue, setActionIssue] = useState<any>(null);
   const [replyMessage, setReplyMessage] = useState("");
+  const [driverMessage, setDriverMessage] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<"customer" | "driver" | "both">("customer");
 
   const fetchDelayAlerts = async () => {
     const { data } = await supabase
