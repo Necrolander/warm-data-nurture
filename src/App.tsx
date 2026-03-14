@@ -17,6 +17,7 @@ import MenuManager from "./pages/admin/MenuManager";
 import Invoices from "./pages/admin/Invoices";
 import BotManager from "./pages/admin/BotManager";
 import BotConversations from "./pages/admin/BotConversations";
+import AdminDriverChat from "./components/admin/AdminDriverChat";
 import SalonManager from "./pages/admin/SalonManager";
 import SalonSettings from "./pages/admin/SalonSettings";
 import Contacts from "./pages/admin/Contacts";
