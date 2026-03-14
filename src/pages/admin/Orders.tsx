@@ -19,6 +19,17 @@ interface OrderWithItems extends Order {
   order_items: OrderItem[];
 }
 
+// Send bot notification when order status changes
+async function notifyCustomerStatus(orderId: string, newStatus: string) {
+  try {
+    await supabase.functions.invoke("whatsapp-bot", {
+      body: { action: "notify_status", order_id: orderId, new_status: newStatus },
+    });
+  } catch (e) {
+    console.error("Failed to send status notification:", e);
+  }
+}
+
 const statusLabels: Record<string, string> = {
   pending: "Pendente",
   production: "Em Produção",
@@ -508,7 +519,7 @@ const Orders = () => {
       toast.error("Erro ao aceitar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} aceito! → Em Produção`);
-      // Print ticket on accept
+      notifyCustomerStatus(order.id, "production");
       printOrderTicket(order);
       fetchOrders();
     }
@@ -524,6 +535,7 @@ const Orders = () => {
       toast.error("Erro ao rejeitar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} rejeitado`);
+      notifyCustomerStatus(order.id, "cancelled");
       fetchOrders();
     }
   };
@@ -546,6 +558,7 @@ const Orders = () => {
       toast.error("Erro ao atualizar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} → ${statusLabels[newStatus]}`);
+      notifyCustomerStatus(order.id, newStatus);
       fetchOrders();
     }
   };
@@ -560,6 +573,7 @@ const Orders = () => {
       toast.error("Erro ao finalizar pedido");
     } else {
       toast.success(`Pedido #${order.order_number} entregue! ✅`);
+      notifyCustomerStatus(order.id, "delivered");
       fetchOrders();
     }
   };
@@ -575,6 +589,7 @@ const Orders = () => {
       toast.error("Erro ao cancelar pedido");
     } else {
       toast.success(`Pedido #${cancelOrder.order_number} cancelado`);
+      notifyCustomerStatus(cancelOrder.id, "cancelled");
       setCancelOrder(null);
       fetchOrders();
     }
