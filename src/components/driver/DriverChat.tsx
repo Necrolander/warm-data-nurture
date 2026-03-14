@@ -31,6 +31,7 @@ const DriverChat = ({ driverId, driverName, currentOrderId, onClose }: DriverCha
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [emergencyActive, setEmergencyActive] = useState(false);
+  const emergencyActiveRef = useRef(false);
   const emergencyIntervalRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [unread, setUnread] = useState(0);
