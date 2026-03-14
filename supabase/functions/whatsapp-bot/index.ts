@@ -190,6 +190,7 @@ async function handleStatusNotification(supabase: any, body: any) {
     production: `🍳 *Pedido #${order.order_number} em preparo!*\n\nSeu pedido foi aceito e já está sendo preparado! 🎉\n\n⏱️ Previsão: 30-45 minutos`,
     ready: `✅ *Pedido #${order.order_number} está pronto!*\n\nSeu pedido está prontinho e aguardando o motoboy! 🏍️`,
     out_for_delivery: await buildDeliveryMessage(supabase, order),
+    arrived: `🚪 *Pedido #${order.order_number} chegou ao endereço!*\n\nO entregador está no local. 📍\n\nPrepare o *código de confirmação* para receber seu pedido! 🔑`,
     delivered: `📦 *Pedido #${order.order_number} entregue!*\n\nEsperamos que você goste! 😋\n\nObrigado por escolher a *Truebox Hamburgueria*! ❤️\n\nDigite *1* para fazer um novo pedido.`,
     cancelled: `❌ *Pedido #${order.order_number} cancelado*\n\nInfelizmente seu pedido foi cancelado.\n\nDigite *5* para falar com um atendente ou *1* para fazer um novo pedido.`,
   };

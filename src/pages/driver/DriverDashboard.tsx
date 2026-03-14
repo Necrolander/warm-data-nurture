@@ -15,6 +15,18 @@ import logo from "@/assets/logo-truebox-new.png";
 import DriverOrderView from "@/components/driver/DriverOrderView";
 import DriverHistory from "@/components/driver/DriverHistory";
 import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
+import DriverChecklist from "@/components/driver/DriverChecklist";
+
+// Haversine distance in meters
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 const DriverDashboard = () => {
   const navigate = useNavigate();
@@ -29,7 +41,9 @@ const DriverDashboard = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [showProblem, setShowProblem] = useState(false);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
+  const [showChecklist, setShowChecklist] = useState(false);
   const locationIntervalRef = useRef<any>(null);
+  const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!driverId) { navigate("/driver/login"); return; }
@@ -37,7 +51,7 @@ const DriverDashboard = () => {
     loadDriverStatus();
   }, [driverId]);
 
-  // Realtime: listen for new orders assigned to this driver
+  // Realtime listeners
   useEffect(() => {
     if (!driverId) return;
 
@@ -48,21 +62,16 @@ const DriverDashboard = () => {
         schema: "public",
         table: "orders",
         filter: `delivery_person_id=eq.${driverId}`,
-      }, () => {
-        loadCurrentOrder();
-      })
+      }, () => { loadCurrentOrder(); })
       .subscribe();
 
-    // Also listen for available orders (ready, no driver assigned)
     const availChannel = supabase
       .channel("available-orders")
       .on("postgres_changes", {
         event: "*",
         schema: "public",
         table: "orders",
-      }, () => {
-        if (isOnline) loadAvailableOrders();
-      })
+      }, () => { if (isOnline) loadAvailableOrders(); })
       .subscribe();
 
     return () => {
@@ -81,7 +90,6 @@ const DriverDashboard = () => {
   };
 
   const loadCurrentOrder = async () => {
-    // Find active order assigned to this driver
     const { data } = await supabase
       .from("orders")
       .select("*")
@@ -141,25 +149,53 @@ const DriverDashboard = () => {
     const sendLocation = () => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
+          const { latitude, longitude } = pos.coords;
+
           await supabase
             .from("delivery_persons")
             .update({
-              current_lat: pos.coords.latitude,
-              current_lng: pos.coords.longitude,
+              current_lat: latitude,
+              current_lng: longitude,
               location_updated_at: new Date().toISOString(),
             })
             .eq("id", driverId!);
 
-          // Also update delivery_tracking if active
+          // Update delivery_tracking if active
           if (currentOrder) {
             await supabase
               .from("delivery_tracking")
-              .update({
-                current_lat: pos.coords.latitude,
-                current_lng: pos.coords.longitude,
-              })
+              .update({ current_lat: latitude, current_lng: longitude })
               .eq("order_id", currentOrder.id)
               .eq("is_active", true);
+
+            // GPS arrival detection: check if within 50m of destination
+            if (
+              currentOrder.delivery_lat &&
+              currentOrder.delivery_lng &&
+              currentOrder.status === "out_for_delivery" &&
+              !arrivedNotifiedRef.current.has(currentOrder.id)
+            ) {
+              const dist = distanceMeters(latitude, longitude, currentOrder.delivery_lat, currentOrder.delivery_lng);
+              if (dist <= 50) {
+                arrivedNotifiedRef.current.add(currentOrder.id);
+                // Auto-update arrived status
+                await supabase
+                  .from("orders")
+                  .update({ arrived_at_destination: true } as any)
+                  .eq("id", currentOrder.id);
+
+                // Notify customer
+                await supabase.functions.invoke("whatsapp-bot", {
+                  body: {
+                    action: "notify_status",
+                    order_id: currentOrder.id,
+                    new_status: "arrived",
+                  },
+                });
+
+                toast.success("📍 Chegada detectada automaticamente!");
+              }
+            }
           }
         },
         () => {},
@@ -183,9 +219,30 @@ const DriverDashboard = () => {
   }, [isOnline, currentOrder?.id]);
 
   const acceptOrder = async (order: any) => {
+    // Show checklist first - load items
+    const { data: items } = await supabase
+      .from("order_items")
+      .select("*")
+      .eq("order_id", order.id);
+
+    setShowPendingOrder(order);
+    setCurrentOrderItems(items || []);
+    setShowChecklist(true);
+  };
+
+  const handleChecklistConfirmed = async () => {
+    const order = showPendingOrder;
+    if (!order) return;
+
+    setShowChecklist(false);
+
     await supabase
       .from("orders")
-      .update({ delivery_person_id: driverId, status: "out_for_delivery" as const })
+      .update({
+        delivery_person_id: driverId,
+        status: "out_for_delivery" as const,
+        checklist_confirmed: true,
+      } as any)
       .eq("id", order.id);
 
     // Create tracking record
@@ -197,14 +254,14 @@ const DriverDashboard = () => {
 
     // Generate delivery confirmation code
     const code = String(Math.floor(1000 + Math.random() * 9000));
-    await supabase.from("orders").update({ delivery_code: code }).eq("id", order.id);
+    await supabase.from("orders").update({ delivery_code: code } as any).eq("id", order.id);
 
-    // Notify customer via bot
+    // Notify customer
     await supabase.functions.invoke("whatsapp-bot", {
       body: { action: "notify_status", order_id: order.id, new_status: "out_for_delivery" },
     });
 
-    // Send delivery code to customer
+    // Send delivery code
     await supabase.functions.invoke("whatsapp-bot", {
       body: {
         action: "notify_status",
@@ -221,6 +278,7 @@ const DriverDashboard = () => {
 
   const rejectOrder = () => {
     setShowPendingOrder(null);
+    setShowChecklist(false);
     toast("Entrega recusada");
   };
 
@@ -302,8 +360,15 @@ const DriverDashboard = () => {
       </div>
 
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Current active order */}
-        {currentOrder ? (
+        {/* Checklist before departure */}
+        {showChecklist && showPendingOrder ? (
+          <DriverChecklist
+            order={showPendingOrder}
+            items={currentOrderItems}
+            onConfirmed={handleChecklistConfirmed}
+            onCancel={rejectOrder}
+          />
+        ) : currentOrder ? (
           <DriverOrderView
             order={currentOrder}
             items={currentOrderItems}
@@ -315,7 +380,6 @@ const DriverDashboard = () => {
           />
         ) : isOnline ? (
           <>
-            {/* Available orders */}
             {availableOrders.length === 0 ? (
               <div className="text-center py-16 space-y-3">
                 <Bike className="h-16 w-16 mx-auto text-muted-foreground animate-pulse" />
@@ -334,7 +398,7 @@ const DriverDashboard = () => {
                   <Card
                     key={order.id}
                     className="cursor-pointer hover:border-primary transition-colors"
-                    onClick={() => setShowPendingOrder(order)}
+                    onClick={() => acceptOrder(order)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -371,53 +435,6 @@ const DriverDashboard = () => {
           </div>
         )}
       </div>
-
-      {/* Pending order detail dialog */}
-      <Dialog open={!!showPendingOrder} onOpenChange={(o) => !o && setShowPendingOrder(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Nova Entrega</DialogTitle>
-          </DialogHeader>
-          {showPendingOrder && (
-            <div className="space-y-4">
-              <div className="bg-muted rounded-xl p-4 space-y-2">
-                <p className="font-bold text-lg">Pedido #{showPendingOrder.order_number}</p>
-                <p className="text-sm flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-primary" />
-                  {showPendingOrder.observation || showPendingOrder.reference || "Sem endereço"}
-                </p>
-                <p className="text-sm flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-green-500" />
-                  Frete: R$ {Number(showPendingOrder.delivery_fee).toFixed(2).replace(".", ",")}
-                </p>
-                <p className="text-sm flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Total: R$ {Number(showPendingOrder.total).toFixed(2).replace(".", ",")}
-                </p>
-                <Badge>
-                  {showPendingOrder.payment_method === "cash" ? "💵 Dinheiro" :
-                   showPendingOrder.payment_method === "pix" ? "📱 PIX" : "💳 Cartão"}
-                </Badge>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={rejectOrder}
-                >
-                  <X className="h-4 w-4 mr-1" /> Recusar
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={() => acceptOrder(showPendingOrder)}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" /> Aceitar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* History dialog */}
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
