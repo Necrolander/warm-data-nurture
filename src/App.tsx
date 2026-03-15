@@ -36,6 +36,7 @@ import DeliveryTracking from "./pages/DeliveryTracking";
 import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import OrderHistory from "./pages/admin/OrderHistory";
+import IfoodIntegration from "./pages/admin/IfoodIntegration";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
