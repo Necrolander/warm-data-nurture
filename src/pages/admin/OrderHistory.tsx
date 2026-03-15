@@ -335,7 +335,7 @@ const OrderHistory = () => {
             {deliveryOrders.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">Nenhum pedido encontrado</p>
             ) : (
-              deliveryOrders.map((order) => <HistoryOrderCard key={order.id} order={order} />)
+              deliveryOrders.map((order) => <HistoryOrderCard key={order.id} order={order} deliveryPersons={deliveryPersons} />)
             )}
           </div>
         </TabsContent>
