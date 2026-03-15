@@ -9,6 +9,7 @@ import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
   Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare, History,
+  Route, Map, UserCog, Cog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,11 @@ const menuItems = [
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
   { title: "iFood", url: "/admin/ifood", icon: Store },
+  { title: "Roteirização", url: "/admin/routing", icon: Route },
+  { title: "Rotas", url: "/admin/routes", icon: Map },
+  { title: "Mapa Operacional", url: "/admin/operational-map", icon: Map },
+  { title: "Gestão Motoboys", url: "/admin/drivers-mgmt", icon: UserCog },
+  { title: "Config. Logística", url: "/admin/routing-config", icon: Cog },
 ];
 
 const URGENCY_SOUND_URL = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==";
