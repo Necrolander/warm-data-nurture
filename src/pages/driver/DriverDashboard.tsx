@@ -7,12 +7,13 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Bike, MapPin, Phone, Package, Navigation, CheckCircle,
-  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare
+  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import logo from "@/assets/logo-truebox-new.png";
 import DriverOrderView from "@/components/driver/DriverOrderView";
+import DriverRouteView from "@/components/driver/DriverRouteView";
 import DriverHistory from "@/components/driver/DriverHistory";
 import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
 import DriverChecklist from "@/components/driver/DriverChecklist";
@@ -20,7 +21,6 @@ import DriverChat from "@/components/driver/DriverChat";
 
 const MAX_ACTIVE_ORDERS = 3;
 
-// Haversine distance in meters
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -43,20 +43,28 @@ const DriverDashboard = () => {
   const [selectedOrderIndex, setSelectedOrderIndex] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [showProblem, setShowProblem] = useState(false);
+  const [problemOrderId, setProblemOrderId] = useState<string | null>(null);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
   const [showChecklist, setShowChecklist] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [pendingChecklistItems, setPendingChecklistItems] = useState<any[]>([]);
+
+  // Route state
+  const [activeRoute, setActiveRoute] = useState<any>(null);
+  const [routeStops, setRouteStops] = useState<any[]>([]);
+  const [currentStopIndex, setCurrentStopIndex] = useState(0);
+  const [viewMode, setViewMode] = useState<"orders" | "route">("orders");
+
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
 
   const activeOrder = currentOrders[selectedOrderIndex] || null;
 
-  // Request notification permission on mount
   useEffect(() => {
     if (!driverId) { navigate("/driver/login"); return; }
     loadCurrentOrders();
     loadDriverStatus();
+    loadActiveRoute();
 
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -67,16 +75,9 @@ const DriverDashboard = () => {
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         const notification = new Notification(title, {
-          body,
-          icon: "/favicon.ico",
-          badge: "/favicon.ico",
-          tag: "new-order",
-          renotify: true,
+          body, icon: "/favicon.ico", badge: "/favicon.ico", tag: "new-order", renotify: true,
         } as NotificationOptions);
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
+        notification.onclick = () => { window.focus(); notification.close(); };
       } catch {
         navigator.serviceWorker?.ready?.then((reg) => {
           reg.showNotification(title, { body, icon: "/favicon.ico", tag: "new-order", renotify: true } as NotificationOptions);
@@ -87,13 +88,9 @@ const DriverDashboard = () => {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 800;
-      osc.type = "sine";
-      gain.gain.value = 0.4;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.5);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 800; osc.type = "sine"; gain.gain.value = 0.4;
+      osc.start(); osc.stop(ctx.currentTime + 0.5);
     } catch {}
   }, []);
 
@@ -103,65 +100,99 @@ const DriverDashboard = () => {
 
     const channel = supabase
       .channel("driver-orders")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "orders",
-        filter: `delivery_person_id=eq.${driverId}`,
-      }, () => { loadCurrentOrders(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `delivery_person_id=eq.${driverId}` },
+        () => { loadCurrentOrders(); })
+      .subscribe();
+
+    const routeChannel = supabase
+      .channel("driver-routes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "routes" },
+        (payload: any) => {
+          const row = payload.new;
+          if (row?.driver_id === driverId) {
+            loadActiveRoute();
+            if (payload.eventType === "UPDATE" && row.status === "assigned") {
+              sendPushNotification("🛣️ Nova Rota Atribuída!", `Rota ${row.code} com entrega(s) para você`);
+              toast("🛣️ Nova rota atribuída!", { duration: 8000 });
+            }
+          }
+        })
       .subscribe();
 
     const availChannel = supabase
       .channel("available-orders")
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "orders",
-      }, (payload: any) => {
-        if (isOnline) {
-          loadAvailableOrders();
-          const newRow = payload.new;
-          if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
-            sendPushNotification(
-              "🛵 Novo Pedido Disponível!",
-              `Pedido #${newRow.order_number} • R$ ${Number(newRow.delivery_fee || 0).toFixed(2).replace(".", ",")}`
-            );
-            toast("🛵 Novo pedido disponível!", { duration: 8000 });
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" },
+        (payload: any) => {
+          if (isOnline) {
+            loadAvailableOrders();
+            const newRow = payload.new;
+            if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
+              sendPushNotification("🛵 Novo Pedido Disponível!", `Pedido #${newRow.order_number}`);
+              toast("🛵 Novo pedido disponível!", { duration: 8000 });
+            }
           }
-        }
-      })
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "orders",
-      }, (payload: any) => {
-        if (isOnline) {
-          loadAvailableOrders();
-          const newRow = payload.new;
-          if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
-            sendPushNotification(
-              "🛵 Novo Pedido Disponível!",
-              `Pedido #${newRow.order_number} • R$ ${Number(newRow.delivery_fee || 0).toFixed(2).replace(".", ",")}`
-            );
-            toast("🛵 Novo pedido disponível!", { duration: 8000 });
-          }
-        }
-      })
+        })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(routeChannel);
       supabase.removeChannel(availChannel);
     };
   }, [driverId, isOnline, sendPushNotification]);
 
   const loadDriverStatus = async () => {
-    const { data } = await supabase
-      .from("delivery_persons")
-      .select("is_online")
-      .eq("id", driverId!)
-      .single();
+    const { data } = await supabase.from("delivery_persons").select("is_online").eq("id", driverId!).single();
     if (data) setIsOnline(data.is_online ?? false);
+  };
+
+  const loadActiveRoute = async () => {
+    // Check for assigned/in_delivery route for this driver
+    const { data: routes } = await supabase
+      .from("routes")
+      .select("*")
+      .eq("driver_id", driverId!)
+      .in("status", ["assigned", "in_delivery"])
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (routes && routes.length > 0) {
+      const route = routes[0];
+      setActiveRoute(route);
+
+      // Load stops with order data and items
+      const { data: stops } = await supabase
+        .from("route_orders")
+        .select("*")
+        .eq("route_id", route.id)
+        .order("stop_order");
+
+      if (stops && stops.length > 0) {
+        const orderIds = stops.map((s: any) => s.order_id);
+        const [{ data: orders }, { data: items }] = await Promise.all([
+          supabase.from("orders").select("*").in("id", orderIds),
+          supabase.from("order_items").select("*").in("order_id", orderIds),
+        ]);
+
+        const enrichedStops = stops.map((s: any) => ({
+          ...s,
+          order: (orders || []).find((o: any) => o.id === s.order_id),
+          items: (items || []).filter((i: any) => i.order_id === s.order_id),
+        }));
+
+        setRouteStops(enrichedStops);
+
+        // Determine current stop index (first non-delivered)
+        const firstPending = enrichedStops.findIndex((s: any) => s.order?.status !== "delivered");
+        setCurrentStopIndex(firstPending >= 0 ? firstPending : enrichedStops.length);
+      }
+
+      setViewMode("route");
+    } else {
+      setActiveRoute(null);
+      setRouteStops([]);
+      setViewMode("orders");
+    }
   };
 
   const loadCurrentOrders = async () => {
@@ -174,17 +205,12 @@ const DriverDashboard = () => {
 
     if (data && data.length > 0) {
       setCurrentOrders(data);
-      // Load items for all orders
       const itemsMap: Record<string, any[]> = {};
       await Promise.all(data.map(async (order) => {
-        const { data: items } = await supabase
-          .from("order_items")
-          .select("*")
-          .eq("order_id", order.id);
+        const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order.id);
         itemsMap[order.id] = items || [];
       }));
       setCurrentOrderItems(itemsMap);
-      // Adjust selected index if needed
       setSelectedOrderIndex(prev => prev >= data.length ? 0 : prev);
     } else {
       setCurrentOrders([]);
@@ -196,26 +222,24 @@ const DriverDashboard = () => {
 
   const loadAvailableOrders = async () => {
     const { data } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("status", "ready")
-      .is("delivery_person_id", null)
-      .eq("order_type", "delivery")
-      .order("created_at", { ascending: true });
+      .from("orders").select("*")
+      .eq("status", "ready").is("delivery_person_id", null)
+      .eq("order_type", "delivery").order("created_at", { ascending: true });
     setAvailableOrders(data || []);
   };
 
   const toggleOnline = async (online: boolean) => {
-    await supabase
-      .from("delivery_persons")
-      .update({ is_online: online })
-      .eq("id", driverId!);
+    await supabase.from("delivery_persons").update({
+      is_online: online,
+      status: online ? "available" : "offline",
+    } as any).eq("id", driverId!);
     setIsOnline(online);
 
     if (online) {
       loadAvailableOrders();
+      loadActiveRoute();
       startLocationSharing();
-      toast.success("Você está ONLINE! Aguardando pedidos...");
+      toast.success("Você está ONLINE!");
     } else {
       stopLocationSharing();
       setAvailableOrders([]);
@@ -230,46 +254,36 @@ const DriverDashboard = () => {
         async (pos) => {
           const { latitude, longitude } = pos.coords;
 
-          await supabase
-            .from("delivery_persons")
-            .update({
-              current_lat: latitude,
-              current_lng: longitude,
-              location_updated_at: new Date().toISOString(),
-            })
-            .eq("id", driverId!);
+          // Update delivery_persons position
+          await supabase.from("delivery_persons").update({
+            current_lat: latitude,
+            current_lng: longitude,
+            location_updated_at: new Date().toISOString(),
+          }).eq("id", driverId!);
 
-          // Update delivery_tracking for all active orders
+          // Save to driver_locations history
+          await supabase.from("driver_locations").insert({
+            driver_id: driverId!,
+            latitude,
+            longitude,
+          } as any);
+
+          // Update delivery_tracking for active orders
           for (const order of currentOrders) {
             if (order.status === "out_for_delivery") {
-              await supabase
-                .from("delivery_tracking")
-                .update({ current_lat: latitude, current_lng: longitude })
-                .eq("order_id", order.id)
-                .eq("is_active", true);
+              await supabase.from("delivery_tracking").update({
+                current_lat: latitude, current_lng: longitude,
+              }).eq("order_id", order.id).eq("is_active", true);
 
               // GPS arrival detection
-              if (
-                order.delivery_lat &&
-                order.delivery_lng &&
-                !arrivedNotifiedRef.current.has(order.id)
-              ) {
+              if (order.delivery_lat && order.delivery_lng && !arrivedNotifiedRef.current.has(order.id)) {
                 const dist = distanceMeters(latitude, longitude, order.delivery_lat, order.delivery_lng);
                 if (dist <= 50) {
                   arrivedNotifiedRef.current.add(order.id);
-                  await supabase
-                    .from("orders")
-                    .update({ arrived_at_destination: true } as any)
-                    .eq("id", order.id);
-
+                  await supabase.from("orders").update({ arrived_at_destination: true } as any).eq("id", order.id);
                   await supabase.functions.invoke("whatsapp-bot", {
-                    body: {
-                      action: "notify_status",
-                      order_id: order.id,
-                      new_status: "arrived",
-                    },
+                    body: { action: "notify_status", order_id: order.id, new_status: "arrived" },
                   });
-
                   toast.success(`📍 Chegada detectada - Pedido #${order.order_number}!`);
                 }
               }
@@ -285,10 +299,7 @@ const DriverDashboard = () => {
   };
 
   const stopLocationSharing = () => {
-    if (locationIntervalRef.current) {
-      clearInterval(locationIntervalRef.current);
-      locationIntervalRef.current = null;
-    }
+    if (locationIntervalRef.current) { clearInterval(locationIntervalRef.current); locationIntervalRef.current = null; }
   };
 
   useEffect(() => {
@@ -296,18 +307,59 @@ const DriverDashboard = () => {
     return () => stopLocationSharing();
   }, [isOnline, currentOrders.length]);
 
+  // --- Route handlers ---
+  const handleStopDelivered = async (stopIndex: number) => {
+    const stop = routeStops[stopIndex];
+    if (!stop) return;
+
+    await supabase.from("orders").update({ status: "delivered" as any }).eq("id", stop.order_id);
+    await supabase.from("delivery_tracking").update({ is_active: false }).eq("order_id", stop.order_id);
+    await supabase.functions.invoke("whatsapp-bot", {
+      body: { action: "notify_status", order_id: stop.order_id, new_status: "delivered" },
+    });
+
+    // Save to delivery_history
+    await supabase.from("delivery_history").insert({
+      order_id: stop.order_id,
+      route_id: activeRoute?.id,
+      driver_id: driverId,
+      distance_km: stop.stop_distance_km || 0,
+      estimated_time_min: stop.stop_duration_min || 0,
+    } as any);
+
+    toast.success(`Entrega #${stop.order?.order_number} finalizada! 🎉`);
+    setCurrentStopIndex(stopIndex + 1);
+    loadActiveRoute();
+    loadCurrentOrders();
+  };
+
+  const handleCompleteRoute = async () => {
+    if (!activeRoute) return;
+    await supabase.from("routes").update({ status: "completed" } as any).eq("id", activeRoute.id);
+    await supabase.from("delivery_persons").update({
+      current_route_id: null,
+      status: "available",
+    } as any).eq("id", driverId!);
+    toast.success("Rota finalizada! 🏁");
+    setActiveRoute(null);
+    setRouteStops([]);
+    setViewMode("orders");
+    loadCurrentOrders();
+    loadAvailableOrders();
+  };
+
+  const handleRouteReportProblem = (orderId: string) => {
+    setProblemOrderId(orderId);
+    setShowProblem(true);
+  };
+
+  // --- Legacy order handlers ---
   const acceptOrder = async (order: any) => {
-    // Check max orders limit
     if (currentOrders.length >= MAX_ACTIVE_ORDERS) {
-      toast.error(`Você já tem ${MAX_ACTIVE_ORDERS} pedidos ativos! Finalize um antes de aceitar outro.`);
+      toast.error(`Máximo de ${MAX_ACTIVE_ORDERS} pedidos ativos!`);
       return;
     }
-
-    const { data: items } = await supabase
-      .from("order_items")
-      .select("*")
-      .eq("order_id", order.id);
-
+    const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order.id);
     setShowPendingOrder(order);
     setPendingChecklistItems(items || []);
     setShowChecklist(true);
@@ -316,22 +368,16 @@ const DriverDashboard = () => {
   const handleChecklistConfirmed = async () => {
     const order = showPendingOrder;
     if (!order) return;
-
     setShowChecklist(false);
 
-    await supabase
-      .from("orders")
-      .update({
-        delivery_person_id: driverId,
-        status: "out_for_delivery" as const,
-        checklist_confirmed: true,
-      } as any)
-      .eq("id", order.id);
+    await supabase.from("orders").update({
+      delivery_person_id: driverId,
+      status: "out_for_delivery" as const,
+      checklist_confirmed: true,
+    } as any).eq("id", order.id);
 
     await supabase.from("delivery_tracking").insert({
-      order_id: order.id,
-      delivery_person_id: driverId,
-      is_active: true,
+      order_id: order.id, delivery_person_id: driverId, is_active: true,
     });
 
     const code = String(Math.floor(1000 + Math.random() * 9000));
@@ -340,52 +386,35 @@ const DriverDashboard = () => {
     await supabase.functions.invoke("whatsapp-bot", {
       body: { action: "notify_status", order_id: order.id, new_status: "out_for_delivery" },
     });
-
     await supabase.functions.invoke("whatsapp-bot", {
-      body: {
-        action: "notify_status",
-        order_id: order.id,
-        new_status: "delivery_code",
-        delivery_code: code,
-      },
+      body: { action: "notify_status", order_id: order.id, new_status: "delivery_code", delivery_code: code },
     });
 
     setShowPendingOrder(null);
     setPendingChecklistItems([]);
-    toast.success("Entrega aceita! Boa corrida! 🛵");
+    toast.success("Entrega aceita! 🛵");
     loadCurrentOrders();
   };
 
   const rejectOrder = () => {
-    setShowPendingOrder(null);
-    setShowChecklist(false);
-    setPendingChecklistItems([]);
+    setShowPendingOrder(null); setShowChecklist(false); setPendingChecklistItems([]);
     toast("Entrega recusada");
   };
 
   const updateDeliveryStatus = async (newStatus: string) => {
     if (!activeOrder) return;
-    await supabase
-      .from("orders")
-      .update({ status: newStatus as any })
-      .eq("id", activeOrder.id);
-
+    await supabase.from("orders").update({ status: newStatus as any }).eq("id", activeOrder.id);
     await supabase.functions.invoke("whatsapp-bot", {
       body: { action: "notify_status", order_id: activeOrder.id, new_status: newStatus },
     });
-
     if (newStatus === "delivered") {
-      await supabase
-        .from("delivery_tracking")
-        .update({ is_active: false })
-        .eq("order_id", activeOrder.id);
+      await supabase.from("delivery_tracking").update({ is_active: false }).eq("order_id", activeOrder.id);
       toast.success("Entrega finalizada! 🎉");
-      loadCurrentOrders();
-      loadAvailableOrders();
     } else {
       toast.success("Status atualizado!");
-      loadCurrentOrders();
     }
+    loadCurrentOrders();
+    loadAvailableOrders();
   };
 
   const openNavigation = () => {
@@ -394,10 +423,7 @@ const DriverDashboard = () => {
       window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank");
       return;
     }
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${activeOrder.delivery_lat},${activeOrder.delivery_lng}&travelmode=driving`,
-      "_blank"
-    );
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeOrder.delivery_lat},${activeOrder.delivery_lng}&travelmode=driving`, "_blank");
   };
 
   const handleLogout = () => {
@@ -442,8 +468,21 @@ const DriverDashboard = () => {
         </div>
       </div>
 
+      {/* View mode toggle when both route and legacy orders exist */}
+      {activeRoute && currentOrders.length > 0 && (
+        <div className="max-w-lg mx-auto px-4 pt-3">
+          <div className="flex gap-2">
+            <Button size="sm" variant={viewMode === "route" ? "default" : "outline"} onClick={() => setViewMode("route")} className="flex-1">
+              <Route className="w-4 h-4 mr-1" /> Rota {activeRoute.code}
+            </Button>
+            <Button size="sm" variant={viewMode === "orders" ? "default" : "outline"} onClick={() => setViewMode("orders")} className="flex-1">
+              <Package className="w-4 h-4 mr-1" /> Pedidos ({currentOrders.length})
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Checklist before departure */}
         {showChecklist && showPendingOrder ? (
           <DriverChecklist
             order={showPendingOrder}
@@ -451,19 +490,22 @@ const DriverDashboard = () => {
             onConfirmed={handleChecklistConfirmed}
             onCancel={rejectOrder}
           />
-        ) : currentOrders.length > 0 ? (
+        ) : viewMode === "route" && activeRoute ? (
+          /* Route View */
+          <DriverRouteView
+            route={activeRoute}
+            stops={routeStops}
+            currentStopIndex={currentStopIndex}
+            onStopDelivered={handleStopDelivered}
+            onCompleteRoute={handleCompleteRoute}
+            onReportProblem={handleRouteReportProblem}
+          />
+        ) : currentOrders.length > 0 && viewMode === "orders" ? (
           <>
-            {/* Order tabs when multiple orders */}
             {currentOrders.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {currentOrders.map((order, idx) => (
-                  <Button
-                    key={order.id}
-                    size="sm"
-                    variant={idx === selectedOrderIndex ? "default" : "outline"}
-                    onClick={() => setSelectedOrderIndex(idx)}
-                    className="shrink-0"
-                  >
+                  <Button key={order.id} size="sm" variant={idx === selectedOrderIndex ? "default" : "outline"} onClick={() => setSelectedOrderIndex(idx)} className="shrink-0">
                     #{order.order_number}
                     {order.status === "out_for_delivery" && " 🛵"}
                     {order.status === "ready" && " 📦"}
@@ -471,12 +513,9 @@ const DriverDashboard = () => {
                 ))}
               </div>
             )}
-
-            {/* Active orders counter */}
             <div className="text-xs text-muted-foreground text-center">
               {currentOrders.length}/{MAX_ACTIVE_ORDERS} pedidos ativos
             </div>
-
             {activeOrder && (
               <DriverOrderView
                 order={activeOrder}
@@ -484,7 +523,7 @@ const DriverDashboard = () => {
                 orderStatus={activeOrder.status}
                 onUpdateStatus={updateDeliveryStatus}
                 onOpenNavigation={openNavigation}
-                onReportProblem={() => setShowProblem(true)}
+                onReportProblem={() => { setProblemOrderId(activeOrder.id); setShowProblem(true); }}
                 driverId={driverId!}
               />
             )}
@@ -495,9 +534,7 @@ const DriverDashboard = () => {
               <div className="text-center py-16 space-y-3">
                 <Bike className="h-16 w-16 mx-auto text-muted-foreground animate-pulse" />
                 <p className="text-lg font-medium text-foreground">Aguardando pedidos...</p>
-                <p className="text-sm text-muted-foreground">
-                  Novos pedidos aparecerão aqui automaticamente
-                </p>
+                <p className="text-sm text-muted-foreground">Novos pedidos e rotas aparecerão automaticamente</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -506,11 +543,7 @@ const DriverDashboard = () => {
                   Pedidos disponíveis ({availableOrders.length})
                 </h2>
                 {availableOrders.map((order) => (
-                  <Card
-                    key={order.id}
-                    className="cursor-pointer hover:border-primary transition-colors"
-                    onClick={() => acceptOrder(order)}
-                  >
+                  <Card key={order.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => acceptOrder(order)}>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
@@ -521,12 +554,9 @@ const DriverDashboard = () => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-primary">
-                            R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}
-                          </p>
+                          <p className="font-bold text-primary">R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</p>
                           <Badge variant="outline" className="text-xs">
-                            {order.payment_method === "cash" ? "Dinheiro" :
-                             order.payment_method === "pix" ? "PIX" : "Cartão"}
+                            {order.payment_method === "cash" ? "Dinheiro" : order.payment_method === "pix" ? "PIX" : "Cartão"}
                           </Badge>
                         </div>
                       </div>
@@ -540,47 +570,38 @@ const DriverDashboard = () => {
           <div className="text-center py-16 space-y-3">
             <Bike className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
             <p className="text-lg font-medium text-foreground">Você está offline</p>
-            <p className="text-sm text-muted-foreground">
-              Ative o botão ONLINE para receber pedidos
-            </p>
+            <p className="text-sm text-muted-foreground">Ative o botão ONLINE para receber pedidos</p>
           </div>
         )}
       </div>
 
-      {/* History dialog */}
+      {/* Dialogs */}
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
         <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Histórico de Entregas</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Histórico de Entregas</DialogTitle></DialogHeader>
           <DriverHistory driverId={driverId!} />
         </DialogContent>
       </Dialog>
 
-      {/* Chat drawer */}
       <Dialog open={showChat} onOpenChange={setShowChat}>
         <DialogContent className="max-w-sm h-[80vh] p-0 flex flex-col">
           <DriverChat
             driverId={driverId!}
             driverName={driverName || "Entregador"}
-            currentOrderId={activeOrder?.id}
-            customerPhone={activeOrder?.customer_phone}
-            customerName={activeOrder?.customer_name}
+            currentOrderId={activeOrder?.id || routeStops[currentStopIndex]?.order_id}
+            customerPhone={activeOrder?.customer_phone || routeStops[currentStopIndex]?.order?.customer_phone}
+            customerName={activeOrder?.customer_name || routeStops[currentStopIndex]?.order?.customer_name}
             onClose={() => setShowChat(false)}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Problem dialog */}
       <DriverProblemDialog
         open={showProblem}
         onOpenChange={setShowProblem}
-        orderId={activeOrder?.id}
+        orderId={problemOrderId || activeOrder?.id}
         driverId={driverId!}
-        onSubmitted={() => {
-          setShowProblem(false);
-          toast.success("Problema reportado ao restaurante");
-        }}
+        onSubmitted={() => { setShowProblem(false); toast.success("Problema reportado"); }}
       />
     </div>
   );
