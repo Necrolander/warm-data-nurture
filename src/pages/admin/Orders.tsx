@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed } from "lucide-react";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -168,6 +168,7 @@ const OrderCard = ({
   onMarkDelivered,
   onCancel,
   onPrint,
+  onChangeDelivery,
   isPending,
   deliveryPersons,
 }: {
@@ -179,6 +180,7 @@ const OrderCard = ({
   onMarkDelivered: (order: OrderWithItems) => void;
   onCancel: (order: OrderWithItems) => void;
   onPrint: (order: OrderWithItems) => void;
+  onChangeDelivery: (order: OrderWithItems) => void;
   isPending: boolean;
   deliveryPersons: DeliveryPerson[];
 }) => {
@@ -253,11 +255,16 @@ const OrderCard = ({
                   <span className="font-medium">{dp.name}</span>
                   <span className="text-muted-foreground text-xs">({dp.phone})</span>
                 </div>
-                <a href={formatWhatsAppLink(dp.phone, `Olá ${dp.name}, sobre o pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp motoboy">
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500 hover:text-green-400">
-                    <Phone className="h-3.5 w-3.5" />
+                <div className="flex items-center gap-0.5">
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
+                    <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
-                </a>
+                  <a href={formatWhatsAppLink(dp.phone, `Olá ${dp.name}, sobre o pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp motoboy">
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-green-500 hover:text-green-400">
+                      <Phone className="h-3.5 w-3.5" />
+                    </Button>
+                  </a>
+                </div>
               </div>
             );
           })()}
@@ -598,6 +605,13 @@ const Orders = () => {
 
   const handleSelectDelivery = (order: OrderWithItems) => {
     setSelectedOrder(order);
+    setSelectedDeliveryPerson("");
+    setShowDeliveryDialog(true);
+  };
+
+  const handleChangeDelivery = (order: OrderWithItems) => {
+    setSelectedOrder(order);
+    setSelectedDeliveryPerson(order.delivery_person_id || "");
     setShowDeliveryDialog(true);
   };
 
@@ -607,18 +621,38 @@ const Orders = () => {
       return;
     }
 
+    // Check max 3 active orders per driver (excluding current order if reassigning)
+    const { data: activeOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("delivery_person_id", selectedDeliveryPerson)
+      .in("status", ["ready", "out_for_delivery"]);
+
+    const activeCount = (activeOrders || []).filter(o => o.id !== selectedOrder.id).length;
+    if (activeCount >= 3) {
+      toast.error("Este entregador já tem 3 pedidos ativos! Máximo permitido: 3");
+      return;
+    }
+
+    const isReassign = !!selectedOrder.delivery_person_id && selectedOrder.status === "out_for_delivery";
+
+    const updateData: any = { delivery_person_id: selectedDeliveryPerson };
+    if (!isReassign) {
+      updateData.status = "out_for_delivery";
+    }
+
     const { error } = await supabase
       .from("orders")
-      .update({
-        status: "out_for_delivery" as any,
-        delivery_person_id: selectedDeliveryPerson,
-      })
+      .update(updateData)
       .eq("id", selectedOrder.id);
 
     if (error) {
       toast.error("Erro ao atualizar pedido");
     } else {
-      toast.success(`Pedido #${selectedOrder.order_number} saiu para entrega!`);
+      toast.success(isReassign
+        ? `Entregador do pedido #${selectedOrder.order_number} alterado!`
+        : `Pedido #${selectedOrder.order_number} saiu para entrega!`
+      );
       setShowDeliveryDialog(false);
       setSelectedOrder(null);
       setSelectedDeliveryPerson("");
@@ -708,6 +742,7 @@ const Orders = () => {
                             onMarkDelivered={markDelivered}
                             onCancel={(o) => setCancelOrder(o)}
                             onPrint={printOrderTicket}
+                            onChangeDelivery={handleChangeDelivery}
                             isPending={order.status === "pending"}
                             deliveryPersons={deliveryPersons}
                           />
@@ -726,7 +761,9 @@ const Orders = () => {
       <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Selecionar Entregador</DialogTitle>
+            <DialogTitle>
+              {selectedOrder?.delivery_person_id ? "Trocar Entregador" : "Selecionar Entregador"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -737,15 +774,22 @@ const Orders = () => {
                 <SelectValue placeholder="Selecione o entregador" />
               </SelectTrigger>
               <SelectContent>
-                {deliveryPersons.map((dp) => (
-                  <SelectItem key={dp.id} value={dp.id}>
-                    {dp.name} - {dp.phone}
-                  </SelectItem>
-                ))}
+                {deliveryPersons.map((dp) => {
+                  const activeCount = orders.filter(o =>
+                    o.delivery_person_id === dp.id &&
+                    ["ready", "out_for_delivery"].includes(o.status) &&
+                    o.id !== selectedOrder?.id
+                  ).length;
+                  return (
+                    <SelectItem key={dp.id} value={dp.id} disabled={activeCount >= 3}>
+                      {dp.name} - {dp.phone} ({activeCount}/3 pedidos)
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Button onClick={confirmDelivery} className="w-full">
-              Confirmar Entrega
+              {selectedOrder?.delivery_person_id ? "Confirmar Troca" : "Confirmar Entrega"}
             </Button>
           </div>
         </DialogContent>
