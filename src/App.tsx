@@ -35,6 +35,7 @@ import TableQRPrint from "./pages/TableQRPrint";
 import DeliveryTracking from "./pages/DeliveryTracking";
 import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
+import OrderHistory from "./pages/admin/OrderHistory";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
