@@ -42,6 +42,7 @@ import RoutesList from "./pages/admin/RoutesList";
 import OperationalMap from "./pages/admin/OperationalMap";
 import DriversManagement from "./pages/admin/DriversManagement";
 import RoutingConfig from "./pages/admin/RoutingConfig";
+import MapDemo from "./pages/MapDemo";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -99,6 +100,9 @@ const App = () => (
 
             {/* Delivery Tracking */}
             <Route path="/tracking/:token" element={<DeliveryTracking />} />
+
+            {/* Public Map Demo */}
+            <Route path="/mapa" element={<MapDemo />} />
 
             {/* Driver App */}
             <Route path="/driver/login" element={<DriverLogin />} />
