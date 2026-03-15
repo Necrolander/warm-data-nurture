@@ -621,18 +621,38 @@ const Orders = () => {
       return;
     }
 
+    // Check max 3 active orders per driver (excluding current order if reassigning)
+    const { data: activeOrders } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("delivery_person_id", selectedDeliveryPerson)
+      .in("status", ["ready", "out_for_delivery"]);
+
+    const activeCount = (activeOrders || []).filter(o => o.id !== selectedOrder.id).length;
+    if (activeCount >= 3) {
+      toast.error("Este entregador já tem 3 pedidos ativos! Máximo permitido: 3");
+      return;
+    }
+
+    const isReassign = !!selectedOrder.delivery_person_id && selectedOrder.status === "out_for_delivery";
+
+    const updateData: any = { delivery_person_id: selectedDeliveryPerson };
+    if (!isReassign) {
+      updateData.status = "out_for_delivery";
+    }
+
     const { error } = await supabase
       .from("orders")
-      .update({
-        status: "out_for_delivery" as any,
-        delivery_person_id: selectedDeliveryPerson,
-      })
+      .update(updateData)
       .eq("id", selectedOrder.id);
 
     if (error) {
       toast.error("Erro ao atualizar pedido");
     } else {
-      toast.success(`Pedido #${selectedOrder.order_number} saiu para entrega!`);
+      toast.success(isReassign
+        ? `Entregador do pedido #${selectedOrder.order_number} alterado!`
+        : `Pedido #${selectedOrder.order_number} saiu para entrega!`
+      );
       setShowDeliveryDialog(false);
       setSelectedOrder(null);
       setSelectedDeliveryPerson("");
