@@ -5,15 +5,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import {
   Truck, UtensilsCrossed, Phone, MapPin, User, CreditCard,
   MessageSquare, ExternalLink, Search, ChevronDown, ChevronUp,
-  Printer, Package, Bike, ShieldCheck, ShieldX, Globe
+  Package, Bike, ShieldCheck, ShieldX, Globe, CalendarIcon, Filter, X
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
 
 type DeliveryPerson = Database["public"]["Tables"]["delivery_persons"]["Row"];
-
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
 
@@ -52,6 +57,14 @@ const orderTypeLabels: Record<string, string> = {
   dine_in: "🍽️ No Salão",
 };
 
+const sourceLabels: Record<string, string> = {
+  site: "🌐 Site",
+  whatsapp_bot: "📱 WhatsApp Bot",
+  ifood: "🟥 iFood",
+  pdv_admin: "💻 PDV Admin",
+  app_garcom: "🍽️ App Garçom",
+};
+
 const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; deliveryPersons: DeliveryPerson[] }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -62,23 +75,14 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
   return (
     <Card className="mb-2">
       <CardContent className="p-3">
-        <div
-          className="flex items-center justify-between cursor-pointer"
-          onClick={() => setExpanded(!expanded)}
-        >
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between cursor-pointer" onClick={() => setExpanded(!expanded)}>
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-bold text-primary text-sm">#{order.order_number}</span>
-            <Badge className={`text-xs ${statusColors[order.status]}`}>
-              {statusLabels[order.status]}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {orderTypeLabels[order.order_type] || order.order_type}
-            </Badge>
+            <Badge className={`text-xs ${statusColors[order.status]}`}>{statusLabels[order.status]}</Badge>
+            <Badge variant="outline" className="text-xs">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
           </div>
           <div className="flex items-center gap-2">
-            <span className="font-bold text-sm">
-              R$ {Number(order.total).toFixed(2).replace(".", ",")}
-            </span>
+            <span className="font-bold text-sm">R$ {Number(order.total).toFixed(2).replace(".", ",")}</span>
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </div>
         </div>
@@ -86,24 +90,14 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
           <span>{order.created_at && new Date(order.created_at).toLocaleString("pt-BR")}</span>
           <span>•</span>
-          <span className="flex items-center gap-1">
-            <User className="h-3 w-3" />
-            {order.customer_name}
-          </span>
+          <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.customer_name}</span>
         </div>
 
         {expanded && (
           <div className="mt-3 space-y-3 border-t border-border pt-3">
-            {/* Customer info */}
             <div className="space-y-1 text-sm">
-              <div className="flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="font-medium">{order.customer_name}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{order.customer_phone}</span>
-              </div>
+              <div className="flex items-center gap-1.5"><User className="h-3.5 w-3.5 text-muted-foreground" /><span className="font-medium">{order.customer_name}</span></div>
+              <div className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" /><span>{order.customer_phone}</span></div>
               {order.payment_method && (
                 <div className="flex items-center gap-1.5">
                   <CreditCard className="h-3.5 w-3.5 text-muted-foreground" />
@@ -113,21 +107,13 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
                   )}
                 </div>
               )}
-              {order.reference && (
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>{order.reference}</span>
-                </div>
-              )}
+              {order.reference && <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-muted-foreground" /><span>{order.reference}</span></div>}
               {mapLink && (
                 <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline text-xs">
-                  <ExternalLink className="h-3 w-3" />
-                  Ver no mapa
+                  <ExternalLink className="h-3 w-3" />Ver no mapa
                 </a>
               )}
-              {order.table_number && (
-                <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>
-              )}
+              {order.table_number && <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>}
               {order.observation && (
                 <div className="flex items-start gap-1.5 bg-muted/50 rounded p-1.5">
                   <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
@@ -136,26 +122,15 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
               )}
             </div>
 
-            {/* Delivery & Platform info */}
             <div className="border-t border-border pt-2 space-y-1 text-sm">
-              {/* Platform/source */}
               <div className="flex items-center gap-1.5">
                 <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-muted-foreground">Origem:</span>
                 <Badge variant="outline" className="text-xs">
-                  {(() => {
-                    const src = (order as any).order_source;
-                    if (src === "whatsapp_bot") return "📱 WhatsApp Bot";
-                    if (src === "ifood") return "🟥 iFood";
-                    if (src === "pdv_admin") return "💻 PDV Admin";
-                    if (src === "app_garcom") return "🍽️ App Garçom";
-                    if (src === "site") return "🌐 Site";
-                    return "🌐 Site";
-                  })()}
+                  {sourceLabels[(order as any).order_source] || "🌐 Site"}
                 </Badge>
               </div>
 
-              {/* Delivery person */}
               {order.delivery_person_id && (() => {
                 const dp = deliveryPersons.find(d => d.id === order.delivery_person_id);
                 return (
@@ -168,44 +143,27 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
                 );
               })()}
 
-              {/* Delivery code confirmation */}
               {order.order_type === "delivery" && (
                 <div className="flex items-center gap-1.5">
                   {order.delivery_code && order.status === "delivered" ? (
-                    <>
-                      <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
-                      <span className="text-green-500 text-xs font-medium">
-                        ✅ Confirmado com código ({order.delivery_code})
-                      </span>
-                    </>
+                    <><ShieldCheck className="h-3.5 w-3.5 text-green-500" /><span className="text-green-500 text-xs font-medium">✅ Confirmado com código ({order.delivery_code})</span></>
                   ) : order.status === "delivered" ? (
-                    <>
-                      <ShieldX className="h-3.5 w-3.5 text-yellow-500" />
-                      <span className="text-yellow-500 text-xs font-medium">
-                        ⚠️ Entregue sem código de confirmação
-                      </span>
-                    </>
+                    <><ShieldX className="h-3.5 w-3.5 text-yellow-500" /><span className="text-yellow-500 text-xs font-medium">⚠️ Entregue sem código de confirmação</span></>
                   ) : null}
                 </div>
               )}
 
-              {/* Checklist */}
               {order.delivery_person_id && (
                 <div className="flex items-center gap-1.5 text-xs">
-                  {order.checklist_confirmed ? (
-                    <span className="text-green-500">✅ Checklist conferido</span>
-                  ) : (
-                    <span className="text-yellow-500">⚠️ Checklist não conferido</span>
-                  )}
+                  {order.checklist_confirmed
+                    ? <span className="text-green-500">✅ Checklist conferido</span>
+                    : <span className="text-yellow-500">⚠️ Checklist não conferido</span>}
                 </div>
               )}
             </div>
 
-            {/* Items */}
             <div className="border-t border-border pt-2">
-              <p className="text-xs font-bold text-muted-foreground mb-1 flex items-center gap-1">
-                <Package className="h-3 w-3" /> ITENS
-              </p>
+              <p className="text-xs font-bold text-muted-foreground mb-1 flex items-center gap-1"><Package className="h-3 w-3" /> ITENS</p>
               {order.order_items?.map((item) => (
                 <div key={item.id} className="text-sm py-0.5">
                   <div className="flex justify-between">
@@ -213,39 +171,18 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
                     <span className="text-muted-foreground">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
                   </div>
                   {item.extras && Array.isArray(item.extras) && (item.extras as any[]).length > 0 && (
-                    <p className="text-xs text-muted-foreground ml-4">
-                      {(item.extras as any[]).map((e: any) => `+ ${e.name || e}`).join(", ")}
-                    </p>
+                    <p className="text-xs text-muted-foreground ml-4">{(item.extras as any[]).map((e: any) => `+ ${e.name || e}`).join(", ")}</p>
                   )}
-                  {item.observation && (
-                    <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
-                  )}
+                  {item.observation && <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>}
                 </div>
               ))}
             </div>
 
-            {/* Totals */}
             <div className="border-t border-border pt-2 space-y-0.5 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>R$ {Number(order.subtotal).toFixed(2).replace(".", ",")}</span>
-              </div>
-              {Number(order.delivery_fee) > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Taxa de entrega</span>
-                  <span>R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span>
-                </div>
-              )}
-              {Number(order.service_charge) > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Taxa de serviço</span>
-                  <span>R$ {Number(order.service_charge).toFixed(2).replace(".", ",")}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold">
-                <span>Total</span>
-                <span>R$ {Number(order.total).toFixed(2).replace(".", ",")}</span>
-              </div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>R$ {Number(order.subtotal).toFixed(2).replace(".", ",")}</span></div>
+              {Number(order.delivery_fee) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa de entrega</span><span>R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span></div>}
+              {Number(order.service_charge) > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Taxa de serviço</span><span>R$ {Number(order.service_charge).toFixed(2).replace(".", ",")}</span></div>}
+              <div className="flex justify-between font-bold"><span>Total</span><span>R$ {Number(order.total).toFixed(2).replace(".", ",")}</span></div>
             </div>
           </div>
         )}
@@ -259,6 +196,14 @@ const OrderHistory = () => {
   const [deliveryPersons, setDeliveryPersons] = useState<DeliveryPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  // Filters
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -285,14 +230,58 @@ const OrderHistory = () => {
     setLoading(false);
   };
 
+  const activeFilterCount = [
+    dateFrom, dateTo,
+    statusFilter !== "all" ? statusFilter : null,
+    sourceFilter !== "all" ? sourceFilter : null,
+    paymentFilter !== "all" ? paymentFilter : null,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setStatusFilter("all");
+    setSourceFilter("all");
+    setPaymentFilter("all");
+    setSearch("");
+  };
+
   const filteredOrders = historyOrders.filter((o) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      String(o.order_number).includes(q) ||
-      o.customer_name.toLowerCase().includes(q) ||
-      o.customer_phone.includes(q)
-    );
+    // Text search
+    if (search) {
+      const q = search.toLowerCase();
+      const matches = String(o.order_number).includes(q) ||
+        o.customer_name.toLowerCase().includes(q) ||
+        o.customer_phone.includes(q);
+      if (!matches) return false;
+    }
+
+    // Date from
+    if (dateFrom && o.created_at) {
+      const orderDate = new Date(o.created_at);
+      const fromStart = new Date(dateFrom);
+      fromStart.setHours(0, 0, 0, 0);
+      if (orderDate < fromStart) return false;
+    }
+
+    // Date to
+    if (dateTo && o.created_at) {
+      const orderDate = new Date(o.created_at);
+      const toEnd = new Date(dateTo);
+      toEnd.setHours(23, 59, 59, 999);
+      if (orderDate > toEnd) return false;
+    }
+
+    // Status
+    if (statusFilter !== "all" && o.status !== statusFilter) return false;
+
+    // Source
+    if (sourceFilter !== "all" && (o as any).order_source !== sourceFilter) return false;
+
+    // Payment
+    if (paymentFilter !== "all" && o.payment_method !== paymentFilter) return false;
+
+    return true;
   });
 
   const deliveryOrders = filteredOrders.filter(o => o.order_type === "delivery" || o.order_type === "pickup");
@@ -314,20 +303,142 @@ const OrderHistory = () => {
           placeholder="Buscar por número, nome ou telefone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
+          className="pl-9 pr-20"
         />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute right-1 top-1/2 -translate-y-1/2 gap-1"
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <Filter className="h-4 w-4" />
+          Filtros
+          {activeFilterCount > 0 && (
+            <Badge variant="default" className="h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
       </div>
+
+      {/* Filters panel */}
+      {showFilters && (
+        <Card>
+          <CardContent className="p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Filtros avançados</span>
+              {activeFilterCount > 0 && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs gap-1 h-7">
+                  <X className="h-3 w-3" /> Limpar filtros
+                </Button>
+              )}
+            </div>
+
+            {/* Date range */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Data início</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal text-xs h-9", !dateFrom && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Selecionar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Data fim</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-full justify-start text-left font-normal text-xs h-9", !dateTo && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-1 h-3 w-3" />
+                      {dateTo ? format(dateTo, "dd/MM/yyyy") : "Selecionar"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={ptBR} initialFocus className={cn("p-3 pointer-events-auto")} />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Quick date buttons */}
+            <div className="flex flex-wrap gap-1">
+              {[
+                { label: "Hoje", fn: () => { const d = new Date(); setDateFrom(d); setDateTo(d); } },
+                { label: "Ontem", fn: () => { const d = new Date(); d.setDate(d.getDate() - 1); setDateFrom(d); setDateTo(d); } },
+                { label: "Últimos 7 dias", fn: () => { const from = new Date(); from.setDate(from.getDate() - 7); setDateFrom(from); setDateTo(new Date()); } },
+                { label: "Últimos 30 dias", fn: () => { const from = new Date(); from.setDate(from.getDate() - 30); setDateFrom(from); setDateTo(new Date()); } },
+                { label: "Este mês", fn: () => { const now = new Date(); setDateFrom(new Date(now.getFullYear(), now.getMonth(), 1)); setDateTo(now); } },
+              ].map((btn) => (
+                <Button key={btn.label} variant="outline" size="sm" className="text-xs h-7" onClick={btn.fn}>
+                  {btn.label}
+                </Button>
+              ))}
+            </div>
+
+            {/* Selects row */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {Object.entries(statusLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Origem</label>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {Object.entries(sourceLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Pagamento</label>
+                <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {Object.entries(paymentLabels).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Results summary */}
+      {activeFilterCount > 0 && (
+        <div className="text-xs text-muted-foreground text-center">
+          {filteredOrders.length} pedido(s) encontrado(s) com {activeFilterCount} filtro(s) ativo(s)
+        </div>
+      )}
 
       <Tabs defaultValue="delivery" className="w-full">
         <TabsList className="w-full grid grid-cols-2">
           <TabsTrigger value="delivery" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Delivery
+            <Truck className="h-4 w-4" />Delivery
             <Badge variant="secondary" className="ml-1 text-xs">{deliveryOrders.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="dine_in" className="flex items-center gap-2">
-            <UtensilsCrossed className="h-4 w-4" />
-            Mesa (Salão)
+            <UtensilsCrossed className="h-4 w-4" />Mesa
             <Badge variant="secondary" className="ml-1 text-xs">{dineInOrders.length}</Badge>
           </TabsTrigger>
         </TabsList>
@@ -337,7 +448,7 @@ const OrderHistory = () => {
             <span className="text-sm text-muted-foreground">{deliveryOrders.length} pedidos</span>
             <span className="text-sm font-bold">Total: R$ {totalDelivery.toFixed(2).replace(".", ",")}</span>
           </div>
-          <div className="max-h-[65vh] overflow-y-auto space-y-0">
+          <div className="max-h-[60vh] overflow-y-auto space-y-0">
             {deliveryOrders.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">Nenhum pedido encontrado</p>
             ) : (
@@ -351,7 +462,7 @@ const OrderHistory = () => {
             <span className="text-sm text-muted-foreground">{dineInOrders.length} pedidos</span>
             <span className="text-sm font-bold">Total: R$ {totalDineIn.toFixed(2).replace(".", ",")}</span>
           </div>
-          <div className="max-h-[65vh] overflow-y-auto space-y-0">
+          <div className="max-h-[60vh] overflow-y-auto space-y-0">
             {dineInOrders.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">Nenhum pedido encontrado</p>
             ) : (
@@ -361,9 +472,7 @@ const OrderHistory = () => {
         </TabsContent>
       </Tabs>
 
-      <p className="text-xs text-center text-muted-foreground">
-        Exibindo pedidos dos últimos 60 dias
-      </p>
+      <p className="text-xs text-center text-muted-foreground">Exibindo pedidos dos últimos 60 dias</p>
     </div>
   );
 };
