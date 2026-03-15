@@ -36,6 +36,7 @@ import DeliveryTracking from "./pages/DeliveryTracking";
 import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import OrderHistory from "./pages/admin/OrderHistory";
+import IfoodIntegration from "./pages/admin/IfoodIntegration";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ const App = () => (
               <Route path="establishment" element={<Establishment />} />
               <Route path="delivery-persons" element={<DeliveryPersons />} />
               <Route path="delivery-alerts" element={<DeliveryAlerts />} />
+              <Route path="ifood" element={<IfoodIntegration />} />
             </Route>
 
             {/* Waiter App */}

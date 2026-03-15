@@ -34,6 +34,7 @@ const menuItems = [
   { title: "Chat Entregadores", url: "/admin/driver-chat", icon: MessageSquare },
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
+  { title: "iFood", url: "/admin/ifood", icon: Store },
 ];
 
 const URGENCY_SOUND_URL = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==";
