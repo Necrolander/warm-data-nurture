@@ -76,6 +76,7 @@ const App = () => (
               <Route path="establishment" element={<Establishment />} />
               <Route path="delivery-persons" element={<DeliveryPersons />} />
               <Route path="delivery-alerts" element={<DeliveryAlerts />} />
+              <Route path="ifood" element={<IfoodIntegration />} />
             </Route>
 
             {/* Waiter App */}
