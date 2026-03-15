@@ -124,13 +124,24 @@ async function pollOrders(supabase: any, token: string, merchantId: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
 
+  const responseText = await resp.text();
+
   if (!resp.ok) {
-    const errText = await resp.text();
-    throw new Error(`iFood polling failed [${resp.status}]: ${errText}`);
+    throw new Error(`iFood polling failed [${resp.status}]: ${responseText}`);
   }
 
-  const events = await resp.json();
-  if (!events || events.length === 0) return { message: "No new events", orders_created: 0 };
+  // iFood may return empty body when no events
+  let events: any[] = [];
+  if (responseText && responseText.trim().length > 0) {
+    try {
+      events = JSON.parse(responseText);
+    } catch (e) {
+      console.warn("Failed to parse polling response:", responseText.substring(0, 200));
+      return { message: "No parseable events", orders_created: 0 };
+    }
+  }
+
+  if (!Array.isArray(events) || events.length === 0) return { message: "No new events", orders_created: 0 };
 
   let ordersCreated = 0;
   const eventIds: string[] = [];
