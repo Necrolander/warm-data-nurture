@@ -452,6 +452,96 @@ export type Database = {
         }
         Relationships: []
       }
+      ifood_events_log: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          event_type: string | null
+          id: string
+          order_id: string | null
+          processed: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          processed?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          event_type?: string | null
+          id?: string
+          order_id?: string | null
+          processed?: boolean | null
+        }
+        Relationships: []
+      }
+      ifood_reviews: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          customer_name: string | null
+          id: string
+          merchant_id: string
+          order_id: string | null
+          rating: number | null
+          responded_at: string | null
+          response_sent: boolean | null
+          response_text: string | null
+          review_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          id?: string
+          merchant_id: string
+          order_id?: string | null
+          rating?: number | null
+          responded_at?: string | null
+          response_sent?: boolean | null
+          response_text?: string | null
+          review_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          customer_name?: string | null
+          id?: string
+          merchant_id?: string
+          order_id?: string | null
+          rating?: number | null
+          responded_at?: string | null
+          response_sent?: boolean | null
+          response_text?: string | null
+          review_id?: string
+        }
+        Relationships: []
+      }
+      ifood_tokens: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string
+          id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at: string
+          id?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
       kitchen_alerts: {
         Row: {
           acknowledged: boolean
