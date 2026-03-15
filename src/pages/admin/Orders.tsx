@@ -168,6 +168,7 @@ const OrderCard = ({
   onMarkDelivered,
   onCancel,
   onPrint,
+  onChangeDelivery,
   isPending,
   deliveryPersons,
 }: {
@@ -179,6 +180,7 @@ const OrderCard = ({
   onMarkDelivered: (order: OrderWithItems) => void;
   onCancel: (order: OrderWithItems) => void;
   onPrint: (order: OrderWithItems) => void;
+  onChangeDelivery: (order: OrderWithItems) => void;
   isPending: boolean;
   deliveryPersons: DeliveryPerson[];
 }) => {
