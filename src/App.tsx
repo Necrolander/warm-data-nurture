@@ -42,6 +42,7 @@ import RoutesList from "./pages/admin/RoutesList";
 import OperationalMap from "./pages/admin/OperationalMap";
 import DriversManagement from "./pages/admin/DriversManagement";
 import RoutingConfig from "./pages/admin/RoutingConfig";
+import MapDemo from "./pages/MapDemo";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
