@@ -304,7 +304,8 @@ const WaiterNewOrder = () => {
             total: subtotal,
             observation: observation || null,
             status: "pending",
-          })
+            order_source: "app_garcom",
+          } as any)
           .select("id, order_number")
           .single();
 

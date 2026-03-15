@@ -670,6 +670,7 @@ async function handleConfirm(supabase: any, session: any, msg: string, settings:
     reference: session.delivery_address,
     delivery_lat: session.delivery_lat || null,
     delivery_lng: session.delivery_lng || null,
+    order_source: "whatsapp_bot",
   }).select().single();
 
   if (orderError || !order) {

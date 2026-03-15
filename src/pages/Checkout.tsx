@@ -178,7 +178,8 @@ const Checkout = () => {
           delivery_lat: location.lat,
           delivery_lng: location.lng,
           status: "pending" as const,
-        });
+          order_source: "site",
+        } as any);
 
       if (orderError) throw orderError;
 
