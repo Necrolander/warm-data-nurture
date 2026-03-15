@@ -1,0 +1,1 @@
+ALTER TABLE public.orders ADD COLUMN order_source text DEFAULT 'site';

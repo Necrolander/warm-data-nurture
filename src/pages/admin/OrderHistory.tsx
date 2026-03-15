@@ -141,11 +141,17 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
               {/* Platform/source */}
               <div className="flex items-center gap-1.5">
                 <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">Plataforma:</span>
+                <span className="text-muted-foreground">Origem:</span>
                 <Badge variant="outline" className="text-xs">
-                  {order.order_type === "delivery" ? "🛵 Delivery (Site)" :
-                   order.order_type === "pickup" ? "🏪 Retirada (Site)" :
-                   order.order_type === "dine_in" ? "🍽️ Salão" : order.order_type}
+                  {(() => {
+                    const src = (order as any).order_source;
+                    if (src === "whatsapp_bot") return "📱 WhatsApp Bot";
+                    if (src === "ifood") return "🟥 iFood";
+                    if (src === "pdv_admin") return "💻 PDV Admin";
+                    if (src === "app_garcom") return "🍽️ App Garçom";
+                    if (src === "site") return "🌐 Site";
+                    return "🌐 Site";
+                  })()}
                 </Badge>
               </div>
 

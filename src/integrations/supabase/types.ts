@@ -550,6 +550,7 @@ export type Database = {
           id: string
           observation: string | null
           order_number: number
+          order_source: string | null
           order_type: Database["public"]["Enums"]["order_type"]
           payment_method: Database["public"]["Enums"]["payment_method"] | null
           reference: string | null
@@ -578,6 +579,7 @@ export type Database = {
           id?: string
           observation?: string | null
           order_number?: number
+          order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           reference?: string | null
@@ -606,6 +608,7 @@ export type Database = {
           id?: string
           observation?: string | null
           order_number?: number
+          order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
           reference?: string | null

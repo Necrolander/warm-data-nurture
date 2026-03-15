@@ -234,7 +234,8 @@ const NewOrder = () => {
       observation,
       table_number: orderType === "dine_in" ? parseInt(tableNumber) || null : null,
       status: "production" as any,
-    }).select().single();
+      order_source: "pdv_admin",
+    } as any).select().single();
 
     if (error || !order) {
       toast.error("Erro ao criar pedido");
