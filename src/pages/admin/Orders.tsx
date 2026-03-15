@@ -761,7 +761,9 @@ const Orders = () => {
       <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Selecionar Entregador</DialogTitle>
+            <DialogTitle>
+              {selectedOrder?.delivery_person_id ? "Trocar Entregador" : "Selecionar Entregador"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -772,15 +774,22 @@ const Orders = () => {
                 <SelectValue placeholder="Selecione o entregador" />
               </SelectTrigger>
               <SelectContent>
-                {deliveryPersons.map((dp) => (
-                  <SelectItem key={dp.id} value={dp.id}>
-                    {dp.name} - {dp.phone}
-                  </SelectItem>
-                ))}
+                {deliveryPersons.map((dp) => {
+                  const activeCount = orders.filter(o =>
+                    o.delivery_person_id === dp.id &&
+                    ["ready", "out_for_delivery"].includes(o.status) &&
+                    o.id !== selectedOrder?.id
+                  ).length;
+                  return (
+                    <SelectItem key={dp.id} value={dp.id} disabled={activeCount >= 3}>
+                      {dp.name} - {dp.phone} ({activeCount}/3 pedidos)
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <Button onClick={confirmDelivery} className="w-full">
-              Confirmar Entrega
+              {selectedOrder?.delivery_person_id ? "Confirmar Troca" : "Confirmar Entrega"}
             </Button>
           </div>
         </DialogContent>
