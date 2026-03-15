@@ -661,42 +661,66 @@ const Orders = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {columns.map((col) => {
-          const colOrders = orders.filter((o) => o.status === col.status);
-          return (
-            <div key={col.status} className={`border-t-2 ${col.color} rounded-lg`}>
-              <div className="flex items-center justify-between p-3">
-                <h3 className="font-semibold text-sm">{col.title}</h3>
-                <Badge variant="secondary">{colOrders.length}</Badge>
-              </div>
-              <div className="px-2 pb-2 max-h-[70vh] overflow-y-auto">
-                {colOrders.length === 0 ? (
-                  <p className="text-center text-muted-foreground text-sm py-8">
-                    Nenhum pedido
-                  </p>
-                ) : (
-                  colOrders.map((order) => (
-                    <OrderCard
-                      key={order.id}
-                      order={order}
-                      onAccept={acceptOrder}
-                      onReject={rejectOrder}
-                      onAdvance={advanceOrder}
-                      onSelectDelivery={handleSelectDelivery}
-                      onMarkDelivered={markDelivered}
-                      onCancel={(o) => setCancelOrder(o)}
-                      onPrint={printOrderTicket}
-                      isPending={order.status === "pending"}
-                      deliveryPersons={deliveryPersons}
-                    />
-                  ))
-                )}
-              </div>
+      <Tabs defaultValue="delivery" className="w-full">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="delivery" className="flex items-center gap-2">
+            <Truck className="h-4 w-4" />
+            Delivery / Retirada
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {orders.filter(o => o.order_type === "delivery" || o.order_type === "pickup").length}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="dine_in" className="flex items-center gap-2">
+            <UtensilsCrossed className="h-4 w-4" />
+            Mesa (Salão)
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {orders.filter(o => o.order_type === "dine_in").length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        {["delivery", "dine_in"].map((tab) => (
+          <TabsContent key={tab} value={tab}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {columns.map((col) => {
+                const colOrders = orders.filter((o) =>
+                  o.status === col.status &&
+                  (tab === "delivery" ? (o.order_type === "delivery" || o.order_type === "pickup") : o.order_type === "dine_in")
+                );
+                return (
+                  <div key={col.status} className={`border-t-2 ${col.color} rounded-lg`}>
+                    <div className="flex items-center justify-between p-3">
+                      <h3 className="font-semibold text-sm">{col.title}</h3>
+                      <Badge variant="secondary">{colOrders.length}</Badge>
+                    </div>
+                    <div className="px-2 pb-2 max-h-[70vh] overflow-y-auto">
+                      {colOrders.length === 0 ? (
+                        <p className="text-center text-muted-foreground text-sm py-8">Nenhum pedido</p>
+                      ) : (
+                        colOrders.map((order) => (
+                          <OrderCard
+                            key={order.id}
+                            order={order}
+                            onAccept={acceptOrder}
+                            onReject={rejectOrder}
+                            onAdvance={advanceOrder}
+                            onSelectDelivery={handleSelectDelivery}
+                            onMarkDelivered={markDelivered}
+                            onCancel={(o) => setCancelOrder(o)}
+                            onPrint={printOrderTicket}
+                            isPending={order.status === "pending"}
+                            deliveryPersons={deliveryPersons}
+                          />
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {/* Delivery person dialog */}
       <Dialog open={showDeliveryDialog} onOpenChange={setShowDeliveryDialog}>
