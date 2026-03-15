@@ -37,6 +37,11 @@ import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import OrderHistory from "./pages/admin/OrderHistory";
 import IfoodIntegration from "./pages/admin/IfoodIntegration";
+import RoutingDashboard from "./pages/admin/RoutingDashboard";
+import RoutesList from "./pages/admin/RoutesList";
+import OperationalMap from "./pages/admin/OperationalMap";
+import DriversManagement from "./pages/admin/DriversManagement";
+import RoutingConfig from "./pages/admin/RoutingConfig";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
