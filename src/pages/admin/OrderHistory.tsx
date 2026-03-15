@@ -136,6 +136,65 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
               )}
             </div>
 
+            {/* Delivery & Platform info */}
+            <div className="border-t border-border pt-2 space-y-1 text-sm">
+              {/* Platform/source */}
+              <div className="flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Plataforma:</span>
+                <Badge variant="outline" className="text-xs">
+                  {order.order_type === "delivery" ? "🛵 Delivery (Site)" :
+                   order.order_type === "pickup" ? "🏪 Retirada (Site)" :
+                   order.order_type === "dine_in" ? "🍽️ Salão" : order.order_type}
+                </Badge>
+              </div>
+
+              {/* Delivery person */}
+              {order.delivery_person_id && (() => {
+                const dp = deliveryPersons.find(d => d.id === order.delivery_person_id);
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <Bike className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Motoboy:</span>
+                    <span className="font-medium">{dp?.name || "Desconhecido"}</span>
+                    {dp?.phone && <span className="text-xs text-muted-foreground">({dp.phone})</span>}
+                  </div>
+                );
+              })()}
+
+              {/* Delivery code confirmation */}
+              {order.order_type === "delivery" && (
+                <div className="flex items-center gap-1.5">
+                  {order.delivery_code && order.status === "delivered" ? (
+                    <>
+                      <ShieldCheck className="h-3.5 w-3.5 text-green-500" />
+                      <span className="text-green-500 text-xs font-medium">
+                        ✅ Confirmado com código ({order.delivery_code})
+                      </span>
+                    </>
+                  ) : order.status === "delivered" ? (
+                    <>
+                      <ShieldX className="h-3.5 w-3.5 text-yellow-500" />
+                      <span className="text-yellow-500 text-xs font-medium">
+                        ⚠️ Entregue sem código de confirmação
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              )}
+
+              {/* Checklist */}
+              {order.delivery_person_id && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  {order.checklist_confirmed ? (
+                    <span className="text-green-500">✅ Checklist conferido</span>
+                  ) : (
+                    <span className="text-yellow-500">⚠️ Checklist não conferido</span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Items */}
             <div className="border-t border-border pt-2">
               <p className="text-xs font-bold text-muted-foreground mb-1 flex items-center gap-1">
