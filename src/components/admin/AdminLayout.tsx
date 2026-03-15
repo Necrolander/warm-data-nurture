@@ -18,6 +18,7 @@ import logo from "@/assets/logo-truebox-new.png";
 const menuItems = [
   { title: "Meus Pedidos", url: "/admin", icon: ClipboardList },
   { title: "Histórico Pedidos", url: "/admin/order-history", icon: History },
+  { title: "Fazer Pedido", url: "/admin/new-order", icon: PlusCircle },
   { title: "Gestor de Cardápio", url: "/admin/menu-manager", icon: UtensilsCrossed },
   { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
   { title: "Robô", url: "/admin/bot", icon: Bot },
