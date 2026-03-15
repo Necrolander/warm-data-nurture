@@ -35,6 +35,7 @@ import TableQRPrint from "./pages/TableQRPrint";
 import DeliveryTracking from "./pages/DeliveryTracking";
 import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
+import OrderHistory from "./pages/admin/OrderHistory";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Orders />} />
+              <Route path="order-history" element={<OrderHistory />} />
               <Route path="new-order" element={<NewOrder />} />
               <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<Invoices />} />

@@ -8,7 +8,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
-  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare,
+  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import logo from "@/assets/logo-truebox-new.png";
 
 const menuItems = [
   { title: "Meus Pedidos", url: "/admin", icon: ClipboardList },
+  { title: "Histórico Pedidos", url: "/admin/order-history", icon: History },
   { title: "Fazer Pedido", url: "/admin/new-order", icon: PlusCircle },
   { title: "Gestor de Cardápio", url: "/admin/menu-manager", icon: UtensilsCrossed },
   { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
