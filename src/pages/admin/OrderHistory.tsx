@@ -52,7 +52,7 @@ const orderTypeLabels: Record<string, string> = {
   dine_in: "🍽️ No Salão",
 };
 
-const HistoryOrderCard = ({ order }: { order: OrderWithItems }) => {
+const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; deliveryPersons: DeliveryPerson[] }) => {
   const [expanded, setExpanded] = useState(false);
 
   const mapLink = order.delivery_lat && order.delivery_lng
