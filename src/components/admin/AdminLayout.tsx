@@ -8,7 +8,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
-  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare,
+  Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare, History,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
