@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Truck, UtensilsCrossed, Phone, MapPin, User, CreditCard,
   MessageSquare, ExternalLink, Search, ChevronDown, ChevronUp,
-  Printer, Package
+  Printer, Package, Bike, ShieldCheck, ShieldX, Globe
 } from "lucide-react";
 import type { Database } from "@/integrations/supabase/types";
+
+type DeliveryPerson = Database["public"]["Tables"]["delivery_persons"]["Row"];
 
 type Order = Database["public"]["Tables"]["orders"]["Row"];
 type OrderItem = Database["public"]["Tables"]["order_items"]["Row"];
