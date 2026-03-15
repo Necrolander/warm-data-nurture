@@ -742,6 +742,13 @@ const Orders = () => {
                             onMarkDelivered={markDelivered}
                             onCancel={(o) => setCancelOrder(o)}
                             onPrint={printOrderTicket}
+                            onChangeDelivery={handleChangeDelivery}
+                            isPending={order.status === "pending"}
+                            deliveryPersons={deliveryPersons}
+                          />
+                            onMarkDelivered={markDelivered}
+                            onCancel={(o) => setCancelOrder(o)}
+                            onPrint={printOrderTicket}
                             isPending={order.status === "pending"}
                             deliveryPersons={deliveryPersons}
                           />
