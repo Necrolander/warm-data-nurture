@@ -250,12 +250,19 @@ const HistoryOrderCard = ({ order, deliveryPersons }: { order: OrderWithItems; d
 
 const OrderHistory = () => {
   const [historyOrders, setHistoryOrders] = useState<OrderWithItems[]>([]);
+  const [deliveryPersons, setDeliveryPersons] = useState<DeliveryPerson[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchHistory();
+    fetchDeliveryPersons();
   }, []);
+
+  const fetchDeliveryPersons = async () => {
+    const { data } = await supabase.from("delivery_persons").select("*");
+    if (data) setDeliveryPersons(data);
+  };
 
   const fetchHistory = async () => {
     setLoading(true);
