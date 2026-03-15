@@ -114,9 +114,8 @@ const OperationalMap = () => {
         </div>
       </div>
       
-      {/* Leaflet CSS */}
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+
       
       <Card>
         <CardContent className="p-0">
