@@ -3,8 +3,8 @@ export const STORE_CONFIG = {
   phone: "5561996179376",
   address: "Gama - DF",
   coordinates: {
-    lat: -16.014293069314565,
-    lng: -48.05929532023717,
+    lat: -16.0145251,
+    lng: -48.0593436,
   },
   hours: {
     open: "18:00",

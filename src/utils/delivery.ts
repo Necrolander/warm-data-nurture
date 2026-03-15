@@ -11,7 +11,7 @@ export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2
 }
 
 // Store coordinates (default fallback)
-const DEFAULT_COORDS = { lat: -16.014293069314565, lng: -48.05929532023717 };
+const DEFAULT_COORDS = { lat: -16.0145251, lng: -48.0593436 };
 
 export async function getDeliveryFeeFromDB(
   customerLat: number,
