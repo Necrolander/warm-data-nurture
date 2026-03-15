@@ -37,16 +37,36 @@ const OperationalMap = () => {
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     const store = getStoreCoords();
-    const L = (window as any).L;
-    if (!L) return;
     
-    const map = L.map(mapRef.current).setView([store.lat, store.lng], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap",
-    }).addTo(map);
-    mapInstanceRef.current = map;
+    const initMap = () => {
+      const L = (window as any).L;
+      if (!L || !mapRef.current) return false;
+      
+      const map = L.map(mapRef.current).setView([store.lat, store.lng], 13);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap",
+      }).addTo(map);
+      mapInstanceRef.current = map;
+      
+      // Force resize after render
+      setTimeout(() => map.invalidateSize(), 200);
+      return true;
+    };
     
-    return () => { map.remove(); mapInstanceRef.current = null; };
+    if (!initMap()) {
+      // Leaflet may not be loaded yet, retry
+      const retryInterval = setInterval(() => {
+        if (initMap()) clearInterval(retryInterval);
+      }, 300);
+      return () => clearInterval(retryInterval);
+    }
+    
+    return () => { 
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove(); 
+        mapInstanceRef.current = null; 
+      }
+    };
   }, []);
 
   useEffect(() => {
