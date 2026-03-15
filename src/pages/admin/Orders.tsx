@@ -605,6 +605,13 @@ const Orders = () => {
 
   const handleSelectDelivery = (order: OrderWithItems) => {
     setSelectedOrder(order);
+    setSelectedDeliveryPerson("");
+    setShowDeliveryDialog(true);
+  };
+
+  const handleChangeDelivery = (order: OrderWithItems) => {
+    setSelectedOrder(order);
+    setSelectedDeliveryPerson(order.delivery_person_id || "");
     setShowDeliveryDialog(true);
   };
 
