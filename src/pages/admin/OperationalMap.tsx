@@ -1,14 +1,16 @@
 import { useEffect, useState, useRef } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getStoreCoords } from "@/services/routing/distanceUtils";
 
 const OperationalMap = () => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markersRef = useRef<any[]>([]);
-  const polylinesRef = useRef<any[]>([]);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Layer[]>([]);
+  const polylinesRef = useRef<L.Layer[]>([]);
   const [drivers, setDrivers] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
@@ -37,44 +39,25 @@ const OperationalMap = () => {
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
     const store = getStoreCoords();
-    
-    const initMap = () => {
-      const L = (window as any).L;
-      if (!L || !mapRef.current) return false;
-      
-      const map = L.map(mapRef.current).setView([store.lat, store.lng], 13);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap",
-      }).addTo(map);
-      mapInstanceRef.current = map;
-      
-      // Force resize after render
-      setTimeout(() => map.invalidateSize(), 200);
-      return true;
-    };
-    
-    if (!initMap()) {
-      // Leaflet may not be loaded yet, retry
-      const retryInterval = setInterval(() => {
-        if (initMap()) clearInterval(retryInterval);
-      }, 300);
-      return () => clearInterval(retryInterval);
-    }
-    
-    return () => { 
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove(); 
-        mapInstanceRef.current = null; 
-      }
+
+    const map = L.map(mapRef.current).setView([store.lat, store.lng], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap",
+    }).addTo(map);
+    mapInstanceRef.current = map;
+
+    setTimeout(() => map.invalidateSize(), 300);
+
+    return () => {
+      map.remove();
+      mapInstanceRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    const L = (window as any).L;
     const map = mapInstanceRef.current;
-    if (!L || !map) return;
+    if (!map) return;
 
-    // Clear old markers
     markersRef.current.forEach(m => m.remove());
     polylinesRef.current.forEach(p => p.remove());
     markersRef.current = [];
@@ -108,7 +91,7 @@ const OperationalMap = () => {
     // Drivers
     drivers.forEach(d => {
       if (!d.current_lat || !d.current_lng) return;
-      const color = (d as any).status === "on_route" ? "#3b82f6" : "#22c55e";
+      const color = d.status === "on_route" ? "#3b82f6" : "#22c55e";
       const icon = L.divIcon({
         html: `<div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)">🏍️</div>`,
         iconSize: [28, 28],
@@ -117,10 +100,15 @@ const OperationalMap = () => {
       markersRef.current.push(
         L.marker([d.current_lat, d.current_lng], { icon })
           .addTo(map)
-          .bindPopup(`${d.name}<br>Status: ${(d as any).status || "online"}`)
+          .bindPopup(`${d.name}<br>Status: ${d.status || "online"}`)
       );
     });
 
+    // Fit bounds to show all markers
+    if (markersRef.current.length > 1) {
+      const group = L.featureGroup(markersRef.current);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
   }, [drivers, pendingOrders, routes]);
 
   return (
@@ -133,21 +121,18 @@ const OperationalMap = () => {
           <Badge variant="outline" className="gap-1">🛣️ {routes.length} rotas ativas</Badge>
         </div>
       </div>
-      
 
-
-      
       <Card>
         <CardContent className="p-0">
           <div ref={mapRef} className="w-full h-[600px] rounded-lg" />
         </CardContent>
       </Card>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
         <span className="flex items-center gap-1">🏪 Loja</span>
         <span className="flex items-center gap-1">📦 Pedido Aguardando</span>
-        <span className="flex items-center gap-1">🏍️ Motoboy</span>
+        <span className="flex items-center gap-1 text-green-500">🏍️ Disponível</span>
+        <span className="flex items-center gap-1 text-blue-500">🏍️ Em Rota</span>
       </div>
     </div>
   );
