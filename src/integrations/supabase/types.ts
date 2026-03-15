@@ -216,6 +216,70 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_history: {
+        Row: {
+          actual_time_min: number | null
+          created_at: string | null
+          delay_min: number | null
+          distance_km: number | null
+          driver_id: string | null
+          estimated_time_min: number | null
+          id: string
+          neighborhood: string | null
+          order_id: string | null
+          region: string | null
+          route_id: string | null
+        }
+        Insert: {
+          actual_time_min?: number | null
+          created_at?: string | null
+          delay_min?: number | null
+          distance_km?: number | null
+          driver_id?: string | null
+          estimated_time_min?: number | null
+          id?: string
+          neighborhood?: string | null
+          order_id?: string | null
+          region?: string | null
+          route_id?: string | null
+        }
+        Update: {
+          actual_time_min?: number | null
+          created_at?: string | null
+          delay_min?: number | null
+          distance_km?: number | null
+          driver_id?: string | null
+          estimated_time_min?: number | null
+          id?: string
+          neighborhood?: string | null
+          order_id?: string | null
+          region?: string | null
+          route_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_history_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_persons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_history_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_issues: {
         Row: {
           created_at: string | null
@@ -260,9 +324,13 @@ export type Database = {
       }
       delivery_persons: {
         Row: {
+          avg_capacity_per_hour: number | null
+          avg_delay_rate: number | null
+          avg_speed_kmh: number | null
           created_at: string | null
           current_lat: number | null
           current_lng: number | null
+          current_route_id: string | null
           id: string
           is_active: boolean | null
           is_online: boolean | null
@@ -270,11 +338,17 @@ export type Database = {
           name: string
           password_hash: string | null
           phone: string
+          status: string | null
+          updated_at: string | null
         }
         Insert: {
+          avg_capacity_per_hour?: number | null
+          avg_delay_rate?: number | null
+          avg_speed_kmh?: number | null
           created_at?: string | null
           current_lat?: number | null
           current_lng?: number | null
+          current_route_id?: string | null
           id?: string
           is_active?: boolean | null
           is_online?: boolean | null
@@ -282,11 +356,17 @@ export type Database = {
           name: string
           password_hash?: string | null
           phone: string
+          status?: string | null
+          updated_at?: string | null
         }
         Update: {
+          avg_capacity_per_hour?: number | null
+          avg_delay_rate?: number | null
+          avg_speed_kmh?: number | null
           created_at?: string | null
           current_lat?: number | null
           current_lng?: number | null
+          current_route_id?: string | null
           id?: string
           is_active?: boolean | null
           is_online?: boolean | null
@@ -294,6 +374,8 @@ export type Database = {
           name?: string
           password_hash?: string | null
           phone?: string
+          status?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -368,6 +450,38 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_locations: {
+        Row: {
+          driver_id: string
+          id: string
+          latitude: number
+          longitude: number
+          recorded_at: string
+        }
+        Insert: {
+          driver_id: string
+          id?: string
+          latitude: number
+          longitude: number
+          recorded_at?: string
+        }
+        Update: {
+          driver_id?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          recorded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_locations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_persons"
             referencedColumns: ["id"]
           },
         ]
@@ -580,6 +694,36 @@ export type Database = {
           },
         ]
       }
+      order_demand_history: {
+        Row: {
+          created_at: string | null
+          date: string
+          hour: number
+          id: string
+          neighborhood: string | null
+          order_count: number | null
+          source: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          hour: number
+          id?: string
+          neighborhood?: string | null
+          order_count?: number | null
+          source?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          hour?: number
+          id?: string
+          neighborhood?: string | null
+          order_count?: number | null
+          source?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -630,6 +774,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delay_notified: boolean | null
+          delay_risk: boolean | null
           delivery_code: string | null
           delivery_fee: number
           delivery_lat: number | null
@@ -643,7 +788,11 @@ export type Database = {
           order_source: string | null
           order_type: Database["public"]["Enums"]["order_type"]
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          predicted_eta: string | null
+          ready_at: string | null
           reference: string | null
+          route_id: string | null
+          route_position: number | null
           service_charge: number
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
@@ -659,6 +808,7 @@ export type Database = {
           customer_name: string
           customer_phone: string
           delay_notified?: boolean | null
+          delay_risk?: boolean | null
           delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
@@ -672,7 +822,11 @@ export type Database = {
           order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          predicted_eta?: string | null
+          ready_at?: string | null
           reference?: string | null
+          route_id?: string | null
+          route_position?: number | null
           service_charge?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -688,6 +842,7 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           delay_notified?: boolean | null
+          delay_risk?: boolean | null
           delivery_code?: string | null
           delivery_fee?: number
           delivery_lat?: number | null
@@ -701,7 +856,11 @@ export type Database = {
           order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          predicted_eta?: string | null
+          ready_at?: string | null
           reference?: string | null
+          route_id?: string | null
+          route_position?: number | null
           service_charge?: number
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -709,7 +868,15 @@ export type Database = {
           total?: number
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orders_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       print_queue: {
         Row: {
@@ -940,6 +1107,134 @@ export type Database = {
         }
         Relationships: []
       }
+      route_orders: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: string
+          predicted_eta: string | null
+          route_id: string
+          stop_distance_km: number | null
+          stop_duration_min: number | null
+          stop_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id: string
+          predicted_eta?: string | null
+          route_id: string
+          stop_distance_km?: number | null
+          stop_duration_min?: number | null
+          stop_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          predicted_eta?: string | null
+          route_id?: string
+          stop_distance_km?: number | null
+          stop_duration_min?: number | null
+          stop_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_orders_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_orders_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routes: {
+        Row: {
+          auto_assigned: boolean | null
+          code: string
+          created_at: string | null
+          driver_id: string | null
+          estimated_duration_min: number | null
+          id: string
+          optimized_sequence: Json | null
+          origin_lat: number
+          origin_lng: number
+          predicted_real_duration_min: number | null
+          status: string
+          total_distance_km: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_assigned?: boolean | null
+          code?: string
+          created_at?: string | null
+          driver_id?: string | null
+          estimated_duration_min?: number | null
+          id?: string
+          optimized_sequence?: Json | null
+          origin_lat?: number
+          origin_lng?: number
+          predicted_real_duration_min?: number | null
+          status?: string
+          total_distance_km?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_assigned?: boolean | null
+          code?: string
+          created_at?: string | null
+          driver_id?: string | null
+          estimated_duration_min?: number | null
+          id?: string
+          optimized_sequence?: Json | null
+          origin_lat?: number
+          origin_lng?: number
+          predicted_real_duration_min?: number | null
+          status?: string
+          total_distance_km?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routes_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_persons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routing_config: {
+        Row: {
+          id: string
+          key: string
+          label: string | null
+          updated_at: string | null
+          value: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          label?: string | null
+          updated_at?: string | null
+          value: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          label?: string | null
+          updated_at?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       salon_tables: {
         Row: {
           created_at: string | null
@@ -1072,6 +1367,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "waiter" | "delivery"
+      driver_status: "available" | "on_route" | "paused" | "offline"
       order_status:
         | "pending"
         | "production"
@@ -1081,6 +1377,13 @@ export type Database = {
         | "cancelled"
       order_type: "delivery" | "pickup" | "dine_in"
       payment_method: "pix" | "credit_card" | "debit_card" | "cash"
+      route_status:
+        | "created"
+        | "awaiting_driver"
+        | "assigned"
+        | "in_delivery"
+        | "completed"
+        | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1209,6 +1512,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "waiter", "delivery"],
+      driver_status: ["available", "on_route", "paused", "offline"],
       order_status: [
         "pending",
         "production",
@@ -1219,6 +1523,14 @@ export const Constants = {
       ],
       order_type: ["delivery", "pickup", "dine_in"],
       payment_method: ["pix", "credit_card", "debit_card", "cash"],
+      route_status: [
+        "created",
+        "awaiting_driver",
+        "assigned",
+        "in_delivery",
+        "completed",
+        "cancelled",
+      ],
     },
   },
 } as const
