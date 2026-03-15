@@ -36,9 +36,9 @@ const DriverDashboard = () => {
 
   const [isOnline, setIsOnline] = useState(false);
   const [availableOrders, setAvailableOrders] = useState<any[]>([]);
-  const [currentOrder, setCurrentOrder] = useState<any>(null);
-  const [currentOrderItems, setCurrentOrderItems] = useState<any[]>([]);
-  const [orderStatus, setOrderStatus] = useState<string>("");
+  const [currentOrders, setCurrentOrders] = useState<any[]>([]);
+  const [currentOrderItems, setCurrentOrderItems] = useState<Record<string, any[]>>({});
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showProblem, setShowProblem] = useState(false);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
