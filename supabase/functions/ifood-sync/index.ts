@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       .single();
 
     const merchantId = merchantSetting?.value;
-    if (!merchantId && action !== "save_settings") {
+    if (!merchantId && !["save_settings", "get_merchants"].includes(action)) {
       return new Response(JSON.stringify({ error: "Merchant ID não configurado", code: "NO_MERCHANT_ID" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
