@@ -18,6 +18,8 @@ import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
 import DriverChecklist from "@/components/driver/DriverChecklist";
 import DriverChat from "@/components/driver/DriverChat";
 
+const MAX_ACTIVE_ORDERS = 3;
+
 // Haversine distance in meters
 function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -38,22 +40,24 @@ const DriverDashboard = () => {
   const [availableOrders, setAvailableOrders] = useState<any[]>([]);
   const [currentOrders, setCurrentOrders] = useState<any[]>([]);
   const [currentOrderItems, setCurrentOrderItems] = useState<Record<string, any[]>>({});
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderIndex, setSelectedOrderIndex] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
   const [showProblem, setShowProblem] = useState(false);
   const [showPendingOrder, setShowPendingOrder] = useState<any>(null);
   const [showChecklist, setShowChecklist] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [pendingChecklistItems, setPendingChecklistItems] = useState<any[]>([]);
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
+
+  const activeOrder = currentOrders[selectedOrderIndex] || null;
 
   // Request notification permission on mount
   useEffect(() => {
     if (!driverId) { navigate("/driver/login"); return; }
-    loadCurrentOrder();
+    loadCurrentOrders();
     loadDriverStatus();
 
-    // Ask for notification permission
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
@@ -74,13 +78,11 @@ const DriverDashboard = () => {
           notification.close();
         };
       } catch {
-        // Fallback for mobile: use registration if available
         navigator.serviceWorker?.ready?.then((reg) => {
           reg.showNotification(title, { body, icon: "/favicon.ico", tag: "new-order", renotify: true } as NotificationOptions);
         }).catch(() => {});
       }
     }
-    // Also play a sound
     try {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = ctx.createOscillator();
@@ -106,7 +108,7 @@ const DriverDashboard = () => {
         schema: "public",
         table: "orders",
         filter: `delivery_person_id=eq.${driverId}`,
-      }, () => { loadCurrentOrder(); })
+      }, () => { loadCurrentOrders(); })
       .subscribe();
 
     const availChannel = supabase
@@ -118,7 +120,6 @@ const DriverDashboard = () => {
       }, (payload: any) => {
         if (isOnline) {
           loadAvailableOrders();
-          // Notify if order just became "ready" with no driver assigned
           const newRow = payload.new;
           if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
             sendPushNotification(
@@ -163,28 +164,32 @@ const DriverDashboard = () => {
     if (data) setIsOnline(data.is_online ?? false);
   };
 
-  const loadCurrentOrder = async () => {
+  const loadCurrentOrders = async () => {
     const { data } = await supabase
       .from("orders")
       .select("*")
       .eq("delivery_person_id", driverId!)
       .in("status", ["ready", "out_for_delivery"])
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+      .order("created_at", { ascending: true });
 
-    if (data) {
-      setCurrentOrder(data);
-      setOrderStatus(data.status);
-      const { data: items } = await supabase
-        .from("order_items")
-        .select("*")
-        .eq("order_id", data.id);
-      setCurrentOrderItems(items || []);
+    if (data && data.length > 0) {
+      setCurrentOrders(data);
+      // Load items for all orders
+      const itemsMap: Record<string, any[]> = {};
+      await Promise.all(data.map(async (order) => {
+        const { data: items } = await supabase
+          .from("order_items")
+          .select("*")
+          .eq("order_id", order.id);
+        itemsMap[order.id] = items || [];
+      }));
+      setCurrentOrderItems(itemsMap);
+      // Adjust selected index if needed
+      setSelectedOrderIndex(prev => prev >= data.length ? 0 : prev);
     } else {
-      setCurrentOrder(null);
-      setCurrentOrderItems([]);
-      setOrderStatus("");
+      setCurrentOrders([]);
+      setCurrentOrderItems({});
+      setSelectedOrderIndex(0);
       if (isOnline) loadAvailableOrders();
     }
   };
@@ -234,40 +239,39 @@ const DriverDashboard = () => {
             })
             .eq("id", driverId!);
 
-          // Update delivery_tracking if active
-          if (currentOrder) {
-            await supabase
-              .from("delivery_tracking")
-              .update({ current_lat: latitude, current_lng: longitude })
-              .eq("order_id", currentOrder.id)
-              .eq("is_active", true);
+          // Update delivery_tracking for all active orders
+          for (const order of currentOrders) {
+            if (order.status === "out_for_delivery") {
+              await supabase
+                .from("delivery_tracking")
+                .update({ current_lat: latitude, current_lng: longitude })
+                .eq("order_id", order.id)
+                .eq("is_active", true);
 
-            // GPS arrival detection: check if within 50m of destination
-            if (
-              currentOrder.delivery_lat &&
-              currentOrder.delivery_lng &&
-              currentOrder.status === "out_for_delivery" &&
-              !arrivedNotifiedRef.current.has(currentOrder.id)
-            ) {
-              const dist = distanceMeters(latitude, longitude, currentOrder.delivery_lat, currentOrder.delivery_lng);
-              if (dist <= 50) {
-                arrivedNotifiedRef.current.add(currentOrder.id);
-                // Auto-update arrived status
-                await supabase
-                  .from("orders")
-                  .update({ arrived_at_destination: true } as any)
-                  .eq("id", currentOrder.id);
+              // GPS arrival detection
+              if (
+                order.delivery_lat &&
+                order.delivery_lng &&
+                !arrivedNotifiedRef.current.has(order.id)
+              ) {
+                const dist = distanceMeters(latitude, longitude, order.delivery_lat, order.delivery_lng);
+                if (dist <= 50) {
+                  arrivedNotifiedRef.current.add(order.id);
+                  await supabase
+                    .from("orders")
+                    .update({ arrived_at_destination: true } as any)
+                    .eq("id", order.id);
 
-                // Notify customer
-                await supabase.functions.invoke("whatsapp-bot", {
-                  body: {
-                    action: "notify_status",
-                    order_id: currentOrder.id,
-                    new_status: "arrived",
-                  },
-                });
+                  await supabase.functions.invoke("whatsapp-bot", {
+                    body: {
+                      action: "notify_status",
+                      order_id: order.id,
+                      new_status: "arrived",
+                    },
+                  });
 
-                toast.success("📍 Chegada detectada automaticamente!");
+                  toast.success(`📍 Chegada detectada - Pedido #${order.order_number}!`);
+                }
               }
             }
           }
@@ -290,17 +294,22 @@ const DriverDashboard = () => {
   useEffect(() => {
     if (isOnline) startLocationSharing();
     return () => stopLocationSharing();
-  }, [isOnline, currentOrder?.id]);
+  }, [isOnline, currentOrders.length]);
 
   const acceptOrder = async (order: any) => {
-    // Show checklist first - load items
+    // Check max orders limit
+    if (currentOrders.length >= MAX_ACTIVE_ORDERS) {
+      toast.error(`Você já tem ${MAX_ACTIVE_ORDERS} pedidos ativos! Finalize um antes de aceitar outro.`);
+      return;
+    }
+
     const { data: items } = await supabase
       .from("order_items")
       .select("*")
       .eq("order_id", order.id);
 
     setShowPendingOrder(order);
-    setCurrentOrderItems(items || []);
+    setPendingChecklistItems(items || []);
     setShowChecklist(true);
   };
 
@@ -319,23 +328,19 @@ const DriverDashboard = () => {
       } as any)
       .eq("id", order.id);
 
-    // Create tracking record
     await supabase.from("delivery_tracking").insert({
       order_id: order.id,
       delivery_person_id: driverId,
       is_active: true,
     });
 
-    // Generate delivery confirmation code
     const code = String(Math.floor(1000 + Math.random() * 9000));
     await supabase.from("orders").update({ delivery_code: code } as any).eq("id", order.id);
 
-    // Notify customer
     await supabase.functions.invoke("whatsapp-bot", {
       body: { action: "notify_status", order_id: order.id, new_status: "out_for_delivery" },
     });
 
-    // Send delivery code
     await supabase.functions.invoke("whatsapp-bot", {
       body: {
         action: "notify_status",
@@ -346,50 +351,51 @@ const DriverDashboard = () => {
     });
 
     setShowPendingOrder(null);
+    setPendingChecklistItems([]);
     toast.success("Entrega aceita! Boa corrida! 🛵");
-    loadCurrentOrder();
+    loadCurrentOrders();
   };
 
   const rejectOrder = () => {
     setShowPendingOrder(null);
     setShowChecklist(false);
+    setPendingChecklistItems([]);
     toast("Entrega recusada");
   };
 
   const updateDeliveryStatus = async (newStatus: string) => {
-    if (!currentOrder) return;
+    if (!activeOrder) return;
     await supabase
       .from("orders")
       .update({ status: newStatus as any })
-      .eq("id", currentOrder.id);
+      .eq("id", activeOrder.id);
 
     await supabase.functions.invoke("whatsapp-bot", {
-      body: { action: "notify_status", order_id: currentOrder.id, new_status: newStatus },
+      body: { action: "notify_status", order_id: activeOrder.id, new_status: newStatus },
     });
 
     if (newStatus === "delivered") {
       await supabase
         .from("delivery_tracking")
         .update({ is_active: false })
-        .eq("order_id", currentOrder.id);
+        .eq("order_id", activeOrder.id);
       toast.success("Entrega finalizada! 🎉");
-      setCurrentOrder(null);
-      setCurrentOrderItems([]);
+      loadCurrentOrders();
       loadAvailableOrders();
     } else {
-      setOrderStatus(newStatus);
       toast.success("Status atualizado!");
+      loadCurrentOrders();
     }
   };
 
   const openNavigation = () => {
-    if (!currentOrder?.delivery_lat || !currentOrder?.delivery_lng) {
-      const address = currentOrder?.observation || currentOrder?.reference || "";
+    if (!activeOrder?.delivery_lat || !activeOrder?.delivery_lng) {
+      const address = activeOrder?.observation || activeOrder?.reference || "";
       window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`, "_blank");
       return;
     }
     window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${currentOrder.delivery_lat},${currentOrder.delivery_lng}&travelmode=driving`,
+      `https://www.google.com/maps/dir/?api=1&destination=${activeOrder.delivery_lat},${activeOrder.delivery_lng}&travelmode=driving`,
       "_blank"
     );
   };
@@ -441,20 +447,48 @@ const DriverDashboard = () => {
         {showChecklist && showPendingOrder ? (
           <DriverChecklist
             order={showPendingOrder}
-            items={currentOrderItems}
+            items={pendingChecklistItems}
             onConfirmed={handleChecklistConfirmed}
             onCancel={rejectOrder}
           />
-        ) : currentOrder ? (
-          <DriverOrderView
-            order={currentOrder}
-            items={currentOrderItems}
-            orderStatus={orderStatus}
-            onUpdateStatus={updateDeliveryStatus}
-            onOpenNavigation={openNavigation}
-            onReportProblem={() => setShowProblem(true)}
-            driverId={driverId!}
-          />
+        ) : currentOrders.length > 0 ? (
+          <>
+            {/* Order tabs when multiple orders */}
+            {currentOrders.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {currentOrders.map((order, idx) => (
+                  <Button
+                    key={order.id}
+                    size="sm"
+                    variant={idx === selectedOrderIndex ? "default" : "outline"}
+                    onClick={() => setSelectedOrderIndex(idx)}
+                    className="shrink-0"
+                  >
+                    #{order.order_number}
+                    {order.status === "out_for_delivery" && " 🛵"}
+                    {order.status === "ready" && " 📦"}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {/* Active orders counter */}
+            <div className="text-xs text-muted-foreground text-center">
+              {currentOrders.length}/{MAX_ACTIVE_ORDERS} pedidos ativos
+            </div>
+
+            {activeOrder && (
+              <DriverOrderView
+                order={activeOrder}
+                items={currentOrderItems[activeOrder.id] || []}
+                orderStatus={activeOrder.status}
+                onUpdateStatus={updateDeliveryStatus}
+                onOpenNavigation={openNavigation}
+                onReportProblem={() => setShowProblem(true)}
+                driverId={driverId!}
+              />
+            )}
+          </>
         ) : isOnline ? (
           <>
             {availableOrders.length === 0 ? (
@@ -529,9 +563,9 @@ const DriverDashboard = () => {
           <DriverChat
             driverId={driverId!}
             driverName={driverName || "Entregador"}
-            currentOrderId={currentOrder?.id}
-            customerPhone={currentOrder?.customer_phone}
-            customerName={currentOrder?.customer_name}
+            currentOrderId={activeOrder?.id}
+            customerPhone={activeOrder?.customer_phone}
+            customerName={activeOrder?.customer_name}
             onClose={() => setShowChat(false)}
           />
         </DialogContent>
@@ -541,7 +575,7 @@ const DriverDashboard = () => {
       <DriverProblemDialog
         open={showProblem}
         onOpenChange={setShowProblem}
-        orderId={currentOrder?.id}
+        orderId={activeOrder?.id}
         driverId={driverId!}
         onSubmitted={() => {
           setShowProblem(false);
