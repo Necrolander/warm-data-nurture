@@ -196,7 +196,7 @@ const OrderCard = ({
     <Card className={`mb-3 bg-white text-gray-900 border-gray-200 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-bold text-primary">#{order.order_number}</span>
+          <span className="font-bold text-amber-600">#{order.order_number}</span>
           <div className="flex items-center gap-1.5">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onPrint(order)} title="Imprimir comanda">
               <Printer className="h-3.5 w-3.5" />
@@ -207,9 +207,9 @@ const OrderCard = ({
 
         {/* Order type & payment */}
         <div className="flex items-center gap-2 mb-2 text-xs">
-          <Badge variant="outline">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
+           <Badge variant="outline" className="border-gray-300 text-gray-700">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
           {order.payment_method && (
-            <Badge variant="outline" className="flex items-center gap-1">
+            <Badge variant="outline" className="flex items-center gap-1 border-gray-300 text-gray-700">
               <CreditCard className="h-3 w-3" />
               {paymentLabels[order.payment_method] || order.payment_method}
             </Badge>
@@ -219,7 +219,7 @@ const OrderCard = ({
         <div className="space-y-1 text-sm mb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <User className="h-3.5 w-3.5 text-gray-500" />
               <span>{order.customer_name}</span>
             </div>
             <a href={formatWhatsAppLink(order.customer_phone, `Olá ${order.customer_name}, sobre seu pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp cliente">
@@ -229,17 +229,17 @@ const OrderCard = ({
             </a>
           </div>
           <div className="flex items-center gap-1.5">
-            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+            <Phone className="h-3.5 w-3.5 text-gray-500" />
             <span>{order.customer_phone}</span>
           </div>
           {order.reference && (
             <div className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              <MapPin className="h-3.5 w-3.5 text-gray-500" />
               <span className="truncate">{order.reference}</span>
             </div>
           )}
           {mapLink && (
-            <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline">
+            <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 underline">
               <ExternalLink className="h-3.5 w-3.5" />
               <span>Ver no mapa</span>
             </a>
@@ -251,12 +251,12 @@ const OrderCard = ({
             return (
               <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
                 <div className="flex items-center gap-1.5">
-                  <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{dp.name}</span>
-                  <span className="text-muted-foreground text-xs">({dp.phone})</span>
+                   <Truck className="h-3.5 w-3.5 text-gray-600" />
+                  <span className="font-medium text-gray-900">{dp.name}</span>
+                  <span className="text-gray-500 text-xs">({dp.phone})</span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-amber-600" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                   <a href={formatWhatsAppLink(dp.phone, `Olá ${dp.name}, sobre o pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp motoboy">
@@ -275,34 +275,34 @@ const OrderCard = ({
             </div>
           )}
           {order.change_for && order.payment_method === "cash" && (
-            <div className="text-xs text-muted-foreground">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
+            <div className="text-xs text-gray-600">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
           )}
           {order.table_number && (
-            <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>
+            <div className="text-xs text-gray-600">🍽️ Mesa: {order.table_number}</div>
           )}
         </div>
 
-        <div className="border-t border-border pt-2 mb-3">
+        <div className="border-t border-gray-200 pt-2 mb-3">
           {order.order_items?.map((item) => (
             <div key={item.id} className="text-sm py-0.5">
               <div className="flex justify-between">
                 <span>{item.quantity}x {item.product_name}</span>
-                <span className="text-muted-foreground">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
+                <span className="text-gray-500">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
               </div>
               {item.observation && (
-                <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
+                <p className="text-xs text-gray-500 ml-4 italic">📝 {item.observation}</p>
               )}
             </div>
           ))}
           {Number(order.delivery_fee) > 0 && (
-            <div className="flex justify-between text-sm py-0.5 text-muted-foreground">
+            <div className="flex justify-between text-sm py-0.5 text-gray-500">
               <span>🛵 Taxa de entrega</span>
               <span>R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span>
             </div>
           )}
         </div>
 
-        <div className="flex justify-between items-center border-t border-border pt-2">
+        <div className="flex justify-between items-center border-t border-gray-200 pt-2">
           <span className="font-bold">
             R$ {Number(order.total).toFixed(2).replace(".", ",")}
           </span>
