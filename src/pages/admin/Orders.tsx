@@ -249,7 +249,7 @@ const OrderCard = ({
             const dp = deliveryPersons.find((d) => d.id === order.delivery_person_id);
             if (!dp) return null;
             return (
-              <div className="flex items-center justify-between bg-muted/50 rounded p-1.5 mt-1">
+              <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
                 <div className="flex items-center gap-1.5">
                   <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="font-medium">{dp.name}</span>
