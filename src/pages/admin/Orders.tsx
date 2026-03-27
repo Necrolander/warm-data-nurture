@@ -302,7 +302,7 @@ const OrderCard = ({
           )}
         </div>
 
-        <div className="flex justify-between items-center border-t border-border pt-2">
+        <div className="flex justify-between items-center border-t border-gray-200 pt-2">
           <span className="font-bold">
             R$ {Number(order.total).toFixed(2).replace(".", ",")}
           </span>
