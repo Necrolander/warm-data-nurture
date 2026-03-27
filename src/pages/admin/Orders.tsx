@@ -196,7 +196,7 @@ const OrderCard = ({
     <Card className={`mb-3 bg-white text-gray-900 border-gray-200 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-bold text-primary">#{order.order_number}</span>
+          <span className="font-bold text-amber-600">#{order.order_number}</span>
           <div className="flex items-center gap-1.5">
             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onPrint(order)} title="Imprimir comanda">
               <Printer className="h-3.5 w-3.5" />
