@@ -256,7 +256,7 @@ const OrderCard = ({
                   <span className="text-gray-500 text-xs">({dp.phone})</span>
                 </div>
                 <div className="flex items-center gap-0.5">
-                  <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
+                  <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-amber-600" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
                   <a href={formatWhatsAppLink(dp.phone, `Olá ${dp.name}, sobre o pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp motoboy">
