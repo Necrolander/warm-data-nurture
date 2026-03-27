@@ -295,7 +295,7 @@ const OrderCard = ({
             </div>
           ))}
           {Number(order.delivery_fee) > 0 && (
-            <div className="flex justify-between text-sm py-0.5 text-muted-foreground">
+            <div className="flex justify-between text-sm py-0.5 text-gray-500">
               <span>🛵 Taxa de entrega</span>
               <span>R$ {Number(order.delivery_fee).toFixed(2).replace(".", ",")}</span>
             </div>
