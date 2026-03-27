@@ -290,7 +290,7 @@ const OrderCard = ({
                 <span className="text-gray-500">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
               </div>
               {item.observation && (
-                <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
+                <p className="text-xs text-gray-500 ml-4 italic">📝 {item.observation}</p>
               )}
             </div>
           ))}
