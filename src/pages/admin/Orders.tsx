@@ -207,9 +207,9 @@ const OrderCard = ({
 
         {/* Order type & payment */}
         <div className="flex items-center gap-2 mb-2 text-xs">
-          <Badge variant="outline">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
+           <Badge variant="outline" className="border-gray-300 text-gray-700">{orderTypeLabels[order.order_type] || order.order_type}</Badge>
           {order.payment_method && (
-            <Badge variant="outline" className="flex items-center gap-1">
+            <Badge variant="outline" className="flex items-center gap-1 border-gray-300 text-gray-700">
               <CreditCard className="h-3 w-3" />
               {paymentLabels[order.payment_method] || order.payment_method}
             </Badge>
