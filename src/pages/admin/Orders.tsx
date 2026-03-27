@@ -219,7 +219,7 @@ const OrderCard = ({
         <div className="space-y-1 text-sm mb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <User className="h-3.5 w-3.5 text-gray-500" />
               <span>{order.customer_name}</span>
             </div>
             <a href={formatWhatsAppLink(order.customer_phone, `Olá ${order.customer_name}, sobre seu pedido #${order.order_number}`)} target="_blank" rel="noopener noreferrer" title="WhatsApp cliente">
