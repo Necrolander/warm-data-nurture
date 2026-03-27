@@ -193,7 +193,7 @@ const OrderCard = ({
   const mapLink = getMapLink(order);
 
   return (
-    <Card className={`mb-3 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
+    <Card className={`mb-3 bg-white text-gray-900 border-gray-200 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="font-bold text-primary">#{order.order_number}</span>
@@ -249,7 +249,7 @@ const OrderCard = ({
             const dp = deliveryPersons.find((d) => d.id === order.delivery_person_id);
             if (!dp) return null;
             return (
-              <div className="flex items-center justify-between bg-muted/50 rounded p-1.5 mt-1">
+              <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
                 <div className="flex items-center gap-1.5">
                   <Truck className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="font-medium">{dp.name}</span>
@@ -269,9 +269,9 @@ const OrderCard = ({
             );
           })()}
           {order.observation && (
-            <div className="flex items-start gap-1.5 bg-muted/50 rounded p-1.5 mt-1">
-              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-              <span className="text-muted-foreground italic">{order.observation}</span>
+            <div className="flex items-start gap-1.5 bg-gray-100 rounded p-1.5 mt-1">
+              <MessageSquare className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+              <span className="text-gray-500 italic">{order.observation}</span>
             </div>
           )}
           {order.change_for && order.payment_method === "cash" && (
