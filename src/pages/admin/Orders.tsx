@@ -282,7 +282,7 @@ const OrderCard = ({
           )}
         </div>
 
-        <div className="border-t border-border pt-2 mb-3">
+        <div className="border-t border-gray-200 pt-2 mb-3">
           {order.order_items?.map((item) => (
             <div key={item.id} className="text-sm py-0.5">
               <div className="flex justify-between">
