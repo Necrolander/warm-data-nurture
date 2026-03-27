@@ -251,9 +251,9 @@ const OrderCard = ({
             return (
               <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
                 <div className="flex items-center gap-1.5">
-                  <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="font-medium">{dp.name}</span>
-                  <span className="text-muted-foreground text-xs">({dp.phone})</span>
+                   <Truck className="h-3.5 w-3.5 text-gray-600" />
+                  <span className="font-medium text-gray-900">{dp.name}</span>
+                  <span className="text-gray-500 text-xs">({dp.phone})</span>
                 </div>
                 <div className="flex items-center gap-0.5">
                   <Button size="icon" variant="ghost" className="h-6 w-6 text-muted-foreground hover:text-primary" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
