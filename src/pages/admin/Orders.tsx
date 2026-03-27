@@ -239,7 +239,7 @@ const OrderCard = ({
             </div>
           )}
           {mapLink && (
-            <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 underline">
+            <a href={mapLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 underline">
               <ExternalLink className="h-3.5 w-3.5" />
               <span>Ver no mapa</span>
             </a>
