@@ -278,7 +278,7 @@ const OrderCard = ({
             <div className="text-xs text-gray-600">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
           )}
           {order.table_number && (
-            <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>
+            <div className="text-xs text-gray-600">🍽️ Mesa: {order.table_number}</div>
           )}
         </div>
 
