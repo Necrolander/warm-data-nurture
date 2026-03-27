@@ -269,9 +269,9 @@ const OrderCard = ({
             );
           })()}
           {order.observation && (
-            <div className="flex items-start gap-1.5 bg-muted/50 rounded p-1.5 mt-1">
-              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground mt-0.5" />
-              <span className="text-muted-foreground italic">{order.observation}</span>
+            <div className="flex items-start gap-1.5 bg-gray-100 rounded p-1.5 mt-1">
+              <MessageSquare className="h-3.5 w-3.5 text-gray-500 mt-0.5" />
+              <span className="text-gray-500 italic">{order.observation}</span>
             </div>
           )}
           {order.change_for && order.payment_method === "cash" && (
