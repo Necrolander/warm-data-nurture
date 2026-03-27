@@ -275,7 +275,7 @@ const OrderCard = ({
             </div>
           )}
           {order.change_for && order.payment_method === "cash" && (
-            <div className="text-xs text-muted-foreground">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
+            <div className="text-xs text-gray-600">💵 Troco para: R$ {Number(order.change_for).toFixed(2).replace(".", ",")}</div>
           )}
           {order.table_number && (
             <div className="text-xs text-muted-foreground">🍽️ Mesa: {order.table_number}</div>
