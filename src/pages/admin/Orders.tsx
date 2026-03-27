@@ -287,7 +287,7 @@ const OrderCard = ({
             <div key={item.id} className="text-sm py-0.5">
               <div className="flex justify-between">
                 <span>{item.quantity}x {item.product_name}</span>
-                <span className="text-muted-foreground">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
+                <span className="text-gray-500">R$ {(item.product_price * item.quantity).toFixed(2).replace(".", ",")}</span>
               </div>
               {item.observation && (
                 <p className="text-xs text-muted-foreground ml-4 italic">📝 {item.observation}</p>
