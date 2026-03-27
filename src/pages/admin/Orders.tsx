@@ -193,7 +193,7 @@ const OrderCard = ({
   const mapLink = getMapLink(order);
 
   return (
-    <Card className={`mb-3 bg-white text-gray-900 border-gray-200 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`}>
+    <Card className={`mb-3 bg-white text-gray-900 border-gray-200 [&_*]:!text-gray-900 ${isPending ? "ring-2 ring-yellow-500 animate-pulse" : ""}`} style={{ colorScheme: 'light' }}>
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
           <span className="font-bold text-primary">#{order.order_number}</span>
