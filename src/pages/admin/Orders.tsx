@@ -234,7 +234,7 @@ const OrderCard = ({
           </div>
           {order.reference && (
             <div className="flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              <MapPin className="h-3.5 w-3.5 text-gray-500" />
               <span className="truncate">{order.reference}</span>
             </div>
           )}
