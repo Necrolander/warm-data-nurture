@@ -74,6 +74,7 @@ const NewOrder = () => {
   const [tableNumber, setTableNumber] = useState("");
   const [observation, setObservation] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("pix");
+  const [orderSource, setOrderSource] = useState<string>("pdv_admin");
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -234,7 +235,7 @@ const NewOrder = () => {
       observation,
       table_number: orderType === "dine_in" ? parseInt(tableNumber) || null : null,
       status: "production" as any,
-      order_source: "pdv_admin",
+      order_source: orderSource,
     } as any).select().single();
 
     if (error || !order) {
@@ -425,6 +426,25 @@ const NewOrder = () => {
                   }`}
                 >
                   {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Order source */}
+            <div className="grid grid-cols-3 gap-1 mb-3 shrink-0">
+              {[
+                { value: "pdv_admin", label: "💻 PDV" },
+                { value: "99food", label: "🟡 99food" },
+                { value: "ifood", label: "🟥 iFood" },
+              ].map(s => (
+                <button
+                  key={s.value}
+                  onClick={() => setOrderSource(s.value)}
+                  className={`py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                    orderSource === s.value ? "bg-amber-500 text-white" : "bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {s.label}
                 </button>
               ))}
             </div>
