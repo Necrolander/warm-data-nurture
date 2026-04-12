@@ -10,20 +10,18 @@ import logo from "@/assets/logo-truebox-new.png";
 const DriverLogin = () => {
   const navigate = useNavigate();
   const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!phone.trim() || !password.trim()) {
-      toast.error("Preencha todos os campos");
+    if (!phone.trim()) {
+      toast.error("Preencha o telefone");
       return;
     }
     setLoading(true);
 
-    // Simple auth: match phone + password_hash (plain for now, can be hashed later)
     const { data, error } = await supabase
       .from("delivery_persons")
-      .select("*")
+      .select("id, name, phone")
       .eq("phone", phone.trim())
       .eq("is_active", true)
       .single();
@@ -34,23 +32,6 @@ const DriverLogin = () => {
       return;
     }
 
-    // Check password (stored as plain text password_hash for simplicity)
-    if (data.password_hash && data.password_hash !== password.trim()) {
-      toast.error("Senha incorreta");
-      setLoading(false);
-      return;
-    }
-
-    // If no password set yet, set it now
-    if (!data.password_hash) {
-      await supabase
-        .from("delivery_persons")
-        .update({ password_hash: password.trim() })
-        .eq("id", data.id);
-      toast.success("Senha cadastrada com sucesso!");
-    }
-
-    // Store driver info in localStorage
     localStorage.setItem("driver_id", data.id);
     localStorage.setItem("driver_name", data.name);
     localStorage.setItem("driver_phone", data.phone);
@@ -81,12 +62,6 @@ const DriverLogin = () => {
             onChange={(e) => setPhone(e.target.value)}
             type="tel"
           />
-          <Input
-            placeholder="Senha de acesso"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-          />
           <Button onClick={handleLogin} disabled={loading} className="w-full" size="lg">
             <LogIn className="h-4 w-4 mr-2" />
             {loading ? "Entrando..." : "Entrar"}
@@ -94,7 +69,7 @@ const DriverLogin = () => {
         </div>
 
         <p className="text-xs text-center text-muted-foreground">
-          Primeiro acesso? Use qualquer senha — ela será cadastrada automaticamente.
+          Use o telefone cadastrado pelo administrador.
         </p>
       </div>
     </div>
