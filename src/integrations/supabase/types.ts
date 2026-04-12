@@ -336,7 +336,6 @@ export type Database = {
           is_online: boolean | null
           location_updated_at: string | null
           name: string
-          password_hash: string | null
           phone: string
           status: string | null
           updated_at: string | null
@@ -354,7 +353,6 @@ export type Database = {
           is_online?: boolean | null
           location_updated_at?: string | null
           name: string
-          password_hash?: string | null
           phone: string
           status?: string | null
           updated_at?: string | null
@@ -372,7 +370,6 @@ export type Database = {
           is_online?: boolean | null
           location_updated_at?: string | null
           name?: string
-          password_hash?: string | null
           phone?: string
           status?: string | null
           updated_at?: string | null
