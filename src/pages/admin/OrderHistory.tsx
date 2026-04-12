@@ -61,6 +61,7 @@ const sourceLabels: Record<string, string> = {
   site: "🌐 Site",
   whatsapp_bot: "📱 WhatsApp Bot",
   ifood: "🟥 iFood",
+  "99food": "🟡 99food",
   pdv_admin: "💻 PDV Admin",
   app_garcom: "🍽️ App Garçom",
 };
