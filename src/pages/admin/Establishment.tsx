@@ -79,7 +79,7 @@ const Establishment = () => {
   };
 
   const updateSchedule = async (id: string, field: string, value: any) => {
-    await supabase.from("store_schedule").update({ [field]: value }).eq("id", id);
+    await supabase.from("store_schedule").update({ [field]: value } as any).eq("id", id);
     fetchAll();
   };
 
