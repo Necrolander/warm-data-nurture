@@ -37,14 +37,12 @@ const DriversManagement = () => {
     
     if (editDriver) {
       const updates: any = { name: form.name, phone: form.phone };
-      if (form.password) updates.password_hash = form.password;
       await supabase.from("delivery_persons").update(updates).eq("id", editDriver.id);
       toast.success("Entregador atualizado!");
     } else {
       await supabase.from("delivery_persons").insert({
         name: form.name,
         phone: form.phone,
-        password_hash: form.password || null,
         is_active: true,
         status: "offline",
       } as any);
