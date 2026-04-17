@@ -525,6 +525,9 @@ export default function WhatsAppConnect() {
                 +{session?.phone_number}
               </p>
             </div>
+            <Button variant="ghost" size="icon" onClick={restartWorker} title="Reiniciar bot na VPS">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={disconnect} title="Desconectar">
               <WifiOff className="h-4 w-4 text-destructive" />
             </Button>
