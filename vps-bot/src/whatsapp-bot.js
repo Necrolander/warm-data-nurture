@@ -179,8 +179,30 @@ async function processOutbox() {
           continue;
         }
 
-        const sent = await client.sendMessage(chatId, item.message);
-        log(`📤 Enviado pra ${phone} [${item.kind || "msg"}]`);
+        let sent;
+        if (item.media_url) {
+          // Baixa a mídia da URL pública e envia como MessageMedia
+          try {
+            const r = await fetch(item.media_url);
+            if (!r.ok) throw new Error(`download ${r.status}`);
+            const buf = Buffer.from(await r.arrayBuffer());
+            const b64 = buf.toString("base64");
+            const mime = item.media_mime || r.headers.get("content-type") || "application/octet-stream";
+            const filename = item.media_url.split("/").pop() || "media";
+            const { MessageMedia } = pkg;
+            const media = new MessageMedia(mime, b64, filename);
+            const caption = item.message && item.message.length ? item.message : undefined;
+            const isAudio = (item.media_type === "audio") || mime.startsWith("audio/");
+            sent = await client.sendMessage(chatId, media, isAudio ? { sendAudioAsVoice: true } : { caption });
+            log(`📤 Mídia (${item.media_type}) pra ${phone}`);
+          } catch (e) {
+            log("⚠️ Falha enviando mídia, tentando como texto:", e.message);
+            sent = await client.sendMessage(chatId, item.message || item.media_url);
+          }
+        } else {
+          sent = await client.sendMessage(chatId, item.message);
+          log(`📤 Enviado pra ${phone} [${item.kind || "msg"}]`);
+        }
 
         await waApi.markOutboxSent({
           id: item.id,
