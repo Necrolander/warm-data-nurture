@@ -155,6 +155,20 @@ export default function IfoodBot() {
 
   return (
     <div className="space-y-6">
+      {/* Header com link pra métricas */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">Bot iFood</h1>
+          <p className="text-sm text-muted-foreground">Status, 2FA, screenshots e falhas</p>
+        </div>
+        <a href="/admin/ifood-bot/metricas">
+          <Button variant="default" className="gap-2">
+            <Activity className="h-4 w-4" />
+            Ver métricas
+          </Button>
+        </a>
+      </div>
+
       {/* 🚨 Banner 2FA pendente */}
       {pending2fa && (
         <Card className="border-2 border-destructive bg-destructive/10 animate-pulse">
