@@ -1,9 +1,11 @@
 // Lida com login do Portal iFood + 2FA via SMS
 // Estratégia:
 // 1. Abre página, se já tem sessão (cookies persistidos), pula
-// 2. Se ver tela de login, busca credenciais do Lovable e preenche
+// 2. Se ver tela de login, busca credenciais do Lovable e preenche (typing humano)
 // 3. Se aparecer 2FA, chama request_2fa e fica esperando admin colar o código no painel
+// 4. Detecta tela "Sorry, you have been blocked" da Cloudflare
 import { api } from "./api.js";
+import { humanPause, typeHuman } from "./stealth.js";
 
 const POLL_2FA_INTERVAL = 5000;   // 5s
 const POLL_2FA_TIMEOUT = 15 * 60_000; // 15 min máx esperando admin
@@ -13,8 +15,15 @@ export async function ensureLoggedIn(page, log) {
   log("🌐 Indo para", url);
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60_000 });
 
-  // Aguarda um pouco pra estabilizar
-  await page.waitForTimeout(3000);
+  // Aguarda render + simula humano
+  await humanPause(2500, 4500);
+
+  // Detecta tela de bloqueio Cloudflare ANTES de qualquer outra coisa
+  const bodyText = (await page.textContent("body").catch(() => "")) || "";
+  if (/sorry, you have been blocked|cloudflare/i.test(bodyText) && /unable to access/i.test(bodyText)) {
+    await uploadCurrentScreen(page, "🛑 Cloudflare BLOQUEOU o IP — precisa proxy residencial BR");
+    throw new Error("Cloudflare blocked: IP da VPS está em blocklist. Configure proxy residencial BR (HTTP_PROXY).");
+  }
 
   // Heurística simples: se NÃO tem campo de email/senha, considera logado
   const hasLoginForm = await page.locator('input[type="email"], input[name="email"]').first().isVisible().catch(() => false);
@@ -27,25 +36,29 @@ export async function ensureLoggedIn(page, log) {
   log("🔐 Tela de login detectada — buscando credenciais");
   const { email, password } = await api.getCredentials();
 
-  // Preenche email
-  await page.locator('input[type="email"], input[name="email"]').first().fill(email);
+  // Preenche email com typing humano
+  const emailInput = page.locator('input[type="email"], input[name="email"]').first();
+  await typeHuman(emailInput, email);
+  await humanPause(400, 900);
+
   // Avança (alguns fluxos têm 2 etapas: email primeiro, senha depois)
   const nextBtn = page.locator('button:has-text("Continuar"), button:has-text("Avançar"), button[type="submit"]').first();
   if (await nextBtn.isVisible().catch(() => false)) {
     await nextBtn.click().catch(() => {});
-    await page.waitForTimeout(2000);
+    await humanPause(1500, 2800);
   }
 
   // Preenche senha
   const passInput = page.locator('input[type="password"]').first();
   await passInput.waitFor({ timeout: 15_000 });
-  await passInput.fill(password);
+  await typeHuman(passInput, password);
+  await humanPause(400, 900);
 
   const submitBtn = page.locator('button[type="submit"], button:has-text("Entrar"), button:has-text("Acessar")').first();
   await submitBtn.click().catch(() => {});
 
   log("⏳ Aguardando resposta do login...");
-  await page.waitForTimeout(5000);
+  await humanPause(4000, 6500);
 
   // Verifica se caiu em tela de 2FA
   const needs2FA = await detect2FA(page);

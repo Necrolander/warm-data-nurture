@@ -10,6 +10,7 @@ import path from "node:path";
 import { api } from "./api.js";
 import { ensureLoggedIn, uploadCurrentScreen } from "./ifood-login.js";
 import { pollOrders } from "./ifood-orders.js";
+import { applyStealth, brContextOptions, pickUserAgent, STEALTH_ARGS } from "./stealth.js";
 
 const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS || "20000", 10);
 const HEADLESS = (process.env.HEADLESS || "true").toLowerCase() === "true";
@@ -45,13 +46,20 @@ async function main() {
   // Heartbeat em paralelo
   heartbeatLoop().catch((e) => log("Heartbeat loop morreu:", e));
 
-  // Browser persistente — guarda cookies entre restarts
+  // Browser persistente com STEALTH ativado pra burlar Cloudflare/iFood
+  const userAgent = pickUserAgent();
+  log("🥷 UA:", userAgent);
+
+  const ctxOpts = brContextOptions(userAgent);
   const browser = await chromium.launchPersistentContext(USER_DATA_DIR, {
     headless: HEADLESS,
     slowMo: SLOW_MO,
-    viewport: { width: 1366, height: 800 },
-    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    args: STEALTH_ARGS,
+    ignoreDefaultArgs: ["--enable-automation"],
+    ...ctxOpts,
   });
+
+  await applyStealth(browser);
 
   const page = browser.pages()[0] || (await browser.newPage());
 
