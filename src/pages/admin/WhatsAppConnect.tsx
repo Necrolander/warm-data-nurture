@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, MessageCircle, RefreshCw, Smartphone, WifiOff } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, MessageCircle, RefreshCw, Send, Smartphone, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface WaSession {
@@ -25,27 +27,57 @@ interface WaSession {
 
 interface WaMessage {
   id: string;
-  direction: string;
+  direction: "in" | "out" | string;
   from_phone: string | null;
   to_phone: string | null;
   message: string;
   created_at: string;
 }
 
-const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }> = {
-  connected:      { label: "Conectado",        variant: "default",     color: "bg-green-600" },
-  qr:             { label: "Aguardando QR",    variant: "secondary",   color: "bg-amber-600" },
-  authenticating: { label: "Autenticando…",    variant: "secondary",   color: "bg-blue-600" },
-  disconnected:   { label: "Desconectado",     variant: "outline",     color: "bg-gray-400" },
-  failed:         { label: "Falha",            variant: "destructive", color: "bg-red-600" },
+const STATUS_BADGE: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; color: string }
+> = {
+  connected:      { label: "Conectado",     variant: "default",     color: "bg-green-600" },
+  qr:             { label: "Aguardando QR", variant: "secondary",   color: "bg-amber-600" },
+  authenticating: { label: "Autenticando…", variant: "secondary",   color: "bg-blue-600" },
+  disconnected:   { label: "Desconectado",  variant: "outline",     color: "bg-gray-400" },
+  failed:         { label: "Falha",         variant: "destructive", color: "bg-red-600" },
 };
+
+function formatPhone(phone: string | null) {
+  if (!phone) return "—";
+  const p = phone.replace(/\D/g, "");
+  if (p.length === 13) return `+${p.slice(0, 2)} (${p.slice(2, 4)}) ${p.slice(4, 9)}-${p.slice(9)}`;
+  if (p.length === 12) return `+${p.slice(0, 2)} (${p.slice(2, 4)}) ${p.slice(4, 8)}-${p.slice(8)}`;
+  if (p.length === 11) return `(${p.slice(0, 2)}) ${p.slice(2, 7)}-${p.slice(7)}`;
+  return phone;
+}
+
+function formatDateLabel(d: Date) {
+  if (isToday(d)) return "Hoje";
+  if (isYesterday(d)) return "Ontem";
+  return format(d, "dd 'de' MMMM", { locale: ptBR });
+}
+
+interface ChatThread {
+  phone: string;
+  lastMessage: WaMessage;
+  unread: number;
+  total: number;
+}
 
 export default function WhatsAppConnect() {
   const [session, setSession] = useState<WaSession | null>(null);
-  const [messages, setMessages] = useState<WaMessage[]>([]);
+  const [allMessages, setAllMessages] = useState<WaMessage[]>([]);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activePhone, setActivePhone] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
   const lastQrRef = useRef<string | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   async function loadSession() {
     const { data } = await (supabase as any)
@@ -62,11 +94,11 @@ export default function WhatsAppConnect() {
       .from("wa_messages")
       .select("id, direction, from_phone, to_phone, message, created_at")
       .order("created_at", { ascending: false })
-      .limit(20);
-    if (data) setMessages(data as WaMessage[]);
+      .limit(500);
+    if (data) setAllMessages(data as WaMessage[]);
   }
 
-  // Gera QR Code visual quando string muda
+  // QR visual
   useEffect(() => {
     if (!session?.qr_code) {
       setQrDataUrl(null);
@@ -80,54 +112,133 @@ export default function WhatsAppConnect() {
       .catch(() => setQrDataUrl(null));
   }, [session?.qr_code]);
 
-  // Realtime subscription
+  // Realtime
   useEffect(() => {
     loadSession();
     loadMessages();
-
     const ch = supabase
       .channel("wa-admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_sessions" }, () => loadSession())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "wa_messages" }, () => loadMessages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, () => loadMessages())
       .subscribe();
-
     return () => {
       supabase.removeChannel(ch);
     };
   }, []);
 
+  // Threads agrupadas por número
+  const threads: ChatThread[] = useMemo(() => {
+    const map = new Map<string, ChatThread>();
+    for (const m of allMessages) {
+      const phone = (m.direction === "in" ? m.from_phone : m.to_phone) || "";
+      if (!phone) continue;
+      const existing = map.get(phone);
+      if (!existing) {
+        map.set(phone, { phone, lastMessage: m, unread: 0, total: 1 });
+      } else {
+        existing.total++;
+        if (new Date(m.created_at) > new Date(existing.lastMessage.created_at)) {
+          existing.lastMessage = m;
+        }
+      }
+    }
+    let list = Array.from(map.values()).sort(
+      (a, b) =>
+        new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime()
+    );
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (t) => t.phone.includes(q) || t.lastMessage.message.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [allMessages, search]);
+
+  // Mensagens da conversa ativa (ordem cronológica)
+  const activeMessages = useMemo(() => {
+    if (!activePhone) return [];
+    return allMessages
+      .filter((m) => m.from_phone === activePhone || m.to_phone === activePhone)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }, [allMessages, activePhone]);
+
+  // Scroll automático ao final ao trocar/receber mensagem
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [activeMessages.length, activePhone]);
+
+  // Selecionar primeira conversa por padrão
+  useEffect(() => {
+    if (!activePhone && threads.length > 0) setActivePhone(threads[0].phone);
+  }, [threads, activePhone]);
+
   async function disconnect() {
     if (!confirm("Desconectar o WhatsApp? Você precisará escanear o QR novamente.")) return;
     await (supabase as any)
       .from("wa_sessions")
-      .update({ status: "disconnected", qr_code: null, phone_number: null, last_event: "manual_disconnect" })
+      .update({
+        status: "disconnected",
+        qr_code: null,
+        phone_number: null,
+        last_event: "manual_disconnect",
+      })
       .eq("channel", "whatsapp");
-    toast({ title: "Solicitação enviada", description: "Reinicie o worker WA na VPS pra escanear novo QR." });
+    toast({
+      title: "Solicitação enviada",
+      description: "Reinicie o worker WA na VPS pra escanear novo QR.",
+    });
+  }
+
+  async function sendMessage() {
+    if (!activePhone || !draft.trim() || sending) return;
+    setSending(true);
+    const message = draft.trim();
+    const { error } = await (supabase as any).from("whatsapp_outbox").insert({
+      phone: activePhone,
+      message,
+      kind: "manual_admin",
+      status: "pending",
+    });
+    if (error) {
+      toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+    } else {
+      setDraft("");
+      toast({ title: "Mensagem enfileirada", description: "Será enviada em ~5s pelo worker." });
+    }
+    setSending(false);
   }
 
   const status = session?.status ?? "disconnected";
   const badge = STATUS_BADGE[status] ?? STATUS_BADGE.disconnected;
+  const isConnected = status === "connected";
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+  // ===== Loading state =====
+  if (loading) {
+    return (
+      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // ===== Não conectado: mostrar QR / status =====
+  if (!isConnected) {
+    return (
+      <div className="container mx-auto p-6 space-y-6 max-w-3xl">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <MessageCircle className="h-7 w-7 text-green-600" />
-            WhatsApp Connect
+            WhatsApp
           </h1>
           <p className="text-muted-foreground mt-1">
             Conecte um número de WhatsApp pra responder clientes e enviar mensagens automáticas
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={loadSession}>
-          <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
-        </Button>
-      </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* QR Code / Status */}
-        <Card className="md:col-span-2">
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Conexão</CardTitle>
@@ -137,27 +248,7 @@ export default function WhatsAppConnect() {
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : status === "connected" ? (
-              <div className="text-center py-8 space-y-3">
-                <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
-                  <Smartphone className="h-10 w-10 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-semibold">{session?.display_name || "WhatsApp"}</p>
-                  <p className="text-muted-foreground font-mono">+{session?.phone_number}</p>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Conectado desde {session?.last_seen_at && format(new Date(session.last_seen_at), "dd/MM HH:mm", { locale: ptBR })}
-                </p>
-                <Button variant="destructive" size="sm" onClick={disconnect} className="mt-4">
-                  <WifiOff className="h-4 w-4 mr-2" /> Desconectar
-                </Button>
-              </div>
-            ) : qrDataUrl ? (
+            {qrDataUrl ? (
               <div className="text-center py-4 space-y-4">
                 <div className="inline-block p-4 bg-white rounded-lg border">
                   <img src={qrDataUrl} alt="QR Code WhatsApp" className="w-72 h-72" />
@@ -165,13 +256,19 @@ export default function WhatsAppConnect() {
                 <div className="text-sm text-muted-foreground space-y-1 max-w-md mx-auto">
                   <p className="font-semibold text-foreground">Escaneie com o WhatsApp:</p>
                   <p>1. Abra WhatsApp no celular</p>
-                  <p>2. Toque em <b>Configurações → Aparelhos conectados</b></p>
-                  <p>3. Toque em <b>Conectar um aparelho</b></p>
+                  <p>
+                    2. Toque em <b>Configurações → Aparelhos conectados</b>
+                  </p>
+                  <p>
+                    3. Toque em <b>Conectar um aparelho</b>
+                  </p>
                   <p>4. Aponte a câmera pra este QR Code</p>
                 </div>
                 {session?.qr_generated_at && (
                   <p className="text-xs text-muted-foreground">
-                    Gerado {format(new Date(session.qr_generated_at), "HH:mm:ss", { locale: ptBR })} — expira em ~60s
+                    Gerado{" "}
+                    {format(new Date(session.qr_generated_at), "HH:mm:ss", { locale: ptBR })} —
+                    expira em ~60s
                   </p>
                 )}
               </div>
@@ -186,74 +283,211 @@ export default function WhatsAppConnect() {
                 <p className="text-xs text-muted-foreground font-mono">
                   Comando: <code>docker compose up -d truebox-bot</code>
                 </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Estatísticas */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Estatísticas</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Stat label="Mensagens enviadas" value={session?.messages_sent_total ?? 0} color="text-green-600" />
-            <Stat label="Mensagens recebidas" value={session?.messages_received_total ?? 0} color="text-blue-600" />
-            <Stat label="Falhas" value={session?.failures_total ?? 0} color="text-red-600" />
-            {session?.last_event && (
-              <div className="pt-4 border-t">
-                <p className="text-xs text-muted-foreground">Último evento</p>
-                <p className="text-sm font-mono break-all">{session.last_event}</p>
+                <Button variant="outline" size="sm" onClick={loadSession} className="mt-2">
+                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                </Button>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+    );
+  }
 
-      {/* Mensagens recentes */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Mensagens recentes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {messages.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">Nenhuma mensagem ainda</p>
+  // ===== Conectado: interface tipo WhatsApp Web =====
+  const activeThread = threads.find((t) => t.phone === activePhone);
+
+  return (
+    <div className="flex h-[calc(100vh-7rem)] border rounded-lg overflow-hidden bg-background">
+      {/* Sidebar de conversas */}
+      <aside className="w-[340px] border-r flex flex-col bg-muted/20">
+        {/* Header com info do número conectado */}
+        <div className="p-4 border-b bg-muted/40">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center text-white">
+              <Smartphone className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">{session?.display_name || "WhatsApp"}</p>
+              <p className="text-xs text-muted-foreground truncate font-mono">
+                +{session?.phone_number}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={disconnect} title="Desconectar">
+              <WifiOff className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mt-3 text-center">
+            <div>
+              <p className="text-xs text-muted-foreground">Enviadas</p>
+              <p className="text-sm font-bold text-green-600">
+                {session?.messages_sent_total ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Recebidas</p>
+              <p className="text-sm font-bold text-blue-600">
+                {session?.messages_received_total ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Falhas</p>
+              <p className="text-sm font-bold text-red-600">{session?.failures_total ?? 0}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Busca */}
+        <div className="p-3 border-b">
+          <Input
+            placeholder="Buscar conversa…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9"
+          />
+        </div>
+
+        {/* Lista de threads */}
+        <ScrollArea className="flex-1">
+          {threads.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-12 px-4">
+              Nenhuma conversa ainda.
+              <br />
+              Aguardando mensagens dos clientes.
+            </div>
           ) : (
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`p-3 rounded-lg border text-sm flex items-start gap-3 ${
-                    m.direction === "in" ? "bg-blue-50 border-blue-100" : "bg-green-50 border-green-100"
-                  }`}
-                >
-                  <Badge variant="outline" className="shrink-0">
-                    {m.direction === "in" ? "📥 IN" : "📤 OUT"}
-                  </Badge>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono text-xs text-muted-foreground">
-                      {m.direction === "in" ? m.from_phone : m.to_phone}
-                    </p>
-                    <p className="break-words">{m.message}</p>
-                  </div>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    {format(new Date(m.created_at), "HH:mm", { locale: ptBR })}
-                  </span>
-                </div>
-              ))}
+            <div>
+              {threads.map((t) => {
+                const isActive = t.phone === activePhone;
+                const last = t.lastMessage;
+                return (
+                  <button
+                    key={t.phone}
+                    onClick={() => setActivePhone(t.phone)}
+                    className={`w-full flex items-start gap-3 px-3 py-3 border-b text-left hover:bg-muted/40 transition-colors ${
+                      isActive ? "bg-muted/60" : ""
+                    }`}
+                  >
+                    <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0">
+                      {t.phone.slice(-4)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-medium text-sm truncate">{formatPhone(t.phone)}</p>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                          {format(new Date(last.created_at), "HH:mm")}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {last.direction === "out" ? "✓ " : ""}
+                        {last.message}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+        </ScrollArea>
+      </aside>
 
-function Stat({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-bold ${color}`}>{value.toLocaleString("pt-BR")}</p>
+      {/* Painel de chat ativo */}
+      <section className="flex-1 flex flex-col">
+        {activeThread ? (
+          <>
+            {/* Header da conversa */}
+            <header className="h-16 px-4 border-b flex items-center gap-3 bg-muted/40 shrink-0">
+              <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold">
+                {activeThread.phone.slice(-4)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold">{formatPhone(activeThread.phone)}</p>
+                <p className="text-xs text-muted-foreground">{activeThread.total} mensagens</p>
+              </div>
+            </header>
+
+            {/* Mensagens */}
+            <div
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto p-4 space-y-2 bg-[hsl(var(--muted))]/10"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 1px 1px, hsl(var(--muted)) 1px, transparent 0)",
+                backgroundSize: "20px 20px",
+              }}
+            >
+              {activeMessages.map((m, idx) => {
+                const prev = activeMessages[idx - 1];
+                const showDate =
+                  !prev ||
+                  format(new Date(prev.created_at), "yyyy-MM-dd") !==
+                    format(new Date(m.created_at), "yyyy-MM-dd");
+                const isOut = m.direction === "out";
+                return (
+                  <div key={m.id}>
+                    {showDate && (
+                      <div className="flex justify-center my-3">
+                        <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground">
+                          {formatDateLabel(new Date(m.created_at))}
+                        </span>
+                      </div>
+                    )}
+                    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
+                          isOut
+                            ? "bg-green-600 text-white rounded-br-none"
+                            : "bg-card border rounded-bl-none"
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap break-words">{m.message}</p>
+                        <p
+                          className={`text-[10px] mt-1 text-right ${
+                            isOut ? "text-green-100" : "text-muted-foreground"
+                          }`}
+                        >
+                          {format(new Date(m.created_at), "HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Input de envio */}
+            <div className="border-t p-3 flex gap-2 bg-muted/40 shrink-0">
+              <Input
+                placeholder="Digite uma mensagem…"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                disabled={sending}
+              />
+              <Button onClick={sendMessage} disabled={!draft.trim() || sending}>
+                {sending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
+            <MessageCircle className="h-16 w-16 mb-4 opacity-30" />
+            <p className="text-lg font-medium">Selecione uma conversa</p>
+            <p className="text-sm mt-1">
+              As mensagens recebidas pelo WhatsApp aparecem aqui em tempo real.
+            </p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
