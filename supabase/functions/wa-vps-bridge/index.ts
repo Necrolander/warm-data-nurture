@@ -21,6 +21,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const BOT_TOKEN = Deno.env.get("IFOOD_BOT_TOKEN")!;
 
+type Actor =
+  | { type: "bot" }
+  | { type: "admin"; userId: string };
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -28,16 +32,83 @@ function json(data: unknown, status = 200) {
   });
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+function getBearerToken(authHeader: string | null) {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  return authHeader.slice(7).trim();
+}
 
-  // Auth simples por bearer (mesmo BOT_TOKEN do iFood)
-  const auth = req.headers.get("Authorization") || "";
-  if (!auth.startsWith("Bearer ") || auth.slice(7) !== BOT_TOKEN) {
+async function authenticateRequest(
+  authHeader: string | null,
+  supabase: ReturnType<typeof createClient>,
+): Promise<Response | Actor> {
+  const token = getBearerToken(authHeader);
+
+  if (!token) return json({ error: "unauthorized" }, 401);
+  if (token === BOT_TOKEN) return { type: "bot" };
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser(token);
+
+  if (userError || !user) {
     return json({ error: "unauthorized" }, 401);
   }
 
+  const { data: roles, error: rolesError } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  if (rolesError) {
+    console.error("wa-vps-bridge roles error:", rolesError);
+    return json({ error: "role_check_failed" }, 500);
+  }
+
+  const hasAccess = roles?.some((entry: { role: string }) => entry.role === "admin" || entry.role === "staff");
+
+  if (!hasAccess) return json({ error: "forbidden" }, 403);
+
+  return { type: "admin", userId: user.id };
+}
+
+function ensureActor(actor: Actor, type: Actor["type"]) {
+  return actor.type === type;
+}
+
+async function proxyRestartRequest(controlUrl: string) {
+  const response = await fetch(controlUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${BOT_TOKEN}`,
+    },
+    body: JSON.stringify({ action: "restart_wa", requested_at: new Date().toISOString() }),
+  });
+
+  const text = await response.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `restart endpoint ${response.status}: ${typeof data === "object" && data && "error" in data ? String((data as { error?: string }).error) : text}`,
+    );
+  }
+
+  return data;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const actor = await authenticateRequest(req.headers.get("Authorization"), supabase);
+  if (actor instanceof Response) return actor;
 
   let body: any = {};
   try { body = await req.json(); } catch {}
@@ -46,6 +117,7 @@ serve(async (req) => {
   try {
     switch (action) {
       case "get_session_state": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const { data } = await supabase
           .from("wa_sessions")
           .select("status, phone_number")
@@ -55,6 +127,7 @@ serve(async (req) => {
       }
 
       case "update_session": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
         const allowed = ["status", "qr_code", "phone_number", "display_name", "last_event"];
         for (const k of allowed) if (body[k] !== undefined) patch[k] = body[k];
@@ -65,6 +138,7 @@ serve(async (req) => {
       }
 
       case "heartbeat": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const inc: Record<string, unknown> = {
           last_seen_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -89,7 +163,45 @@ serve(async (req) => {
         return json({ ok: true, restart_requested });
       }
 
+      case "request_restart": {
+        if (!ensureActor(actor, "admin")) return json({ error: "forbidden" }, 403);
+
+        const { data: sess } = await supabase
+          .from("wa_sessions")
+          .select("meta")
+          .eq("channel", "whatsapp")
+          .maybeSingle();
+
+        const meta: Record<string, unknown> = (sess?.meta as Record<string, unknown> | null) ?? {};
+        const controlUrl = String(body.control_url ?? meta.control_url ?? "").trim();
+
+        if (!controlUrl) {
+          return json({ error: "control_url_missing" }, 400);
+        }
+
+        if (!/^https?:\/\//i.test(controlUrl)) {
+          return json({ error: "control_url_invalid" }, 400);
+        }
+
+        const response = await proxyRestartRequest(controlUrl);
+        const nextMeta = {
+          ...meta,
+          control_url: controlUrl,
+          last_restart_request_at: new Date().toISOString(),
+          last_restart_requested_by: actor.userId,
+          last_restart_error: null,
+        };
+
+        await supabase
+          .from("wa_sessions")
+          .update({ meta: nextMeta, last_event: "restart_requested_via_http", updated_at: new Date().toISOString() })
+          .eq("channel", "whatsapp");
+
+        return json({ ok: true, control_url: controlUrl, response });
+      }
+
       case "get_outbox": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const limit = Math.min(Number(body.limit ?? 10), 50);
         const { data } = await supabase
           .from("whatsapp_outbox")
@@ -102,6 +214,7 @@ serve(async (req) => {
       }
 
       case "upload_media": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         // VPS envia { phone, kind: 'image'|'audio', mime, filename, data_base64 }
         const { phone, kind, mime, filename, data_base64 } = body;
         if (!data_base64 || !filename) return json({ error: "data_base64 + filename obrigatórios" }, 400);
@@ -116,6 +229,7 @@ serve(async (req) => {
       }
 
       case "mark_outbox_sent": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const { id, success, error, wa_message_id } = body;
         if (!id) return json({ error: "id required" }, 400);
 
@@ -163,6 +277,7 @@ serve(async (req) => {
       }
 
       case "log_incoming_message": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         const {
           from_phone, message, wa_message_id, customer_name,
           media_type, media_url, media_mime, location_lat, location_lng,
@@ -266,6 +381,7 @@ serve(async (req) => {
       }
 
       case "log_outgoing_message": {
+        if (!ensureActor(actor, "bot")) return json({ error: "forbidden" }, 403);
         await supabase.from("wa_messages").insert({
           direction: "out",
           to_phone: body.to_phone,

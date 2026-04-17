@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "${WA_CONTROL_PORT:-3011}:3011"
     volumes:
       # Sessão Playwright iFood
       - ./browser-data:/app/browser-data
