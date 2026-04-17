@@ -172,7 +172,7 @@ export default function WhatsAppConnect() {
     };
   }, []);
 
-  // Threads agrupadas por número
+  // Threads agrupadas por número (com contagem de não lidas)
   const threads: ChatThread[] = useMemo(() => {
     const map = new Map<string, ChatThread>();
     for (const m of allMessages) {
@@ -188,6 +188,16 @@ export default function WhatsAppConnect() {
         }
       }
     }
+    // Calcular não lidas: mensagens recebidas (in) após lastReadAt[phone]
+    for (const t of map.values()) {
+      const readAt = lastReadAt[t.phone] ? new Date(lastReadAt[t.phone]).getTime() : 0;
+      t.unread = allMessages.filter(
+        (m) =>
+          m.direction === "in" &&
+          m.from_phone === t.phone &&
+          new Date(m.created_at).getTime() > readAt
+      ).length;
+    }
     let list = Array.from(map.values()).sort(
       (a, b) =>
         new Date(b.lastMessage.created_at).getTime() - new Date(a.lastMessage.created_at).getTime()
@@ -199,7 +209,12 @@ export default function WhatsAppConnect() {
       );
     }
     return list;
-  }, [allMessages, search]);
+  }, [allMessages, search, lastReadAt]);
+
+  const totalUnread = useMemo(
+    () => threads.reduce((sum, t) => sum + t.unread, 0),
+    [threads]
+  );
 
   // Mensagens da conversa ativa (ordem cronológica)
   const activeMessages = useMemo(() => {
@@ -208,6 +223,17 @@ export default function WhatsAppConnect() {
       .filter((m) => m.from_phone === activePhone || m.to_phone === activePhone)
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
   }, [allMessages, activePhone]);
+
+  // Marca conversa ativa como lida sempre que houver novas mensagens
+  useEffect(() => {
+    if (!activePhone) return;
+    const lastIn = activeMessages.filter((m) => m.direction === "in").slice(-1)[0];
+    if (!lastIn) return;
+    const current = lastReadAt[activePhone];
+    if (!current || new Date(lastIn.created_at) > new Date(current)) {
+      persistRead({ ...lastReadAt, [activePhone]: lastIn.created_at });
+    }
+  }, [activePhone, activeMessages]);
 
   // Scroll automático ao final ao trocar/receber mensagem
   useEffect(() => {
