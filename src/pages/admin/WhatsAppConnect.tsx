@@ -70,6 +70,7 @@ interface ChatThread {
 export default function WhatsAppConnect() {
   const [session, setSession] = useState<WaSession | null>(null);
   const [allMessages, setAllMessages] = useState<WaMessage[]>([]);
+  const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePhone, setActivePhone] = useState<string | null>(null);
@@ -96,6 +97,35 @@ export default function WhatsAppConnect() {
       .order("created_at", { ascending: false })
       .limit(500);
     if (data) setAllMessages(data as WaMessage[]);
+  }
+
+  async function loadContacts() {
+    const { data } = await (supabase as any).from("customers").select("phone, name");
+    if (data) {
+      const map: Record<string, string> = {};
+      for (const c of data) {
+        if (c.phone && c.name) map[c.phone.replace(/\D/g, "")] = c.name;
+      }
+      setContactNames(map);
+    }
+  }
+
+  // Resolve contact name from phone (try variants with/without country code 55)
+  function getContactName(phone: string): string | null {
+    const clean = phone.replace(/\D/g, "");
+    if (contactNames[clean]) return contactNames[clean];
+    if (clean.startsWith("55") && contactNames[clean.slice(2)]) return contactNames[clean.slice(2)];
+    if (!clean.startsWith("55") && contactNames["55" + clean]) return contactNames["55" + clean];
+    return null;
+  }
+
+  function getInitials(phone: string): string {
+    const name = getContactName(phone);
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || phone.slice(-2);
+    }
+    return phone.slice(-2);
   }
 
   // QR visual
