@@ -3,6 +3,7 @@ services:
     build: .
     container_name: truebox-bot
     restart: unless-stopped
+    command: ["node", "src/supervisor.js"]
     env_file:
       - .env
     ports:
