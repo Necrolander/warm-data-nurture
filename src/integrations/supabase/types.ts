@@ -1566,6 +1566,56 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_outbox: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          kind: string | null
+          last_error: string | null
+          message: string
+          order_id: string | null
+          phone: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          kind?: string | null
+          last_error?: string | null
+          message: string
+          order_id?: string | null
+          phone: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          kind?: string | null
+          last_error?: string | null
+          message?: string
+          order_id?: string | null
+          phone?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_outbox_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
