@@ -161,7 +161,6 @@ export default function IfoodBot() {
           <h1 className="text-2xl font-bold">Bot iFood</h1>
           <p className="text-sm text-muted-foreground">Status, 2FA, screenshots e falhas</p>
         </div>
-        <a href="/admin/ifood-bot/metricas">
         <div className="flex gap-2 flex-wrap">
           <a href="/admin/ifood-bot/avaliacoes">
             <Button variant="outline" className="gap-2">
