@@ -780,6 +780,65 @@ export type Database = {
         }
         Relationships: []
       }
+      ifood_chat_messages: {
+        Row: {
+          ai_confidence: number | null
+          auto_replied: boolean
+          created_at: string
+          customer_name: string | null
+          direction: string
+          escalated: boolean
+          id: string
+          intent: string | null
+          internal_order_id: string | null
+          message: string
+          order_external_id: string
+          raw_payload: Json | null
+          response_pending: string | null
+          response_sent_at: string | null
+        }
+        Insert: {
+          ai_confidence?: number | null
+          auto_replied?: boolean
+          created_at?: string
+          customer_name?: string | null
+          direction: string
+          escalated?: boolean
+          id?: string
+          intent?: string | null
+          internal_order_id?: string | null
+          message: string
+          order_external_id: string
+          raw_payload?: Json | null
+          response_pending?: string | null
+          response_sent_at?: string | null
+        }
+        Update: {
+          ai_confidence?: number | null
+          auto_replied?: boolean
+          created_at?: string
+          customer_name?: string | null
+          direction?: string
+          escalated?: boolean
+          id?: string
+          intent?: string | null
+          internal_order_id?: string | null
+          message?: string
+          order_external_id?: string
+          raw_payload?: Json | null
+          response_pending?: string | null
+          response_sent_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ifood_chat_messages_internal_order_id_fkey"
+            columns: ["internal_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ifood_events_log: {
         Row: {
           created_at: string | null
