@@ -16,7 +16,7 @@ import NewOrder from "./pages/admin/NewOrder";
 import MenuManager from "./pages/admin/MenuManager";
 import Invoices from "./pages/admin/Invoices";
 import BotManager from "./pages/admin/BotManager";
-import BotConversations from "./pages/admin/BotConversations";
+
 import AdminDriverChat from "./components/admin/AdminDriverChat";
 import SalonManager from "./pages/admin/SalonManager";
 import SalonSettings from "./pages/admin/SalonSettings";
@@ -77,7 +77,6 @@ const App = () => (
               <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="bot" element={<BotManager />} />
-              <Route path="bot-conversations" element={<BotConversations />} />
               <Route path="driver-chat" element={<AdminDriverChat />} />
               <Route path="salon" element={<SalonManager />} />
               <Route path="salon-settings" element={<SalonSettings />} />
