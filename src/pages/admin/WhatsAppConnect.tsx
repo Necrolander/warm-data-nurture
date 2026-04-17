@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, MessageCircle, RefreshCw, Send, Smartphone, WifiOff } from "lucide-react";
+import { Loader2, MessageCircle, Paperclip, RefreshCw, Send, Smartphone, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "@/hooks/use-toast";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { WaMessageBubble } from "@/components/admin/WaMessageBubble";
 
 interface WaSession {
   status: string;
