@@ -6,6 +6,7 @@
 // 4. Detecta tela "Sorry, you have been blocked" da Cloudflare
 import { api } from "./api.js";
 import { humanPause, typeHuman } from "./stealth.js";
+import { CloudflareBlockError } from "./retry.js";
 
 const POLL_2FA_INTERVAL = 5000;   // 5s
 const POLL_2FA_TIMEOUT = 15 * 60_000; // 15 min máx esperando admin
@@ -20,9 +21,13 @@ export async function ensureLoggedIn(page, log) {
 
   // Detecta tela de bloqueio Cloudflare ANTES de qualquer outra coisa
   const bodyText = (await page.textContent("body").catch(() => "")) || "";
-  if (/sorry, you have been blocked|cloudflare/i.test(bodyText) && /unable to access/i.test(bodyText)) {
-    await uploadCurrentScreen(page, "🛑 Cloudflare BLOQUEOU o IP — precisa proxy residencial BR");
-    throw new Error("Cloudflare blocked: IP da VPS está em blocklist. Configure proxy residencial BR (HTTP_PROXY).");
+  if (
+    (/sorry, you have been blocked|cloudflare|just a moment/i.test(bodyText) &&
+      /unable to access|checking your browser|review the security/i.test(bodyText)) ||
+    /access denied/i.test(bodyText)
+  ) {
+    await uploadCurrentScreen(page, "🛑 Cloudflare BLOQUEOU — vai tentar rotacionar UA + backoff");
+    throw new CloudflareBlockError("Cloudflare blocked the request");
   }
 
   // Heurística simples: se NÃO tem campo de email/senha, considera logado
