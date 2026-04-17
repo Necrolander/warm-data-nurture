@@ -234,7 +234,23 @@ async function processOutbox() {
 async function heartbeatLoop() {
   while (true) {
     if (isReady) {
-      await waApi.heartbeat({ status: "connected" }).catch(() => {});
+      try {
+        const res = await waApi.heartbeat({ status: "connected" });
+        if (res?.restart_requested) {
+          log("♻️ Restart solicitado pelo admin — encerrando processo (Docker reinicia)");
+          try { await client.destroy(); } catch {}
+          process.exit(0);
+        }
+      } catch {}
+    } else {
+      // Mesmo desconectado, checa flag pra permitir reset quando travado
+      try {
+        const res = await waApi.heartbeat({ status: "disconnected" });
+        if (res?.restart_requested) {
+          log("♻️ Restart solicitado (estado desconectado) — encerrando");
+          process.exit(0);
+        }
+      } catch {}
     }
     await new Promise((r) => setTimeout(r, 30_000));
   }
