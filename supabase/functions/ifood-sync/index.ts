@@ -327,24 +327,64 @@ async function pollReviews(supabase: any, token: string, merchantId: string) {
   return { message: `Found ${newCount} new reviews`, total: (reviews || []).length };
 }
 
+async function generateAIReply(review: any, restaurantName: string): Promise<string | null> {
+  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  if (!apiKey) {
+    console.warn("LOVABLE_API_KEY not set, skipping AI reply");
+    return null;
+  }
+
+  const customerName = review.customer_name || "Cliente";
+  const rating = review.rating || 0;
+  const comment = review.comment || "";
+
+  const systemPrompt = `Você é o atendimento do restaurante "${restaurantName}". Está respondendo uma avaliação NEGATIVA (${rating} estrelas) no iFood. Responda em português brasileiro, com empatia genuína, máximo 2 frases curtas. Reconheça o problema específico mencionado pelo cliente, peça desculpas, e ofereça contato direto. NÃO use clichês genéricos. NÃO ofereça cupom/desconto. Tom: humano, próximo, profissional. Use o primeiro nome do cliente.`;
+
+  const userPrompt = `Cliente: ${customerName}\nNota: ${rating}/5\nComentário: "${comment}"\n\nGere a resposta:`;
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!resp.ok) {
+      console.error(`AI gateway error [${resp.status}]:`, await resp.text());
+      return null;
+    }
+
+    const data = await resp.json();
+    const text = data?.choices?.[0]?.message?.content?.trim();
+    return text || null;
+  } catch (e: any) {
+    console.error("AI reply generation failed:", e.message);
+    return null;
+  }
+}
+
 async function autoReplyReviews(supabase: any, token: string, merchantId: string) {
-  // Get auto-reply templates from store_settings
-  const { data: positiveSetting } = await supabase
+  const { data: settings } = await supabase
     .from("store_settings")
-    .select("value")
-    .eq("key", "ifood_review_positive_reply")
-    .single();
+    .select("key, value")
+    .in("key", ["ifood_review_positive_reply", "ifood_review_negative_reply", "ifood_review_mode", "store_name"]);
 
-  const { data: negativeSetting } = await supabase
-    .from("store_settings")
-    .select("value")
-    .eq("key", "ifood_review_negative_reply")
-    .single();
+  const settingsMap = Object.fromEntries((settings || []).map((s: any) => [s.key, s.value]));
 
-  const positiveReply = positiveSetting?.value || "Obrigado pela avaliação! 😊 Ficamos felizes que gostou. Esperamos você novamente!";
-  const negativeReply = negativeSetting?.value || "Sentimos muito pela sua experiência. Vamos melhorar! Entre em contato conosco para resolvermos.";
+  const positiveReply = settingsMap.ifood_review_positive_reply || "Obrigado pela avaliação, {nome}! 😊 Ficamos felizes que gostou. Esperamos você novamente!";
+  const negativeReply = settingsMap.ifood_review_negative_reply || "Sentimos muito pela sua experiência, {nome}. Vamos melhorar! Entre em contato conosco para resolvermos.";
+  const mode = settingsMap.ifood_review_mode || "hybrid";
+  const restaurantName = settingsMap.store_name || "nosso restaurante";
 
-  // Get unresponded reviews
   const { data: pendingReviews } = await supabase
     .from("ifood_reviews")
     .select("*")
@@ -352,15 +392,25 @@ async function autoReplyReviews(supabase: any, token: string, merchantId: string
     .not("comment", "is", null);
 
   let repliedCount = 0;
+  let aiUsed = 0;
 
   for (const review of (pendingReviews || [])) {
     const isPositive = (review.rating || 0) >= 4;
-    const replyText = isPositive ? positiveReply : negativeReply;
+    let finalReply: string | null = null;
 
-    // Replace placeholders
-    const finalReply = replyText
-      .replace("{nome}", review.customer_name || "Cliente")
-      .replace("{nota}", String(review.rating || ""));
+    const useAI = mode === "ai" || (mode === "hybrid" && !isPositive);
+
+    if (useAI) {
+      finalReply = await generateAIReply(review, restaurantName);
+      if (finalReply) aiUsed++;
+    }
+
+    if (!finalReply) {
+      const tpl = isPositive ? positiveReply : negativeReply;
+      finalReply = tpl
+        .replace(/\{nome\}/g, review.customer_name || "Cliente")
+        .replace(/\{nota\}/g, String(review.rating || ""));
+    }
 
     try {
       const resp = await fetch(
@@ -391,7 +441,7 @@ async function autoReplyReviews(supabase: any, token: string, merchantId: string
     }
   }
 
-  return { replied: repliedCount, pending: (pendingReviews || []).length };
+  return { replied: repliedCount, ai_used: aiUsed, pending: (pendingReviews || []).length, mode };
 }
 
 async function saveSettings(supabase: any, body: any) {

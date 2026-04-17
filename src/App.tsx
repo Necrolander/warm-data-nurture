@@ -39,6 +39,7 @@ import OrderHistory from "./pages/admin/OrderHistory";
 import IfoodIntegration from "./pages/admin/IfoodIntegration";
 import IfoodBot from "./pages/admin/IfoodBot";
 import IfoodBotMetrics from "./pages/admin/IfoodBotMetrics";
+import IfoodReviews from "./pages/admin/IfoodReviews";
 import ExternalIntegrations from "./pages/admin/ExternalIntegrations";
 import RoutingDashboard from "./pages/admin/RoutingDashboard";
 import RoutesList from "./pages/admin/RoutesList";
@@ -88,6 +89,7 @@ const App = () => (
               <Route path="ifood" element={<IfoodIntegration />} />
               <Route path="ifood-bot" element={<IfoodBot />} />
               <Route path="ifood-bot/metricas" element={<IfoodBotMetrics />} />
+              <Route path="ifood-bot/avaliacoes" element={<IfoodReviews />} />
               <Route path="external-integrations" element={<ExternalIntegrations />} />
               <Route path="routing" element={<RoutingDashboard />} />
               <Route path="routes" element={<RoutesList />} />
