@@ -24,6 +24,7 @@ const menuItems = [
   { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
   { title: "Robô", url: "/admin/bot", icon: Bot },
   { title: "Conversas Bot", url: "/admin/bot-conversations", icon: MessageSquare },
+  { title: "WhatsApp Outbox", url: "/admin/whatsapp-outbox", icon: MessageSquare },
   { title: "Gestão Salão", url: "/admin/salon", icon: Armchair },
   { title: "Config. Salão", url: "/admin/salon-settings", icon: Settings },
   { title: "Contatos", url: "/admin/contacts", icon: Users },
