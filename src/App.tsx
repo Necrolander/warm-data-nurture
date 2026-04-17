@@ -38,6 +38,7 @@ import DriverDashboard from "./pages/driver/DriverDashboard";
 import OrderHistory from "./pages/admin/OrderHistory";
 import IfoodIntegration from "./pages/admin/IfoodIntegration";
 import IfoodBot from "./pages/admin/IfoodBot";
+import IfoodBotMetrics from "./pages/admin/IfoodBotMetrics";
 import ExternalIntegrations from "./pages/admin/ExternalIntegrations";
 import RoutingDashboard from "./pages/admin/RoutingDashboard";
 import RoutesList from "./pages/admin/RoutesList";
@@ -86,6 +87,7 @@ const App = () => (
               <Route path="delivery-alerts" element={<DeliveryAlerts />} />
               <Route path="ifood" element={<IfoodIntegration />} />
               <Route path="ifood-bot" element={<IfoodBot />} />
+              <Route path="ifood-bot/metricas" element={<IfoodBotMetrics />} />
               <Route path="external-integrations" element={<ExternalIntegrations />} />
               <Route path="routing" element={<RoutingDashboard />} />
               <Route path="routes" element={<RoutesList />} />
