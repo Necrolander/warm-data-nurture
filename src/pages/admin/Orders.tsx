@@ -518,7 +518,16 @@ const Orders = () => {
     const channel = supabase
       .channel("orders-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (payload) => {
-        toast.success("🔔 Novo pedido recebido!");
+        const isIfood = (payload.new as any)?.order_source === "ifood";
+        if (isIfood) {
+          playIfoodAlert();
+          toast.error("🛵 Novo pedido iFood!", {
+            description: `Pedido #${(payload.new as any)?.order_number ?? ""} acabou de chegar`,
+            duration: 8000,
+          });
+        } else {
+          toast.success("🔔 Novo pedido recebido!");
+        }
         fetchOrders();
 
         if (autoAcceptRef.current && payload.new && (payload.new as any).id) {
