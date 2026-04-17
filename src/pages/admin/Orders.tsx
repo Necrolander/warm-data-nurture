@@ -551,7 +551,7 @@ const Orders = () => {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [autoPrintOrder]);
+  }, [autoPrintOrder, playIfoodAlert]);
 
   const acceptOrder = async (order: OrderWithItems) => {
     const { error } = await supabase
