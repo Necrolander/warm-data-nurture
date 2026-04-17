@@ -76,33 +76,6 @@ function ensureActor(actor: Actor, type: Actor["type"]) {
   return actor.type === type;
 }
 
-async function proxyRestartRequest(controlUrl: string) {
-  const response = await fetch(controlUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${BOT_TOKEN}`,
-    },
-    body: JSON.stringify({ action: "restart_wa", requested_at: new Date().toISOString() }),
-  });
-
-  const text = await response.text();
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { raw: text };
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      `restart endpoint ${response.status}: ${typeof data === "object" && data && "error" in data ? String((data as { error?: string }).error) : text}`,
-    );
-  }
-
-  return data;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -173,31 +146,22 @@ serve(async (req) => {
           .maybeSingle();
 
         const meta: Record<string, unknown> = (sess?.meta as Record<string, unknown> | null) ?? {};
-        const controlUrl = String(body.control_url ?? meta.control_url ?? "").trim();
-
-        if (!controlUrl) {
-          return json({ error: "control_url_missing" }, 400);
-        }
-
-        if (!/^https?:\/\//i.test(controlUrl)) {
-          return json({ error: "control_url_invalid" }, 400);
-        }
-
-        const response = await proxyRestartRequest(controlUrl);
+        const requestedAt = new Date().toISOString();
         const nextMeta = {
           ...meta,
-          control_url: controlUrl,
-          last_restart_request_at: new Date().toISOString(),
+          restart_requested: true,
+          restart_requested_at: requestedAt,
+          last_restart_request_at: requestedAt,
           last_restart_requested_by: actor.userId,
           last_restart_error: null,
         };
 
         await supabase
           .from("wa_sessions")
-          .update({ meta: nextMeta, last_event: "restart_requested_via_http", updated_at: new Date().toISOString() })
+          .update({ meta: nextMeta, last_event: "restart_requested_by_admin", updated_at: requestedAt, status: "disconnected" })
           .eq("channel", "whatsapp");
 
-        return json({ ok: true, control_url: controlUrl, response });
+        return json({ ok: true, restart_requested: true, requested_at: requestedAt });
       }
 
       case "get_outbox": {
