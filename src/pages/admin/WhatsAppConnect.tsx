@@ -400,16 +400,23 @@ export default function WhatsAppConnect() {
                       isActive ? "bg-muted/60" : ""
                     }`}
                   >
-                    <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0">
-                      {t.phone.slice(-4)}
+                    <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0 text-xs">
+                      {getInitials(t.phone)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-sm truncate">{formatPhone(t.phone)}</p>
+                        <p className="font-medium text-sm truncate">
+                          {getContactName(t.phone) || formatPhone(t.phone)}
+                        </p>
                         <span className="text-[10px] text-muted-foreground shrink-0">
                           {format(new Date(last.created_at), "HH:mm")}
                         </span>
                       </div>
+                      {getContactName(t.phone) && (
+                        <p className="text-[10px] text-muted-foreground/70 truncate font-mono">
+                          {formatPhone(t.phone)}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {last.direction === "out" ? "✓ " : ""}
                         {last.message}
