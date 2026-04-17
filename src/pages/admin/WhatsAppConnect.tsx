@@ -212,13 +212,25 @@ export default function WhatsAppConnect() {
 
   // Realtime
   useEffect(() => {
-    loadSession();
-    loadMessages();
-    loadContacts();
+    (async () => {
+      await Promise.all([loadSession(), loadMessages(), loadContacts()]);
+      // Marca histórico atual como já notificado
+      initializedRef.current = true;
+    })();
     const ch = supabase
       .channel("wa-admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_sessions" }, () => loadSession())
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, () => loadMessages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, (payload: any) => {
+        loadMessages();
+        if (!initializedRef.current) return;
+        const msg = payload?.new as WaMessage | undefined;
+        if (!msg || msg.direction !== "in") return;
+        if (lastNotifiedIdRef.current === msg.id) return;
+        lastNotifiedIdRef.current = msg.id;
+        // Não notificar se a conversa ativa já está aberta E a aba está visível
+        if (msg.from_phone === activePhoneRef.current && document.visibilityState === "visible") return;
+        notifyNewMessage(msg);
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadContacts())
       .subscribe();
     return () => {
