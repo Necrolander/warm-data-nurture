@@ -35,4 +35,5 @@ export const waApi = {
   markOutboxSent: (payload) => call("mark_outbox_sent", payload),
   logIncoming: (payload) => call("log_incoming_message", payload),
   logOutgoing: (payload) => call("log_outgoing_message", payload),
+  uploadMedia: (payload) => call("upload_media", payload),
 };

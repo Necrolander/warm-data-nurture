@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, MessageCircle, RefreshCw, Send, Smartphone, WifiOff } from "lucide-react";
+import { Loader2, MessageCircle, Paperclip, RefreshCw, Send, Smartphone, WifiOff } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "@/hooks/use-toast";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { WaMessageBubble } from "@/components/admin/WaMessageBubble";
 
 interface WaSession {
   status: string;
@@ -32,6 +33,12 @@ interface WaMessage {
   to_phone: string | null;
   message: string;
   created_at: string;
+  media_type?: string | null;
+  media_url?: string | null;
+  media_mime?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  ai_analysis?: string | null;
 }
 
 const STATUS_BADGE: Record<
@@ -161,7 +168,7 @@ export default function WhatsAppConnect() {
   async function loadMessages() {
     const { data } = await (supabase as any)
       .from("wa_messages")
-      .select("id, direction, from_phone, to_phone, message, created_at")
+      .select("id, direction, from_phone, to_phone, message, created_at, media_type, media_url, media_mime, location_lat, location_lng, ai_analysis")
       .order("created_at", { ascending: false })
       .limit(500);
     if (data) setAllMessages(data as WaMessage[]);
@@ -335,18 +342,37 @@ export default function WhatsAppConnect() {
     setSending(true);
     const message = draft.trim();
     const { error } = await (supabase as any).from("whatsapp_outbox").insert({
-      phone: activePhone,
-      message,
-      kind: "manual_admin",
-      status: "pending",
+      phone: activePhone, message, kind: "manual_admin", status: "pending",
     });
-    if (error) {
-      toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
-    } else {
-      setDraft("");
-      toast({ title: "Mensagem enfileirada", description: "Será enviada em ~5s pelo worker." });
-    }
+    if (error) toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+    else { setDraft(""); toast({ title: "Mensagem enfileirada" }); }
     setSending(false);
+  }
+
+  async function sendMedia(file: File) {
+    if (!activePhone || sending) return;
+    setSending(true);
+    try {
+      const isAudio = file.type.startsWith("audio/");
+      const kind = isAudio ? "audio" : "image";
+      const path = `${kind}/${activePhone}/${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
+      const { error: upErr } = await (supabase as any).storage.from("wa-media").upload(path, file, { contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase as any).storage.from("wa-media").getPublicUrl(path);
+      const { error } = await (supabase as any).from("whatsapp_outbox").insert({
+        phone: activePhone,
+        message: draft.trim() || (isAudio ? "🎤 Áudio" : "📷 Imagem"),
+        kind: "manual_admin", status: "pending",
+        media_url: pub.publicUrl, media_type: kind, media_mime: file.type,
+      });
+      if (error) throw error;
+      setDraft("");
+      toast({ title: `${isAudio ? "Áudio" : "Imagem"} enfileirado` });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar mídia", description: e.message, variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
   }
 
   const status = session?.status ?? "disconnected";
@@ -586,7 +612,6 @@ export default function WhatsAppConnect() {
                   !prev ||
                   format(new Date(prev.created_at), "yyyy-MM-dd") !==
                     format(new Date(m.created_at), "yyyy-MM-dd");
-                const isOut = m.direction === "out";
                 return (
                   <div key={m.id}>
                     {showDate && (
@@ -596,24 +621,7 @@ export default function WhatsAppConnect() {
                         </span>
                       </div>
                     )}
-                    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
-                          isOut
-                            ? "bg-green-600 text-white rounded-br-none"
-                            : "bg-card border rounded-bl-none"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">{m.message}</p>
-                        <p
-                          className={`text-[10px] mt-1 text-right ${
-                            isOut ? "text-green-100" : "text-muted-foreground"
-                          }`}
-                        >
-                          {format(new Date(m.created_at), "HH:mm")}
-                        </p>
-                      </div>
-                    </div>
+                    <WaMessageBubble message={m} />
                   </div>
                 );
               })}

@@ -1598,11 +1598,17 @@ export type Database = {
       wa_messages: {
         Row: {
           ack: number | null
+          ai_analysis: string | null
           created_at: string
           direction: string
           error: string | null
           from_phone: string | null
           id: string
+          location_lat: number | null
+          location_lng: number | null
+          media_mime: string | null
+          media_type: string | null
+          media_url: string | null
           message: string
           outbox_id: string | null
           raw: Json | null
@@ -1612,11 +1618,17 @@ export type Database = {
         }
         Insert: {
           ack?: number | null
+          ai_analysis?: string | null
           created_at?: string
           direction: string
           error?: string | null
           from_phone?: string | null
           id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          media_mime?: string | null
+          media_type?: string | null
+          media_url?: string | null
           message: string
           outbox_id?: string | null
           raw?: Json | null
@@ -1626,11 +1638,17 @@ export type Database = {
         }
         Update: {
           ack?: number | null
+          ai_analysis?: string | null
           created_at?: string
           direction?: string
           error?: string | null
           from_phone?: string | null
           id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          media_mime?: string | null
+          media_type?: string | null
+          media_url?: string | null
           message?: string
           outbox_id?: string | null
           raw?: Json | null
@@ -1743,6 +1761,9 @@ export type Database = {
           id: string
           kind: string | null
           last_error: string | null
+          media_mime: string | null
+          media_type: string | null
+          media_url: string | null
           message: string
           order_id: string | null
           phone: string
@@ -1756,6 +1777,9 @@ export type Database = {
           id?: string
           kind?: string | null
           last_error?: string | null
+          media_mime?: string | null
+          media_type?: string | null
+          media_url?: string | null
           message: string
           order_id?: string | null
           phone: string
@@ -1769,6 +1793,9 @@ export type Database = {
           id?: string
           kind?: string | null
           last_error?: string | null
+          media_mime?: string | null
+          media_type?: string | null
+          media_url?: string | null
           message?: string
           order_id?: string | null
           phone?: string
