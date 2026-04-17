@@ -109,7 +109,7 @@ serve(async (req) => {
             outbox_id: id,
             related_order_id: body.order_id ?? null,
           });
-          await supabase.rpc("execute_sql" as never, {} as never).catch(() => {});
+          
           // Increment counter via direct SQL not allowed → fetch + update
           const { data: sess } = await supabase
             .from("wa_sessions")
@@ -178,13 +178,14 @@ serve(async (req) => {
           }
           // Salva nome do contato em customers se vier
           if (customer_name) {
-            await supabase
-              .from("customers")
-              .upsert(
-                { phone: from_phone, name: customer_name, last_order_at: new Date().toISOString() },
-                { onConflict: "phone" }
-              )
-              .catch(() => {});
+            try {
+              await supabase
+                .from("customers")
+                .upsert(
+                  { phone: from_phone, name: customer_name, last_order_at: new Date().toISOString() },
+                  { onConflict: "phone" }
+                );
+            } catch (_) { /* ignore */ }
           }
           return json({ ok: true, dispatched: true, has_reply: !!replyText });
         } catch (e) {
