@@ -27,6 +27,8 @@ const client = new Client({
   authStrategy: new LocalAuth({ clientId: "truebox-wa", dataPath: SESSION_DIR }),
   puppeteer: {
     headless: true,
+    // Profile dedicado pro WhatsApp pra não conflitar com Chromium do iFood
+    userDataDir: `${SESSION_DIR}/chromium-profile`,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -35,6 +37,7 @@ const client = new Client({
       "--no-first-run",
       "--no-zygote",
       "--disable-gpu",
+      `--user-data-dir=${SESSION_DIR}/chromium-profile`,
     ],
   },
 });
