@@ -436,12 +436,18 @@ export default function WhatsAppConnect() {
           <>
             {/* Header da conversa */}
             <header className="h-16 px-4 border-b flex items-center gap-3 bg-muted/40 shrink-0">
-              <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold">
-                {activeThread.phone.slice(-4)}
+              <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-xs">
+                {getInitials(activeThread.phone)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold">{formatPhone(activeThread.phone)}</p>
-                <p className="text-xs text-muted-foreground">{activeThread.total} mensagens</p>
+                <p className="font-semibold truncate">
+                  {getContactName(activeThread.phone) || formatPhone(activeThread.phone)}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {getContactName(activeThread.phone)
+                    ? `${formatPhone(activeThread.phone)} · ${activeThread.total} mensagens`
+                    : `${activeThread.total} mensagens`}
+                </p>
               </div>
             </header>
 
