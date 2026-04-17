@@ -78,12 +78,26 @@ serve(async (req) => {
         const limit = Math.min(Number(body.limit ?? 10), 50);
         const { data } = await supabase
           .from("whatsapp_outbox")
-          .select("id, phone, message, attempts, kind, order_id")
+          .select("id, phone, message, attempts, kind, order_id, media_url, media_type, media_mime")
           .eq("status", "pending")
           .lt("attempts", 5)
           .order("created_at", { ascending: true })
           .limit(limit);
         return json({ outbox: data ?? [] });
+      }
+
+      case "upload_media": {
+        // VPS envia { phone, kind: 'image'|'audio', mime, filename, data_base64 }
+        const { phone, kind, mime, filename, data_base64 } = body;
+        if (!data_base64 || !filename) return json({ error: "data_base64 + filename obrigatórios" }, 400);
+        const bytes = Uint8Array.from(atob(data_base64), (c) => c.charCodeAt(0));
+        const path = `${kind || "media"}/${phone || "unknown"}/${Date.now()}-${filename}`;
+        const { error: upErr } = await supabase.storage
+          .from("wa-media")
+          .upload(path, bytes, { contentType: mime || "application/octet-stream", upsert: false });
+        if (upErr) return json({ error: upErr.message }, 500);
+        const { data: pub } = supabase.storage.from("wa-media").getPublicUrl(path);
+        return json({ ok: true, url: pub.publicUrl, path });
       }
 
       case "mark_outbox_sent": {
