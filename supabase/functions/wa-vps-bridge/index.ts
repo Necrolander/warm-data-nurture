@@ -166,16 +166,27 @@ serve(async (req) => {
             body: JSON.stringify({ phone: from_phone, message, customer_name }),
           });
           const reply = await res.json().catch(() => ({}));
-          // Se o whatsapp-bot retornou uma resposta, enfileira pra envio
-          if (reply?.reply) {
+          // whatsapp-bot retorna { response } (fluxo cardápio) ou { reply } (legado)
+          const replyText = reply?.response || reply?.reply || reply?.notification;
+          if (replyText) {
             await supabase.from("whatsapp_outbox").insert({
               phone: from_phone,
-              message: reply.reply,
+              message: replyText,
               kind: "bot_reply",
               status: "pending",
             });
           }
-          return json({ ok: true, dispatched: true, has_reply: !!reply?.reply });
+          // Salva nome do contato em customers se vier
+          if (customer_name) {
+            await supabase
+              .from("customers")
+              .upsert(
+                { phone: from_phone, name: customer_name, last_order_at: new Date().toISOString() },
+                { onConflict: "phone" }
+              )
+              .catch(() => {});
+          }
+          return json({ ok: true, dispatched: true, has_reply: !!replyText });
         } catch (e) {
           return json({ ok: true, dispatched: false, error: String(e).slice(0, 200) });
         }

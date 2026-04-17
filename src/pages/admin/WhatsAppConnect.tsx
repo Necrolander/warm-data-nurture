@@ -70,6 +70,7 @@ interface ChatThread {
 export default function WhatsAppConnect() {
   const [session, setSession] = useState<WaSession | null>(null);
   const [allMessages, setAllMessages] = useState<WaMessage[]>([]);
+  const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activePhone, setActivePhone] = useState<string | null>(null);
@@ -98,6 +99,35 @@ export default function WhatsAppConnect() {
     if (data) setAllMessages(data as WaMessage[]);
   }
 
+  async function loadContacts() {
+    const { data } = await (supabase as any).from("customers").select("phone, name");
+    if (data) {
+      const map: Record<string, string> = {};
+      for (const c of data) {
+        if (c.phone && c.name) map[c.phone.replace(/\D/g, "")] = c.name;
+      }
+      setContactNames(map);
+    }
+  }
+
+  // Resolve contact name from phone (try variants with/without country code 55)
+  function getContactName(phone: string): string | null {
+    const clean = phone.replace(/\D/g, "");
+    if (contactNames[clean]) return contactNames[clean];
+    if (clean.startsWith("55") && contactNames[clean.slice(2)]) return contactNames[clean.slice(2)];
+    if (!clean.startsWith("55") && contactNames["55" + clean]) return contactNames["55" + clean];
+    return null;
+  }
+
+  function getInitials(phone: string): string {
+    const name = getContactName(phone);
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || phone.slice(-2);
+    }
+    return phone.slice(-2);
+  }
+
   // QR visual
   useEffect(() => {
     if (!session?.qr_code) {
@@ -116,10 +146,12 @@ export default function WhatsAppConnect() {
   useEffect(() => {
     loadSession();
     loadMessages();
+    loadContacts();
     const ch = supabase
       .channel("wa-admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_sessions" }, () => loadSession())
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, () => loadMessages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadContacts())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
@@ -368,16 +400,23 @@ export default function WhatsAppConnect() {
                       isActive ? "bg-muted/60" : ""
                     }`}
                   >
-                    <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0">
-                      {t.phone.slice(-4)}
+                    <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0 text-xs">
+                      {getInitials(t.phone)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-sm truncate">{formatPhone(t.phone)}</p>
+                        <p className="font-medium text-sm truncate">
+                          {getContactName(t.phone) || formatPhone(t.phone)}
+                        </p>
                         <span className="text-[10px] text-muted-foreground shrink-0">
                           {format(new Date(last.created_at), "HH:mm")}
                         </span>
                       </div>
+                      {getContactName(t.phone) && (
+                        <p className="text-[10px] text-muted-foreground/70 truncate font-mono">
+                          {formatPhone(t.phone)}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {last.direction === "out" ? "✓ " : ""}
                         {last.message}
@@ -397,12 +436,18 @@ export default function WhatsAppConnect() {
           <>
             {/* Header da conversa */}
             <header className="h-16 px-4 border-b flex items-center gap-3 bg-muted/40 shrink-0">
-              <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold">
-                {activeThread.phone.slice(-4)}
+              <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold text-xs">
+                {getInitials(activeThread.phone)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold">{formatPhone(activeThread.phone)}</p>
-                <p className="text-xs text-muted-foreground">{activeThread.total} mensagens</p>
+                <p className="font-semibold truncate">
+                  {getContactName(activeThread.phone) || formatPhone(activeThread.phone)}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {getContactName(activeThread.phone)
+                    ? `${formatPhone(activeThread.phone)} · ${activeThread.total} mensagens`
+                    : `${activeThread.total} mensagens`}
+                </p>
               </div>
             </header>
 
