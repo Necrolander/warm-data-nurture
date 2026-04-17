@@ -351,8 +351,25 @@ export default function WhatsAppConnect() {
     setSending(false);
   }
 
-  async function sendMedia(file: File) {
-    if (!activePhone || sending) return;
+  function pickFile(file: File) {
+    setPendingFile(file);
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setPendingPreview(url);
+    } else {
+      setPendingPreview(null);
+    }
+  }
+
+  function clearPending() {
+    if (pendingPreview) URL.revokeObjectURL(pendingPreview);
+    setPendingPreview(null);
+    setPendingFile(null);
+  }
+
+  async function sendMedia() {
+    const file = pendingFile;
+    if (!activePhone || !file || sending) return;
     setSending(true);
     try {
       const isAudio = file.type.startsWith("audio/");
@@ -369,6 +386,7 @@ export default function WhatsAppConnect() {
       });
       if (error) throw error;
       setDraft("");
+      clearPending();
       toast({ title: `${isAudio ? "Áudio" : "Imagem"} enfileirado` });
     } catch (e: any) {
       toast({ title: "Erro ao enviar mídia", description: e.message, variant: "destructive" });
