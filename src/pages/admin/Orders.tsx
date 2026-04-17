@@ -427,6 +427,33 @@ const Orders = () => {
     } catch (_) {}
   }, []);
 
+  // Som distintivo de iFood: sirene grave→aguda 2x (mais marcante)
+  const playIfoodAlert = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const playTone = (freq: number, start: number, dur: number, vol: number, type: OscillatorType = "sawtooth") => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = type;
+        gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      };
+      // Sirene: sobe-desce 2 vezes
+      for (let i = 0; i < 2; i++) {
+        const base = i * 0.6;
+        playTone(600, base, 0.25, 0.8);
+        playTone(900, base + 0.25, 0.25, 0.9);
+        playTone(1200, base + 0.5, 0.1, 0.9);
+      }
+      setTimeout(() => ctx.close().catch(() => {}), 2000);
+    } catch (_) {}
+  }, []);
+
   const startLoopingSound = useCallback(() => {
     if (soundIntervalRef.current) return;
     playBurst();
