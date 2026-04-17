@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "start:whatsapp": "node src/whatsapp-bot.js",
-    "start:all": "node src/index.js & node src/whatsapp-bot.js & wait",
+    "start:all": "node src/supervisor.js",
     "dev": "node --watch src/index.js",
     "dev:whatsapp": "node --watch src/whatsapp-bot.js"
   },
