@@ -71,7 +71,22 @@ serve(async (req) => {
         };
         if (body.status) inc.status = body.status;
         await supabase.from("wa_sessions").update(inc).eq("channel", "whatsapp");
-        return json({ ok: true });
+        // Verifica se admin pediu restart
+        const { data: sess } = await supabase
+          .from("wa_sessions")
+          .select("meta")
+          .eq("channel", "whatsapp")
+          .maybeSingle();
+        const meta: any = sess?.meta || {};
+        const restart_requested = !!meta.restart_requested;
+        if (restart_requested) {
+          // Limpa a flag
+          await supabase
+            .from("wa_sessions")
+            .update({ meta: { ...meta, restart_requested: false, restart_consumed_at: new Date().toISOString() } })
+            .eq("channel", "whatsapp");
+        }
+        return json({ ok: true, restart_requested });
       }
 
       case "get_outbox": {
