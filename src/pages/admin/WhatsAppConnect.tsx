@@ -146,10 +146,12 @@ export default function WhatsAppConnect() {
   useEffect(() => {
     loadSession();
     loadMessages();
+    loadContacts();
     const ch = supabase
       .channel("wa-admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_sessions" }, () => loadSession())
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, () => loadMessages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadContacts())
       .subscribe();
     return () => {
       supabase.removeChannel(ch);
