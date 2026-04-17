@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_2fa_requests: {
+        Row: {
+          channel: string
+          code: string | null
+          consumed_at: string | null
+          expires_at: string
+          id: string
+          provided_at: string | null
+          reason: string | null
+          requested_at: string
+          status: string
+        }
+        Insert: {
+          channel?: string
+          code?: string | null
+          consumed_at?: string | null
+          expires_at?: string
+          id?: string
+          provided_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Update: {
+          channel?: string
+          code?: string | null
+          consumed_at?: string | null
+          expires_at?: string
+          id?: string
+          provided_at?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       bot_failures: {
         Row: {
           channel: string
@@ -107,6 +143,33 @@ export type Database = {
           trigger_key?: string
           trigger_label?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      bot_screenshots: {
+        Row: {
+          channel: string
+          created_at: string
+          id: string
+          note: string | null
+          page_url: string | null
+          screenshot_url: string
+        }
+        Insert: {
+          channel?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          page_url?: string | null
+          screenshot_url: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          page_url?: string | null
+          screenshot_url?: string
         }
         Relationships: []
       }
