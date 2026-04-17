@@ -32,6 +32,12 @@ interface WaMessage {
   to_phone: string | null;
   message: string;
   created_at: string;
+  media_type?: string | null;
+  media_url?: string | null;
+  media_mime?: string | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  ai_analysis?: string | null;
 }
 
 const STATUS_BADGE: Record<
