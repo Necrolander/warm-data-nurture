@@ -37,6 +37,7 @@ import DriverLogin from "./pages/driver/DriverLogin";
 import DriverDashboard from "./pages/driver/DriverDashboard";
 import OrderHistory from "./pages/admin/OrderHistory";
 import IfoodIntegration from "./pages/admin/IfoodIntegration";
+import ExternalIntegrations from "./pages/admin/ExternalIntegrations";
 import RoutingDashboard from "./pages/admin/RoutingDashboard";
 import RoutesList from "./pages/admin/RoutesList";
 import OperationalMap from "./pages/admin/OperationalMap";
@@ -83,6 +84,7 @@ const App = () => (
               <Route path="delivery-persons" element={<DeliveryPersons />} />
               <Route path="delivery-alerts" element={<DeliveryAlerts />} />
               <Route path="ifood" element={<IfoodIntegration />} />
+              <Route path="external-integrations" element={<ExternalIntegrations />} />
               <Route path="routing" element={<RoutingDashboard />} />
               <Route path="routes" element={<RoutesList />} />
               <Route path="operational-map" element={<OperationalMap />} />
