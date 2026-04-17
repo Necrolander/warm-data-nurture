@@ -647,6 +647,31 @@ export default function WhatsAppConnect() {
               })}
             </div>
 
+            {/* Preview de mídia pendente */}
+            {pendingFile && (
+              <div className="border-t p-3 bg-muted/60 shrink-0 flex items-center gap-3">
+                {pendingPreview ? (
+                  <img src={pendingPreview} alt="preview" className="h-20 w-20 object-cover rounded border" />
+                ) : (
+                  <div className="h-20 w-20 rounded border bg-muted flex items-center justify-center text-3xl">
+                    🎤
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{pendingFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(pendingFile.size / 1024).toFixed(0)} KB · {pendingFile.type}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adicione uma legenda abaixo (opcional) e clique em enviar
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={clearPending} disabled={sending}>
+                  Cancelar
+                </Button>
+              </div>
+            )}
+
             {/* Input de envio */}
             <div className="border-t p-3 flex gap-2 bg-muted/40 shrink-0 items-center">
               <input
@@ -656,7 +681,7 @@ export default function WhatsAppConnect() {
                 className="hidden"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) sendMedia(f);
+                  if (f) pickFile(f);
                   e.target.value = "";
                 }}
               />
@@ -666,23 +691,27 @@ export default function WhatsAppConnect() {
                 size="icon"
                 disabled={sending}
                 onClick={() => document.getElementById("wa-media-input")?.click()}
-                title="Enviar imagem ou áudio"
+                title="Anexar imagem ou áudio"
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
               <Input
-                placeholder="Digite uma mensagem…"
+                placeholder={pendingFile ? "Legenda (opcional)…" : "Digite uma mensagem…"}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    sendMessage();
+                    if (pendingFile) sendMedia();
+                    else sendMessage();
                   }
                 }}
                 disabled={sending}
               />
-              <Button onClick={sendMessage} disabled={!draft.trim() || sending}>
+              <Button
+                onClick={() => (pendingFile ? sendMedia() : sendMessage())}
+                disabled={sending || (!pendingFile && !draft.trim())}
+              >
                 {sending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
