@@ -1,18 +1,19 @@
 services:
-  ifood-bot:
+  truebox-bot:
     build: .
-    container_name: truebox-ifood-bot
+    container_name: truebox-bot
     restart: unless-stopped
     env_file:
       - .env
     volumes:
-      # Persiste sessão do navegador (cookies + login) → não precisa logar todo restart
+      # Sessão Playwright iFood
       - ./browser-data:/app/browser-data
+      # Sessão WhatsApp Web (LocalAuth) — NÃO apague, senão precisa escanear QR de novo
+      - ./wa-session:/app/wa-session
       # Screenshots locais pra debug
       - ./screenshots:/app/screenshots
-    # Limita memória pra não estourar a VPS
-    mem_limit: 1g
-    shm_size: 1g
+    mem_limit: 2g
+    shm_size: 2g
     logging:
       driver: json-file
       options:
