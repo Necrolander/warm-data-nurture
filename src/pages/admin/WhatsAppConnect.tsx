@@ -410,13 +410,18 @@ export default function WhatsAppConnect() {
         </div>
 
         {/* Busca */}
-        <div className="p-3 border-b">
+        <div className="p-3 border-b flex items-center gap-2">
           <Input
             placeholder="Buscar conversa…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-9"
+            className="h-9 flex-1"
           />
+          {totalUnread > 0 && (
+            <Badge variant="destructive" className="shrink-0">
+              {totalUnread} nova{totalUnread > 1 ? "s" : ""}
+            </Badge>
+          )}
         </div>
 
         {/* Lista de threads */}
@@ -432,12 +437,13 @@ export default function WhatsAppConnect() {
               {threads.map((t) => {
                 const isActive = t.phone === activePhone;
                 const last = t.lastMessage;
+                const hasUnread = t.unread > 0 && !isActive;
                 return (
                   <button
                     key={t.phone}
                     onClick={() => setActivePhone(t.phone)}
                     className={`w-full flex items-start gap-3 px-3 py-3 border-b text-left hover:bg-muted/40 transition-colors ${
-                      isActive ? "bg-muted/60" : ""
+                      isActive ? "bg-muted/60" : hasUnread ? "bg-green-500/5" : ""
                     }`}
                   >
                     <div className="h-10 w-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold shrink-0 text-xs">
@@ -445,10 +451,10 @@ export default function WhatsAppConnect() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-sm truncate">
+                        <p className={`text-sm truncate ${hasUnread ? "font-bold" : "font-medium"}`}>
                           {getContactName(t.phone) || formatPhone(t.phone)}
                         </p>
-                        <span className="text-[10px] text-muted-foreground shrink-0">
+                        <span className={`text-[10px] shrink-0 ${hasUnread ? "text-green-600 font-semibold" : "text-muted-foreground"}`}>
                           {format(new Date(last.created_at), "HH:mm")}
                         </span>
                       </div>
@@ -457,10 +463,17 @@ export default function WhatsAppConnect() {
                           {formatPhone(t.phone)}
                         </p>
                       )}
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {last.direction === "out" ? "✓ " : ""}
-                        {last.message}
-                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-0.5">
+                        <p className={`text-xs truncate ${hasUnread ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+                          {last.direction === "out" ? "✓ " : ""}
+                          {last.message}
+                        </p>
+                        {hasUnread && (
+                          <span className="shrink-0 h-5 min-w-5 px-1.5 rounded-full bg-green-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            {t.unread}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </button>
                 );
