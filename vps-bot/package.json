@@ -6,11 +6,15 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start:whatsapp": "node src/whatsapp-sender.js",
+    "start:all": "node src/index.js & node src/whatsapp-sender.js & wait",
+    "dev": "node --watch src/index.js",
+    "dev:whatsapp": "node --watch src/whatsapp-sender.js"
   },
   "dependencies": {
     "playwright": "1.55.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "@supabase/supabase-js": "^2.45.0"
   },
   "engines": {
     "node": ">=20"
