@@ -36,6 +36,7 @@ const menuItems = [
   { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
   { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
   { title: "iFood", url: "/admin/ifood", icon: Store },
+  { title: "Bots Externos", url: "/admin/external-integrations", icon: Bot },
   { title: "Roteirização", url: "/admin/routing", icon: Route },
   { title: "Rotas", url: "/admin/routes", icon: Map },
   { title: "Mapa Operacional", url: "/admin/operational-map", icon: Map },
