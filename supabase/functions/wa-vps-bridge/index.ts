@@ -148,16 +148,31 @@ serve(async (req) => {
       }
 
       case "log_incoming_message": {
-        const { from_phone, message, wa_message_id, customer_name } = body;
-        if (!from_phone || !message) return json({ error: "from_phone+message required" }, 400);
+        const {
+          from_phone, message, wa_message_id, customer_name,
+          media_type, media_url, media_mime, location_lat, location_lng,
+        } = body;
+        if (!from_phone) return json({ error: "from_phone required" }, 400);
 
-        await supabase.from("wa_messages").insert({
+        const insertPayload: any = {
           direction: "in",
           from_phone,
-          message,
+          message: message || (media_type ? `[${media_type}]` : ""),
           wa_message_id,
           raw: body.raw ?? {},
-        });
+        };
+        if (media_type) insertPayload.media_type = media_type;
+        if (media_url) insertPayload.media_url = media_url;
+        if (media_mime) insertPayload.media_mime = media_mime;
+        if (typeof location_lat === "number") insertPayload.location_lat = location_lat;
+        if (typeof location_lng === "number") insertPayload.location_lng = location_lng;
+
+        const { data: inserted } = await supabase
+          .from("wa_messages")
+          .insert(insertPayload)
+          .select("id")
+          .maybeSingle();
+
         const { data: sess } = await supabase
           .from("wa_sessions")
           .select("messages_received_total")
@@ -168,7 +183,47 @@ serve(async (req) => {
           .update({ messages_received_total: (sess?.messages_received_total ?? 0) + 1 })
           .eq("channel", "whatsapp");
 
-        // Despacha pro fluxo whatsapp-bot existente (cardápio + IA + pedidos)
+        // Salva contato
+        if (customer_name) {
+          try {
+            await supabase
+              .from("customers")
+              .upsert(
+                { phone: from_phone, name: customer_name, last_order_at: new Date().toISOString() },
+                { onConflict: "phone" }
+              );
+          } catch (_) {}
+        }
+
+        // Análise de imagem em background (não bloqueia resposta)
+        if (media_type === "image" && media_url && inserted?.id) {
+          fetch(`${SUPABASE_URL}/functions/v1/wa-image-analyze`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({ message_id: inserted.id, image_url: media_url }),
+          }).catch((e) => console.error("wa-image-analyze trigger fail", e));
+        }
+
+        // Áudio: apenas armazena, NÃO dispara o bot (admin escuta manualmente)
+        if (media_type === "audio") {
+          return json({ ok: true, dispatched: false, reason: "audio_manual" });
+        }
+
+        // Localização: converte em texto "lat,lng" pro fluxo do bot processar
+        let textForBot = message || "";
+        if (media_type === "location" && typeof location_lat === "number" && typeof location_lng === "number") {
+          textForBot = `${location_lat},${location_lng}`;
+        }
+        if (media_type === "image") {
+          // Não dispara bot pra imagem; admin trata
+          return json({ ok: true, dispatched: false, reason: "image_admin" });
+        }
+        if (!textForBot) return json({ ok: true, dispatched: false });
+
+        // Despacha pro fluxo whatsapp-bot
         try {
           const url = `${SUPABASE_URL}/functions/v1/whatsapp-bot`;
           const res = await fetch(url, {
@@ -177,10 +232,9 @@ serve(async (req) => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
             },
-            body: JSON.stringify({ phone: from_phone, message, customer_name }),
+            body: JSON.stringify({ phone: from_phone, message: textForBot, customer_name }),
           });
           const reply = await res.json().catch(() => ({}));
-          // whatsapp-bot retorna { response } (fluxo cardápio) ou { reply } (legado)
           const replyText = reply?.response || reply?.reply || reply?.notification;
           if (replyText) {
             await supabase.from("whatsapp_outbox").insert({
@@ -189,17 +243,6 @@ serve(async (req) => {
               kind: "bot_reply",
               status: "pending",
             });
-          }
-          // Salva nome do contato em customers se vier
-          if (customer_name) {
-            try {
-              await supabase
-                .from("customers")
-                .upsert(
-                  { phone: from_phone, name: customer_name, last_order_at: new Date().toISOString() },
-                  { onConflict: "phone" }
-                );
-            } catch (_) { /* ignore */ }
           }
           return json({ ok: true, dispatched: true, has_reply: !!replyText });
         } catch (e) {
@@ -214,6 +257,9 @@ serve(async (req) => {
           message: body.message,
           wa_message_id: body.wa_message_id,
           related_order_id: body.related_order_id ?? null,
+          media_type: body.media_type ?? null,
+          media_url: body.media_url ?? null,
+          media_mime: body.media_mime ?? null,
         });
         return json({ ok: true });
       }
