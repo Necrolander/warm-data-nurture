@@ -77,8 +77,22 @@ export default function WhatsAppConnect() {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [lastReadAt, setLastReadAt] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("wa_last_read") || "{}");
+    } catch {
+      return {};
+    }
+  });
   const lastQrRef = useRef<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  function persistRead(next: Record<string, string>) {
+    setLastReadAt(next);
+    try {
+      localStorage.setItem("wa_last_read", JSON.stringify(next));
+    } catch {}
+  }
 
   async function loadSession() {
     const { data } = await (supabase as any)
