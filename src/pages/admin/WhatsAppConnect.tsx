@@ -628,7 +628,28 @@ export default function WhatsAppConnect() {
             </div>
 
             {/* Input de envio */}
-            <div className="border-t p-3 flex gap-2 bg-muted/40 shrink-0">
+            <div className="border-t p-3 flex gap-2 bg-muted/40 shrink-0 items-center">
+              <input
+                type="file"
+                accept="image/*,audio/*"
+                id="wa-media-input"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) sendMedia(f);
+                  e.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                disabled={sending}
+                onClick={() => document.getElementById("wa-media-input")?.click()}
+                title="Enviar imagem ou áudio"
+              >
+                <Paperclip className="h-5 w-5" />
+              </Button>
               <Input
                 placeholder="Digite uma mensagem…"
                 value={draft}
