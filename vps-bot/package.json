@@ -1,20 +1,22 @@
 {
   "name": "truebox-ifood-bot",
   "version": "1.0.0",
-  "description": "Bot Playwright que lê o Portal iFood e envia pedidos para o Lovable Cloud",
+  "description": "Bot Playwright (iFood) + WhatsApp (whatsapp-web.js) integrado ao Lovable Cloud",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "start:whatsapp": "node src/whatsapp-sender.js",
-    "start:all": "node src/index.js & node src/whatsapp-sender.js & wait",
+    "start:whatsapp": "node src/whatsapp-bot.js",
+    "start:all": "node src/index.js & node src/whatsapp-bot.js & wait",
     "dev": "node --watch src/index.js",
-    "dev:whatsapp": "node --watch src/whatsapp-sender.js"
+    "dev:whatsapp": "node --watch src/whatsapp-bot.js"
   },
   "dependencies": {
     "playwright": "1.55.0",
     "dotenv": "^16.4.5",
-    "@supabase/supabase-js": "^2.45.0"
+    "@supabase/supabase-js": "^2.45.0",
+    "whatsapp-web.js": "^1.26.0",
+    "qrcode-terminal": "^0.12.0"
   },
   "engines": {
     "node": ">=20"

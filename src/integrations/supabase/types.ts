@@ -1595,6 +1595,117 @@ export type Database = {
         }
         Relationships: []
       }
+      wa_messages: {
+        Row: {
+          ack: number | null
+          created_at: string
+          direction: string
+          error: string | null
+          from_phone: string | null
+          id: string
+          message: string
+          outbox_id: string | null
+          raw: Json | null
+          related_order_id: string | null
+          to_phone: string | null
+          wa_message_id: string | null
+        }
+        Insert: {
+          ack?: number | null
+          created_at?: string
+          direction: string
+          error?: string | null
+          from_phone?: string | null
+          id?: string
+          message: string
+          outbox_id?: string | null
+          raw?: Json | null
+          related_order_id?: string | null
+          to_phone?: string | null
+          wa_message_id?: string | null
+        }
+        Update: {
+          ack?: number | null
+          created_at?: string
+          direction?: string
+          error?: string | null
+          from_phone?: string | null
+          id?: string
+          message?: string
+          outbox_id?: string | null
+          raw?: Json | null
+          related_order_id?: string | null
+          to_phone?: string | null
+          wa_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wa_messages_outbox_id_fkey"
+            columns: ["outbox_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_outbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wa_messages_related_order_id_fkey"
+            columns: ["related_order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wa_sessions: {
+        Row: {
+          channel: string
+          display_name: string | null
+          failures_total: number
+          id: string
+          last_event: string | null
+          last_seen_at: string | null
+          messages_received_total: number
+          messages_sent_total: number
+          meta: Json
+          phone_number: string | null
+          qr_code: string | null
+          qr_generated_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          channel?: string
+          display_name?: string | null
+          failures_total?: number
+          id?: string
+          last_event?: string | null
+          last_seen_at?: string | null
+          messages_received_total?: number
+          messages_sent_total?: number
+          meta?: Json
+          phone_number?: string | null
+          qr_code?: string | null
+          qr_generated_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          display_name?: string | null
+          failures_total?: number
+          id?: string
+          last_event?: string | null
+          last_seen_at?: string | null
+          messages_received_total?: number
+          messages_sent_total?: number
+          meta?: Json
+          phone_number?: string | null
+          qr_code?: string | null
+          qr_generated_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       waiters: {
         Row: {
           created_at: string | null
