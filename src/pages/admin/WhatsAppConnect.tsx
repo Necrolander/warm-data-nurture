@@ -84,6 +84,8 @@ export default function WhatsAppConnect() {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<string | null>(null);
   const [lastReadAt, setLastReadAt] = useState<Record<string, string>>(() => {
     try {
       return JSON.parse(localStorage.getItem("wa_last_read") || "{}");
