@@ -87,27 +87,10 @@ client.on("disconnected", async (reason) => {
 // Mensagens recebidas → encaminha pro fluxo do bot
 client.on("message", async (msg) => {
   try {
-    // Ignora grupos, status broadcast, mensagens próprias
     if (msg.from.endsWith("@g.us") || msg.from === "status@broadcast" || msg.fromMe) return;
 
     const phone = msg.from.replace(/@c\.us$/, "");
-    let text = msg.body?.trim() || "";
-
-    // Localização do WhatsApp (pin GPS) → converte em "lat,lng" pro bot processar
-    if (msg.type === "location" && msg.location) {
-      const lat = msg.location.latitude ?? msg.location.degreesLatitude;
-      const lng = msg.location.longitude ?? msg.location.degreesLongitude;
-      if (typeof lat === "number" && typeof lng === "number") {
-        text = `${lat},${lng}`;
-        log(`📍 Localização recebida de ${phone}: ${text}`);
-      } else {
-        return;
-      }
-    } else if (msg.type !== "chat") {
-      return; // ignora outras mídias
-    }
-
-    if (!text) return;
+    const text = msg.body?.trim() || "";
 
     let contactName = null;
     try {
@@ -115,15 +98,51 @@ client.on("message", async (msg) => {
       contactName = contact?.pushname || contact?.name || null;
     } catch {}
 
-    log(`📥 ${phone}${contactName ? ` (${contactName})` : ""}: ${text.slice(0, 80)}`);
-
-    await waApi.logIncoming({
+    const payload = {
       from_phone: phone,
       message: text,
       wa_message_id: msg.id?._serialized,
       customer_name: contactName,
       raw: { type: msg.type, timestamp: msg.timestamp },
-    });
+    };
+
+    if (msg.type === "location" && msg.location) {
+      const lat = msg.location.latitude ?? msg.location.degreesLatitude;
+      const lng = msg.location.longitude ?? msg.location.degreesLongitude;
+      if (typeof lat !== "number" || typeof lng !== "number") return;
+      payload.media_type = "location";
+      payload.location_lat = lat;
+      payload.location_lng = lng;
+      payload.message = `📍 Localização: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      log(`📍 Localização ${phone}: ${lat},${lng}`);
+    } else if ((msg.type === "image" || msg.type === "audio" || msg.type === "ptt") && msg.hasMedia) {
+      try {
+        const media = await msg.downloadMedia();
+        if (!media?.data) return;
+        const isAudio = msg.type === "audio" || msg.type === "ptt";
+        const kind = isAudio ? "audio" : "image";
+        const ext = (media.mimetype?.split("/")[1] || (isAudio ? "ogg" : "jpg")).split(";")[0];
+        const filename = `${msg.id?.id || Date.now()}.${ext}`;
+        log(`📎 ${kind} de ${phone} (${(media.data.length / 1024).toFixed(0)}KB)`);
+        const up = await waApi.uploadMedia({
+          phone, kind, mime: media.mimetype, filename, data_base64: media.data,
+        });
+        payload.media_type = kind;
+        payload.media_url = up.url;
+        payload.media_mime = media.mimetype;
+        payload.message = text || (isAudio ? "🎤 Áudio" : "📷 Imagem");
+      } catch (e) {
+        log("⚠️ Falha upload mídia:", e.message);
+        return;
+      }
+    } else if (msg.type !== "chat") {
+      return;
+    } else if (!text) {
+      return;
+    }
+
+    log(`📥 ${phone}${contactName ? ` (${contactName})` : ""} [${msg.type}]: ${(payload.message || "").slice(0, 80)}`);
+    await waApi.logIncoming(payload);
   } catch (e) {
     log("⚠️ Erro processando msg recebida:", e.message);
   }
