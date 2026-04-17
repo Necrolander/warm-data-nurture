@@ -593,7 +593,6 @@ export default function WhatsAppConnect() {
                   !prev ||
                   format(new Date(prev.created_at), "yyyy-MM-dd") !==
                     format(new Date(m.created_at), "yyyy-MM-dd");
-                const isOut = m.direction === "out";
                 return (
                   <div key={m.id}>
                     {showDate && (
@@ -603,24 +602,7 @@ export default function WhatsAppConnect() {
                         </span>
                       </div>
                     )}
-                    <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[70%] px-3 py-2 rounded-lg shadow-sm ${
-                          isOut
-                            ? "bg-green-600 text-white rounded-br-none"
-                            : "bg-card border rounded-bl-none"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words">{m.message}</p>
-                        <p
-                          className={`text-[10px] mt-1 text-right ${
-                            isOut ? "text-green-100" : "text-muted-foreground"
-                          }`}
-                        >
-                          {format(new Date(m.created_at), "HH:mm")}
-                        </p>
-                      </div>
-                    </div>
+                    <WaMessageBubble message={m} />
                   </div>
                 );
               })}
