@@ -342,18 +342,37 @@ export default function WhatsAppConnect() {
     setSending(true);
     const message = draft.trim();
     const { error } = await (supabase as any).from("whatsapp_outbox").insert({
-      phone: activePhone,
-      message,
-      kind: "manual_admin",
-      status: "pending",
+      phone: activePhone, message, kind: "manual_admin", status: "pending",
     });
-    if (error) {
-      toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
-    } else {
-      setDraft("");
-      toast({ title: "Mensagem enfileirada", description: "Será enviada em ~5s pelo worker." });
-    }
+    if (error) toast({ title: "Erro ao enviar", description: error.message, variant: "destructive" });
+    else { setDraft(""); toast({ title: "Mensagem enfileirada" }); }
     setSending(false);
+  }
+
+  async function sendMedia(file: File) {
+    if (!activePhone || sending) return;
+    setSending(true);
+    try {
+      const isAudio = file.type.startsWith("audio/");
+      const kind = isAudio ? "audio" : "image";
+      const path = `${kind}/${activePhone}/${Date.now()}-${file.name.replace(/[^\w.-]/g, "_")}`;
+      const { error: upErr } = await (supabase as any).storage.from("wa-media").upload(path, file, { contentType: file.type });
+      if (upErr) throw upErr;
+      const { data: pub } = (supabase as any).storage.from("wa-media").getPublicUrl(path);
+      const { error } = await (supabase as any).from("whatsapp_outbox").insert({
+        phone: activePhone,
+        message: draft.trim() || (isAudio ? "🎤 Áudio" : "📷 Imagem"),
+        kind: "manual_admin", status: "pending",
+        media_url: pub.publicUrl, media_type: kind, media_mime: file.type,
+      });
+      if (error) throw error;
+      setDraft("");
+      toast({ title: `${isAudio ? "Áudio" : "Imagem"} enfileirado` });
+    } catch (e: any) {
+      toast({ title: "Erro ao enviar mídia", description: e.message, variant: "destructive" });
+    } finally {
+      setSending(false);
+    }
   }
 
   const status = session?.status ?? "disconnected";
