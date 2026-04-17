@@ -48,22 +48,22 @@ export default function WhatsAppConnect() {
   const lastQrRef = useRef<string | null>(null);
 
   async function loadSession() {
-    const { data } = await supabase
-      .from("wa_sessions" as never)
+    const { data } = await (supabase as any)
+      .from("wa_sessions")
       .select("*")
       .eq("channel", "whatsapp")
       .maybeSingle();
-    if (data) setSession(data as never);
+    if (data) setSession(data as WaSession);
     setLoading(false);
   }
 
   async function loadMessages() {
-    const { data } = await supabase
-      .from("wa_messages" as never)
+    const { data } = await (supabase as any)
+      .from("wa_messages")
       .select("id, direction, from_phone, to_phone, message, created_at")
       .order("created_at", { ascending: false })
       .limit(20);
-    if (data) setMessages(data as never);
+    if (data) setMessages(data as WaMessage[]);
   }
 
   // Gera QR Code visual quando string muda
@@ -98,8 +98,8 @@ export default function WhatsAppConnect() {
 
   async function disconnect() {
     if (!confirm("Desconectar o WhatsApp? Você precisará escanear o QR novamente.")) return;
-    await supabase
-      .from("wa_sessions" as never)
+    await (supabase as any)
+      .from("wa_sessions")
       .update({ status: "disconnected", qr_code: null, phone_number: null, last_event: "manual_disconnect" })
       .eq("channel", "whatsapp");
     toast({ title: "Solicitação enviada", description: "Reinicie o worker WA na VPS pra escanear novo QR." });
