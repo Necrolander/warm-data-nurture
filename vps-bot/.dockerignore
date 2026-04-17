@@ -1,0 +1,7 @@
+node_modules
+browser-data
+screenshots
+.env
+.env.example
+*.log
+README.md

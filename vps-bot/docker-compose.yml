@@ -1,0 +1,20 @@
+services:
+  ifood-bot:
+    build: .
+    container_name: truebox-ifood-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Persiste sessão do navegador (cookies + login) → não precisa logar todo restart
+      - ./browser-data:/app/browser-data
+      # Screenshots locais pra debug
+      - ./screenshots:/app/screenshots
+    # Limita memória pra não estourar a VPS
+    mem_limit: 1g
+    shm_size: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
