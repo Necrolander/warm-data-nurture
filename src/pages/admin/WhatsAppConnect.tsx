@@ -86,6 +86,60 @@ export default function WhatsAppConnect() {
   });
   const lastQrRef = useRef<string | null>(null);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const lastNotifiedIdRef = useRef<string | null>(null);
+  const initializedRef = useRef(false);
+  const activePhoneRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    activePhoneRef.current = activePhone;
+  }, [activePhone]);
+
+  // Pedir permissão de notificação ao montar
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  function playBeep() {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+      setTimeout(() => ctx.close().catch(() => {}), 600);
+    } catch {}
+  }
+
+  function notifyNewMessage(msg: WaMessage) {
+    const phone = msg.from_phone || "";
+    const name = getContactName(phone) || formatPhone(phone);
+    playBeep();
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState !== "visible") {
+        const n = new Notification(`💬 ${name}`, {
+          body: msg.message.slice(0, 120),
+          tag: `wa-${phone}`,
+          icon: "/favicon.ico",
+        });
+        n.onclick = () => {
+          window.focus();
+          setActivePhone(phone);
+          n.close();
+        };
+      }
+    } catch {}
+  }
 
   function persistRead(next: Record<string, string>) {
     setLastReadAt(next);
@@ -158,13 +212,25 @@ export default function WhatsAppConnect() {
 
   // Realtime
   useEffect(() => {
-    loadSession();
-    loadMessages();
-    loadContacts();
+    (async () => {
+      await Promise.all([loadSession(), loadMessages(), loadContacts()]);
+      // Marca histórico atual como já notificado
+      initializedRef.current = true;
+    })();
     const ch = supabase
       .channel("wa-admin")
       .on("postgres_changes", { event: "*", schema: "public", table: "wa_sessions" }, () => loadSession())
-      .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, () => loadMessages())
+      .on("postgres_changes", { event: "*", schema: "public", table: "wa_messages" }, (payload: any) => {
+        loadMessages();
+        if (!initializedRef.current) return;
+        const msg = payload?.new as WaMessage | undefined;
+        if (!msg || msg.direction !== "in") return;
+        if (lastNotifiedIdRef.current === msg.id) return;
+        lastNotifiedIdRef.current = msg.id;
+        // Não notificar se a conversa ativa já está aberta E a aba está visível
+        if (msg.from_phone === activePhoneRef.current && document.visibilityState === "visible") return;
+        notifyNewMessage(msg);
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "customers" }, () => loadContacts())
       .subscribe();
     return () => {
