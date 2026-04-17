@@ -484,15 +484,20 @@ export default function WhatsAppConnect() {
                 <WifiOff className="h-12 w-12 mx-auto text-muted-foreground" />
                 <p className="text-muted-foreground">
                   {status === "failed"
-                    ? "Falha na conexão. Verifique os logs do worker WA na VPS."
-                    : "Aguardando worker do WhatsApp na VPS gerar o QR Code…"}
+                    ? "Falha na conexão. Reinicie o bot abaixo."
+                    : "Aguardando worker do WhatsApp gerar o QR Code…"}
                 </p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  Comando: <code>docker compose up -d truebox-bot</code>
+                <div className="flex justify-center gap-2 mt-2">
+                  <Button variant="outline" size="sm" onClick={loadSession}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                  </Button>
+                  <Button variant="default" size="sm" onClick={restartWorker}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Reiniciar bot
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  O bot pode levar até 30s pra responder ao restart
                 </p>
-                <Button variant="outline" size="sm" onClick={loadSession} className="mt-2">
-                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
-                </Button>
               </div>
             )}
           </CardContent>
