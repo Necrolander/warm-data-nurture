@@ -324,56 +324,6 @@ export default function WhatsAppConnect() {
     if (!activePhone && threads.length > 0) setActivePhone(threads[0].phone);
   }, [threads, activePhone]);
 
-  function getControlUrl() {
-    const value = session?.meta && typeof session.meta.control_url === "string" ? session.meta.control_url : "";
-    return value.trim();
-  }
-
-  async function saveControlUrl(nextUrl: string) {
-    const trimmed = nextUrl.trim();
-    if (!/^https?:\/\//i.test(trimmed)) {
-      toast({
-        title: "URL inválida",
-        description: "Use a URL pública completa, por exemplo: http://SEU_IP:3011/restart-wa",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const nextMeta = {
-      ...(session?.meta || {}),
-      control_url: trimmed,
-      control_url_updated_at: new Date().toISOString(),
-    };
-
-    const { error } = await (supabase as any)
-      .from("wa_sessions")
-      .update({ meta: nextMeta })
-      .eq("channel", "whatsapp");
-
-    if (error) {
-      toast({ title: "Erro ao salvar endpoint", description: error.message, variant: "destructive" });
-      return null;
-    }
-
-    setSession((current) => (current ? { ...current, meta: nextMeta } : current));
-    return trimmed;
-  }
-
-  async function configureControlUrl() {
-    const next = window.prompt(
-      "Cole a URL pública do endpoint de reinício da VPS.\nExemplo: http://SEU_IP:3011/restart-wa",
-      getControlUrl(),
-    );
-
-    if (next === null) return;
-
-    const saved = await saveControlUrl(next);
-    if (saved) {
-      toast({ title: "Endpoint salvo", description: "O painel agora pode pedir restart direto na VPS." });
-    }
-  }
-
   async function disconnect() {
     if (!confirm("Desconectar o WhatsApp? Você precisará escanear o QR novamente.")) return;
     await (supabase as any)
@@ -395,38 +345,17 @@ export default function WhatsAppConnect() {
     if (!confirm("Reiniciar o bot do WhatsApp na VPS? Vai demorar ~30s pra voltar.")) return;
     setRestarting(true);
     try {
-      let controlUrl = getControlUrl();
-
-      if (!controlUrl) {
-        const prompted = window.prompt(
-          "Cole a URL pública do endpoint de reinício da VPS.\nExemplo: http://SEU_IP:3011/restart-wa",
-          "",
-        );
-
-        if (!prompted) {
-          setRestarting(false);
-          return;
-        }
-
-        const saved = await saveControlUrl(prompted);
-        if (!saved) {
-          setRestarting(false);
-          return;
-        }
-        controlUrl = saved;
-      }
-
       const { data, error } = await supabase.functions.invoke("wa-vps-bridge", {
-        body: { action: "request_restart", control_url: controlUrl },
+        body: { action: "request_restart" },
       });
 
       if (error || data?.error) {
-        throw new Error(data?.error || error?.message || "Falha ao chamar endpoint da VPS");
+        throw new Error(data?.error || error?.message || "Falha ao solicitar reinício");
       }
 
       toast({
         title: "♻️ Restart enviado",
-        description: "A VPS recebeu o comando. Aguarde alguns segundos e clique em atualizar se o QR não aparecer sozinho.",
+        description: "O worker vai reiniciar sozinho no próximo heartbeat. Aguarde alguns segundos e atualize se o QR não aparecer.",
       });
       await loadSession();
     } catch (error: any) {
@@ -565,16 +494,10 @@ export default function WhatsAppConnect() {
                   <Button variant="outline" size="sm" onClick={loadSession}>
                     <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
                   </Button>
-                  <Button variant="outline" size="sm" onClick={configureControlUrl}>
-                    Configurar endpoint
-                  </Button>
                   <Button variant="default" size="sm" onClick={restartWorker} disabled={restarting}>
                     <RefreshCw className={`h-4 w-4 mr-2 ${restarting ? "animate-spin" : ""}`} /> Reiniciar bot
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Endpoint VPS: {getControlUrl() ? "configurado" : "não configurado"}
-                </p>
                 <p className="text-xs text-muted-foreground mt-2">
                   O bot pode levar alguns segundos pra reiniciar e gerar um novo QR.
                 </p>
