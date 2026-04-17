@@ -21,10 +21,10 @@ interface OutboxItem {
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
-  pending: { label: "Pendente", color: "bg-yellow-500/20 text-yellow-700", icon: Clock },
-  sending: { label: "Enviando", color: "bg-blue-500/20 text-blue-700", icon: Send },
-  sent: { label: "Enviado", color: "bg-green-500/20 text-green-700", icon: CheckCircle2 },
-  failed: { label: "Falhou", color: "bg-red-500/20 text-red-700", icon: AlertCircle },
+  pending: { label: "Pendente", color: "bg-amber-500/15 text-amber-600 border-amber-500/30", icon: Clock },
+  sending: { label: "Enviando", color: "bg-primary/15 text-primary border-primary/30", icon: Send },
+  sent: { label: "Enviado", color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30", icon: CheckCircle2 },
+  failed: { label: "Falhou", color: "bg-destructive/15 text-destructive border-destructive/30", icon: AlertCircle },
 };
 
 const WhatsAppOutbox = () => {
@@ -133,7 +133,7 @@ const WhatsAppOutbox = () => {
                       {item.message}
                     </p>
                     {item.last_error && (
-                      <p className="text-xs text-red-600 mt-1 ml-1">⚠️ {item.last_error}</p>
+                      <p className="text-xs text-destructive mt-1 ml-1">⚠️ {item.last_error}</p>
                     )}
                   </div>
                 );
