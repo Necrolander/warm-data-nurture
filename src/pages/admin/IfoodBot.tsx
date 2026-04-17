@@ -168,6 +168,12 @@ export default function IfoodBot() {
               Avaliações
             </Button>
           </a>
+          <a href="/admin/ifood-bot/chat">
+            <Button variant="outline" className="gap-2">
+              <Activity className="h-4 w-4" />
+              Chat clientes
+            </Button>
+          </a>
           <a href="/admin/ifood-bot/metricas">
             <Button variant="default" className="gap-2">
               <Activity className="h-4 w-4" />
