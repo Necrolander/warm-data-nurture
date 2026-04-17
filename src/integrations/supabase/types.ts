@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      bot_failures: {
+        Row: {
+          channel: string
+          context: Json | null
+          created_at: string
+          error_message: string
+          html_snapshot_url: string | null
+          id: string
+          screenshot_url: string | null
+        }
+        Insert: {
+          channel: string
+          context?: Json | null
+          created_at?: string
+          error_message: string
+          html_snapshot_url?: string | null
+          id?: string
+          screenshot_url?: string | null
+        }
+        Update: {
+          channel?: string
+          context?: Json | null
+          created_at?: string
+          error_message?: string
+          html_snapshot_url?: string | null
+          id?: string
+          screenshot_url?: string | null
+        }
+        Relationships: []
+      }
+      bot_heartbeats: {
+        Row: {
+          channel: string
+          failures_total: number
+          id: string
+          last_polled_at: string | null
+          meta: Json | null
+          orders_captured_total: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          failures_total?: number
+          id?: string
+          last_polled_at?: string | null
+          meta?: Json | null
+          orders_captured_total?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          failures_total?: number
+          id?: string
+          last_polled_at?: string | null
+          meta?: Json | null
+          orders_captured_total?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bot_responses: {
         Row: {
           id: string
@@ -521,6 +584,97 @@ export type Database = {
           {
             foreignKeyName: "driver_messages_order_id_fkey"
             columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_order_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          external_order_id: string
+          id: string
+          payload: Json
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          external_order_id: string
+          id?: string
+          payload?: Json
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          external_order_id?: string
+          id?: string
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_order_events_external_order_id_fkey"
+            columns: ["external_order_id"]
+            isOneToOne: false
+            referencedRelation: "external_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_orders: {
+        Row: {
+          channel: string
+          created_at: string
+          external_order_id: string
+          first_seen_at: string
+          id: string
+          internal_order_id: string | null
+          last_seen_at: string
+          normalized_payload: Json
+          normalized_status: Database["public"]["Enums"]["external_order_status"]
+          order_hash: string
+          raw_payload: Json
+          raw_status: string | null
+          sent_to_menu_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          external_order_id: string
+          first_seen_at?: string
+          id?: string
+          internal_order_id?: string | null
+          last_seen_at?: string
+          normalized_payload?: Json
+          normalized_status?: Database["public"]["Enums"]["external_order_status"]
+          order_hash: string
+          raw_payload?: Json
+          raw_status?: string | null
+          sent_to_menu_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          external_order_id?: string
+          first_seen_at?: string
+          id?: string
+          internal_order_id?: string | null
+          last_seen_at?: string
+          normalized_payload?: Json
+          normalized_status?: Database["public"]["Enums"]["external_order_status"]
+          order_hash?: string
+          raw_payload?: Json
+          raw_status?: string | null
+          sent_to_menu_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_orders_internal_order_id_fkey"
+            columns: ["internal_order_id"]
             isOneToOne: false
             referencedRelation: "orders"
             referencedColumns: ["id"]
@@ -1354,6 +1508,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order_from_external: {
+        Args: { _external_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1365,6 +1523,15 @@ export type Database = {
     Enums: {
       app_role: "admin" | "staff" | "waiter" | "delivery"
       driver_status: "available" | "on_route" | "paused" | "offline"
+      external_order_status:
+        | "PENDING"
+        | "CONFIRMED"
+        | "PREPARING"
+        | "READY"
+        | "OUT_FOR_DELIVERY"
+        | "DELIVERED"
+        | "CANCELLED"
+        | "UNKNOWN"
       order_status:
         | "pending"
         | "production"
@@ -1510,6 +1677,16 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "staff", "waiter", "delivery"],
       driver_status: ["available", "on_route", "paused", "offline"],
+      external_order_status: [
+        "PENDING",
+        "CONFIRMED",
+        "PREPARING",
+        "READY",
+        "OUT_FOR_DELIVERY",
+        "DELIVERED",
+        "CANCELLED",
+        "UNKNOWN",
+      ],
       order_status: [
         "pending",
         "production",
