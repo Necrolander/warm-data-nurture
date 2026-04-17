@@ -167,7 +167,7 @@ export default function WhatsAppConnect() {
   async function loadMessages() {
     const { data } = await (supabase as any)
       .from("wa_messages")
-      .select("id, direction, from_phone, to_phone, message, created_at")
+      .select("id, direction, from_phone, to_phone, message, created_at, media_type, media_url, media_mime, location_lat, location_lng, ai_analysis")
       .order("created_at", { ascending: false })
       .limit(500);
     if (data) setAllMessages(data as WaMessage[]);
