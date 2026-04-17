@@ -335,7 +335,30 @@ export default function WhatsAppConnect() {
       .eq("channel", "whatsapp");
     toast({
       title: "Solicitação enviada",
-      description: "Reinicie o worker WA na VPS pra escanear novo QR.",
+      description: "Clique em 'Reiniciar bot' pra gerar novo QR.",
+    });
+  }
+
+  async function restartWorker() {
+    if (!confirm("Reiniciar o bot do WhatsApp na VPS? Vai demorar ~30s pra voltar.")) return;
+    // Carrega meta atual e adiciona flag
+    const { data: cur } = await (supabase as any)
+      .from("wa_sessions")
+      .select("meta")
+      .eq("channel", "whatsapp")
+      .maybeSingle();
+    const meta = { ...(cur?.meta || {}), restart_requested: true, restart_requested_at: new Date().toISOString() };
+    const { error } = await (supabase as any)
+      .from("wa_sessions")
+      .update({ meta, last_event: "restart_requested_by_admin" })
+      .eq("channel", "whatsapp");
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "♻️ Restart agendado",
+      description: "O bot vai reiniciar no próximo heartbeat (até 30s). Aguarde o QR aparecer.",
     });
   }
 
@@ -461,15 +484,20 @@ export default function WhatsAppConnect() {
                 <WifiOff className="h-12 w-12 mx-auto text-muted-foreground" />
                 <p className="text-muted-foreground">
                   {status === "failed"
-                    ? "Falha na conexão. Verifique os logs do worker WA na VPS."
-                    : "Aguardando worker do WhatsApp na VPS gerar o QR Code…"}
+                    ? "Falha na conexão. Reinicie o bot abaixo."
+                    : "Aguardando worker do WhatsApp gerar o QR Code…"}
                 </p>
-                <p className="text-xs text-muted-foreground font-mono">
-                  Comando: <code>docker compose up -d truebox-bot</code>
+                <div className="flex justify-center gap-2 mt-2">
+                  <Button variant="outline" size="sm" onClick={loadSession}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
+                  </Button>
+                  <Button variant="default" size="sm" onClick={restartWorker}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Reiniciar bot
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  O bot pode levar até 30s pra responder ao restart
                 </p>
-                <Button variant="outline" size="sm" onClick={loadSession} className="mt-2">
-                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar
-                </Button>
               </div>
             )}
           </CardContent>
@@ -497,6 +525,9 @@ export default function WhatsAppConnect() {
                 +{session?.phone_number}
               </p>
             </div>
+            <Button variant="ghost" size="icon" onClick={restartWorker} title="Reiniciar bot na VPS">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" onClick={disconnect} title="Desconectar">
               <WifiOff className="h-4 w-4 text-destructive" />
             </Button>
