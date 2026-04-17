@@ -335,7 +335,30 @@ export default function WhatsAppConnect() {
       .eq("channel", "whatsapp");
     toast({
       title: "Solicitação enviada",
-      description: "Reinicie o worker WA na VPS pra escanear novo QR.",
+      description: "Clique em 'Reiniciar bot' pra gerar novo QR.",
+    });
+  }
+
+  async function restartWorker() {
+    if (!confirm("Reiniciar o bot do WhatsApp na VPS? Vai demorar ~30s pra voltar.")) return;
+    // Carrega meta atual e adiciona flag
+    const { data: cur } = await (supabase as any)
+      .from("wa_sessions")
+      .select("meta")
+      .eq("channel", "whatsapp")
+      .maybeSingle();
+    const meta = { ...(cur?.meta || {}), restart_requested: true, restart_requested_at: new Date().toISOString() };
+    const { error } = await (supabase as any)
+      .from("wa_sessions")
+      .update({ meta, last_event: "restart_requested_by_admin" })
+      .eq("channel", "whatsapp");
+    if (error) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({
+      title: "♻️ Restart agendado",
+      description: "O bot vai reiniciar no próximo heartbeat (até 30s). Aguarde o QR aparecer.",
     });
   }
 
