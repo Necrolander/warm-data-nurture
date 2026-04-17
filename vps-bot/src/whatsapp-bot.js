@@ -89,10 +89,24 @@ client.on("message", async (msg) => {
   try {
     // Ignora grupos, status broadcast, mensagens próprias
     if (msg.from.endsWith("@g.us") || msg.from === "status@broadcast" || msg.fromMe) return;
-    if (msg.type !== "chat") return; // ignora media/áudio por enquanto
 
     const phone = msg.from.replace(/@c\.us$/, "");
-    const text = msg.body?.trim();
+    let text = msg.body?.trim() || "";
+
+    // Localização do WhatsApp (pin GPS) → converte em "lat,lng" pro bot processar
+    if (msg.type === "location" && msg.location) {
+      const lat = msg.location.latitude ?? msg.location.degreesLatitude;
+      const lng = msg.location.longitude ?? msg.location.degreesLongitude;
+      if (typeof lat === "number" && typeof lng === "number") {
+        text = `${lat},${lng}`;
+        log(`📍 Localização recebida de ${phone}: ${text}`);
+      } else {
+        return;
+      }
+    } else if (msg.type !== "chat") {
+      return; // ignora outras mídias
+    }
+
     if (!text) return;
 
     let contactName = null;
