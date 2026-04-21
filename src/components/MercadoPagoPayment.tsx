@@ -195,6 +195,26 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const handleCancel = async () => {
+    if (cancelling) return;
+    if (!confirm("Cancelar este pedido? O pagamento será anulado.")) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mercadopago-cancel-payment", {
+        body: { order_id: orderId },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error((data as any)?.error || error?.message || "Erro ao cancelar");
+      }
+      toast.success("Pedido cancelado");
+      onCancelled?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao cancelar");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (method === "pix") {
     return (
       <div className="space-y-4">
