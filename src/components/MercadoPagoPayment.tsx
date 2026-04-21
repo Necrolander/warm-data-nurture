@@ -284,6 +284,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   if (method === "pix") {
     return (
       <div className="space-y-4">
+        {paymentStatus && (
+          <div className="flex justify-center">{statusBadge()}</div>
+        )}
         {!pix ? (
           <Button onClick={generatePix} disabled={loading} className="w-full" size="lg">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -303,14 +306,18 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
               {copied ? "Copiado!" : "Copiar código PIX"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              {polling ? "⏳ Aguardando confirmação do pagamento..." : "Após pagar, aguarde a confirmação"}
+              {paymentStatus === "approved"
+                ? "✅ Pagamento confirmado!"
+                : polling
+                  ? "⏳ Aguardando confirmação em tempo real..."
+                  : "Após pagar, aguarde a confirmação"}
             </p>
           </div>
         )}
         <Button
           variant="ghost"
           onClick={handleCancel}
-          disabled={cancelling}
+          disabled={cancelling || paymentStatus === "approved"}
           className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
