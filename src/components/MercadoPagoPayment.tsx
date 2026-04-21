@@ -191,6 +191,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       if (error) throw error;
       if (!data?.qr_code) throw new Error("QR Code não gerado");
       setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+      if (data?.status) setPaymentStatus(data.status);
       startPolling();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao gerar PIX");
