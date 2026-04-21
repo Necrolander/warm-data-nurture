@@ -1,5 +1,6 @@
 // Mercado Pago - Create Payment (PIX or Card token)
 // Public endpoint - validates input, calls MP API, updates order
+// Idempotent by order_id: if a pending/in_process payment already exists, returns it.
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -26,6 +27,8 @@ interface CardBody {
   payer: { email: string; identification?: { type: string; number: string } };
 }
 
+const REUSABLE_STATUSES = new Set(["pending", "in_process", "authorized"]);
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -36,7 +39,73 @@ Deno.serve(async (req) => {
     }
     if (body.amount <= 0) return json({ error: "Valor inválido" }, 400);
 
-    const idempotencyKey = crypto.randomUUID();
+    // ---- Idempotency check ----
+    const orderRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}&select=id,mercadopago_payment_id,payment_status,status`,
+      { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
+    );
+    const orders = await orderRes.json();
+    const order = orders?.[0];
+    if (!order) return json({ error: "Pedido não encontrado" }, 404);
+    if (order.status === "cancelled") {
+      return json({ error: "Pedido cancelado. Crie um novo pedido." }, 409);
+    }
+
+    if (order.mercadopago_payment_id) {
+      // Fetch live status from MP to decide whether to reuse
+      const mpGet = await fetch(
+        `https://api.mercadopago.com/v1/payments/${order.mercadopago_payment_id}`,
+        { headers: { Authorization: `Bearer ${MP_TOKEN}` } },
+      );
+      if (mpGet.ok) {
+        const existing = await mpGet.json();
+        if (existing.status === "approved") {
+          return json(
+            {
+              error: "Pagamento já aprovado para este pedido.",
+              payment_id: existing.id,
+              status: existing.status,
+            },
+            409,
+          );
+        }
+        if (REUSABLE_STATUSES.has(existing.status)) {
+          // Same method? Reuse. Different method? Cancel old, create new below.
+          const existingMethod =
+            existing.payment_method_id === "pix" ? "pix" : "card";
+          if (existingMethod === body.method) {
+            const result: any = {
+              payment_id: existing.id,
+              status: existing.status,
+              status_detail: existing.status_detail,
+              reused: true,
+            };
+            if (body.method === "pix") {
+              const tx = existing.point_of_interaction?.transaction_data;
+              result.qr_code = tx?.qr_code;
+              result.qr_code_base64 = tx?.qr_code_base64;
+              result.ticket_url = tx?.ticket_url;
+            }
+            return json(result, 200);
+          } else {
+            // Cancel previous payment (different method requested)
+            await fetch(
+              `https://api.mercadopago.com/v1/payments/${order.mercadopago_payment_id}`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${MP_TOKEN}`,
+                },
+                body: JSON.stringify({ status: "cancelled" }),
+              },
+            );
+          }
+        }
+      }
+    }
+
+    const idempotencyKey = `${body.order_id}:${body.method}`;
     const baseEmail = body.payer?.email?.trim() || `cliente-${body.order_id.slice(0, 8)}@truebox.app`;
 
     let mpPayload: any;
