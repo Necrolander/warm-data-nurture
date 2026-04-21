@@ -4,8 +4,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, Check, Loader2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Copy, Check, Loader2, Clock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Mercado Pago error code → friendly PT-BR message
+const MP_ERROR_MAP: Record<string, string> = {
+  // Tokenization (cardForm)
+  "205": "Digite o número do cartão.",
+  "208": "Selecione o mês de vencimento.",
+  "209": "Selecione o ano de vencimento.",
+  "212": "Digite o tipo de documento.",
+  "213": "Digite o número do documento.",
+  "214": "Digite o número do documento.",
+  "220": "Selecione o banco emissor.",
+  "221": "Digite o nome impresso no cartão.",
+  "224": "Digite o código de segurança (CVV).",
+  E301: "Número de cartão inválido. Verifique e tente novamente.",
+  E302: "Código de segurança (CVV) inválido.",
+  316: "Nome no cartão inválido.",
+  324: "CPF/CNPJ inválido.",
+  325: "Mês de vencimento inválido.",
+  326: "Ano de vencimento inválido.",
+  // Payment status_detail (after charge)
+  cc_rejected_bad_filled_card_number: "Número do cartão incorreto. Revise e tente novamente.",
+  cc_rejected_bad_filled_date: "Data de validade incorreta.",
+  cc_rejected_bad_filled_security_code: "CVV incorreto.",
+  cc_rejected_bad_filled_other: "Verifique os dados do cartão e tente novamente.",
+  cc_rejected_call_for_authorize: "Você precisa autorizar o pagamento com seu banco antes de tentar novamente.",
+  cc_rejected_card_disabled: "Cartão desabilitado. Ligue para o seu banco para ativá-lo.",
+  cc_rejected_card_error: "Não foi possível processar o pagamento. Tente outro cartão.",
+  cc_rejected_duplicated_payment: "Você já fez um pagamento com esse valor. Se precisar pagar novamente, use outro cartão.",
+  cc_rejected_high_risk: "Pagamento recusado por análise de risco. Tente outro meio de pagamento.",
+  cc_rejected_insufficient_amount: "Saldo insuficiente no cartão.",
+  cc_rejected_invalid_installments: "Número de parcelas inválido para este cartão.",
+  cc_rejected_max_attempts: "Você atingiu o limite de tentativas. Tente outro cartão ou meio de pagamento.",
+  cc_rejected_other_reason: "O cartão não autorizou o pagamento. Tente outro cartão.",
+  cc_rejected_blacklist: "Cartão não autorizado. Use outro meio de pagamento.",
+};
+
+const friendlyMpError = (code?: string, fallback?: string) => {
+  if (!code) return fallback || "Não foi possível processar o pagamento. Tente novamente.";
+  return MP_ERROR_MAP[code] || MP_ERROR_MAP[String(code).toUpperCase()] || fallback || `Erro do gateway (${code}).`;
+};
 
 
 
@@ -33,6 +74,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
@@ -117,6 +159,16 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       },
       callbacks: {
         onFormMounted: (e: any) => { if (e) console.warn("MP mount", e); },
+        onValidityChange: (errors: any[], field: string) => {
+          // Clear inline error when user starts fixing fields
+          if (cardError && (!errors || errors.length === 0)) setCardError(null);
+        },
+        onError: (errors: any[]) => {
+          if (!errors?.length) return;
+          const first = errors[0];
+          const msg = friendlyMpError(first?.code, first?.message);
+          setCardError(msg);
+        },
         onSubmit: async (event: any) => {
           event.preventDefault();
           await handleCardSubmit();
@@ -127,12 +179,33 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   };
 
   const handleCardSubmit = async () => {
-    if (!cardFormRef.current) return;
-    const data = cardFormRef.current.getCardFormData();
-    if (!data.token) {
-      toast.error("Verifique os dados do cartão");
+    setCardError(null);
+    if (!cardFormRef.current) {
+      setCardError("Formulário ainda carregando. Aguarde um instante e tente novamente.");
       return;
     }
+    const data = cardFormRef.current.getCardFormData();
+
+    // Pre-validate fields before tokenizing — give specific feedback
+    const missing: string[] = [];
+    if (!data.cardholderName?.trim()) missing.push("Nome no cartão");
+    if (!data.cardholderEmail?.trim()) missing.push("E-mail");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.cardholderEmail)) {
+      setCardError("E-mail inválido. Verifique o formato (ex: nome@dominio.com).");
+      return;
+    }
+    if (!data.identificationNumber?.trim()) missing.push("CPF");
+    if (!data.installments) missing.push("Parcelas");
+    if (missing.length) {
+      setCardError(`Preencha os campos obrigatórios: ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!data.token) {
+      setCardError("Não foi possível validar os dados do cartão. Confira número, validade e CVV.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: res, error } = await supabase.functions.invoke("mercadopago-create-payment", {
@@ -153,20 +226,38 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
           },
         },
       });
-      if (error) throw error;
+
+      // Edge function may return 400 with details in body
+      const fnError = (res as any)?.error;
+      const fnDetails = (res as any)?.details;
+      if (error || fnError) {
+        const code = fnDetails?.cause?.[0]?.code || fnDetails?.error;
+        const msg = friendlyMpError(code, fnError || error?.message);
+        setCardError(msg);
+        toast.error(msg);
+        return;
+      }
+
       if (res?.status) setPaymentStatus(res.status);
       if (res?.status === "approved") {
         finalizedRef.current = true;
         toast.success("Pagamento aprovado! 🎉");
         onApproved();
       } else if (res?.status === "in_process" || res?.status === "pending") {
-        toast.info("Pagamento em análise");
+        toast.info("Pagamento em análise — você será notificado quando confirmar.");
         onPending();
       } else {
-        toast.error(`Pagamento recusado: ${res?.status_detail || res?.status}`);
+        // rejected
+        const msg = friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão.");
+        setCardError(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Erro ao processar cartão");
+      const msg = err?.message?.includes("Failed to fetch")
+        ? "Sem conexão com o servidor. Verifique sua internet e tente novamente."
+        : err?.message || "Erro inesperado ao processar o cartão.";
+      setCardError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -332,6 +423,12 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
     <form id="form-mp-card" className="space-y-3">
       {paymentStatus && (
         <div className="flex justify-center">{statusBadge()}</div>
+      )}
+      {cardError && (
+        <Alert variant="destructive" className="border-destructive/40">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-sm">{cardError}</AlertDescription>
+        </Alert>
       )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
