@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
+const MercadoPagoPayment = lazy(() => import("@/components/MercadoPagoPayment"));
 
-const PAYMENT_METHODS = ["Pix", "Dinheiro", "Cartão na entrega"];
+const PAYMENT_METHODS = ["Pix (online)", "Cartão (online)", "Dinheiro", "Cartão na entrega"];
 
 const Checkout = () => {
   const navigate = useNavigate();
