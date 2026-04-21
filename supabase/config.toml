@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.mercadopago-public-key]
 verify_jwt = false
+
+[functions.mercadopago-cancel-payment]
+verify_jwt = false

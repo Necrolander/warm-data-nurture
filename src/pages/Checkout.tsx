@@ -375,6 +375,11 @@ const Checkout = () => {
                   toast.info("Pagamento em análise. Acompanharemos por aqui.");
                   navigate("/order-success");
                 }}
+                onCancelled={() => {
+                  setPaymentDialog(null);
+                  toast.info("Pedido cancelado.");
+                  navigate("/");
+                }}
               />
             </Suspense>
           )}

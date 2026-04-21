@@ -16,6 +16,7 @@ interface Props {
   method: "pix" | "card";
   onApproved: () => void;
   onPending: () => void;
+  onCancelled?: () => void;
 }
 
 declare global {
@@ -24,8 +25,9 @@ declare global {
   }
 }
 
-const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending }: Props) => {
+const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending, onCancelled }: Props) => {
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [pix, setPix] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -193,6 +195,26 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const handleCancel = async () => {
+    if (cancelling) return;
+    if (!confirm("Cancelar este pedido? O pagamento será anulado.")) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("mercadopago-cancel-payment", {
+        body: { order_id: orderId },
+      });
+      if (error || (data as any)?.error) {
+        throw new Error((data as any)?.error || error?.message || "Erro ao cancelar");
+      }
+      toast.success("Pedido cancelado");
+      onCancelled?.();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao cancelar");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (method === "pix") {
     return (
       <div className="space-y-4">
@@ -219,6 +241,15 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
             </p>
           </div>
         )}
+        <Button
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+          Cancelar pedido
+        </Button>
       </div>
     );
   }
@@ -266,9 +297,19 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         <Label className="text-xs">Parcelas</Label>
         <select id="form-mp-installments" className="h-10 w-full bg-background border border-border rounded-xl px-2" />
       </div>
-      <Button type="submit" disabled={loading} size="lg" className="w-full">
+      <Button type="submit" disabled={loading || cancelling} size="lg" className="w-full">
         {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
         Pagar R$ {amount.toFixed(2).replace(".", ",")}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleCancel}
+        disabled={cancelling || loading}
+        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+      >
+        {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+        Cancelar pedido
       </Button>
     </form>
   );

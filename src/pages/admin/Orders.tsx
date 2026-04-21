@@ -624,18 +624,33 @@ const Orders = () => {
 
   const handleCancelOrder = async () => {
     if (!cancelOrder) return;
-    const { error } = await supabase
-      .from("orders")
-      .update({ status: "cancelled" as any })
-      .eq("id", cancelOrder.id);
+    const order = cancelOrder as any;
+    const hasMPPayment = !!order.mercadopago_payment_id;
+    const mpApproved = order.payment_status === "approved";
 
-    if (error) {
-      toast.error("Erro ao cancelar pedido");
-    } else {
+    try {
+      if (hasMPPayment && !mpApproved) {
+        // Cancel via Mercado Pago (refunds nothing because it isn't approved yet)
+        const { data, error } = await supabase.functions.invoke("mercadopago-cancel-payment", {
+          body: { order_id: cancelOrder.id },
+        });
+        if (error || (data as any)?.error) {
+          throw new Error((data as any)?.error || error?.message || "Falha ao cancelar no Mercado Pago");
+        }
+      } else {
+        const { error } = await supabase
+          .from("orders")
+          .update({ status: "cancelled" as any })
+          .eq("id", cancelOrder.id);
+        if (error) throw error;
+      }
+
       toast.success(`Pedido #${cancelOrder.order_number} cancelado`);
       notifyCustomerStatus(cancelOrder.id, "cancelled");
       setCancelOrder(null);
       fetchOrders();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao cancelar pedido");
     }
   };
 
