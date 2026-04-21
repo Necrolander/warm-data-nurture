@@ -49,6 +49,7 @@ const Checkout = () => {
   const [change, setChange] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentDialog, setPaymentDialog] = useState<{ orderId: string; method: "pix" | "card" } | null>(null);
 
   const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
 
@@ -155,12 +156,15 @@ const Checkout = () => {
 
     try {
       const paymentMap: Record<string, string> = {
+        "Pix (online)": "pix",
         "Pix": "pix",
         "Dinheiro": "cash",
+        "Cartão (online)": "credit_card",
         "Cartão na entrega": "credit_card",
       };
 
       const orderId = crypto.randomUUID();
+      const isOnlinePayment = payment === "Pix (online)" || payment === "Cartão (online)";
 
       const { error: orderError } = await supabase
         .from("orders")
@@ -180,6 +184,7 @@ const Checkout = () => {
           delivery_lng: location.lng,
           status: "pending" as const,
           order_source: "site",
+          payment_status: isOnlinePayment ? "pending" : null,
         } as any);
 
       if (orderError) throw orderError;
@@ -195,6 +200,12 @@ const Checkout = () => {
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
       if (itemsError) throw itemsError;
+
+      if (isOnlinePayment) {
+        setPaymentDialog({ orderId, method: payment === "Pix (online)" ? "pix" : "card" });
+        setSubmitting(false);
+        return;
+      }
 
       clearCart();
       toast.success("Pedido confirmado com sucesso! 🎉");
@@ -269,7 +280,7 @@ const Checkout = () => {
 
         <div className="space-y-3 bg-card rounded-xl border border-border p-4">
           <h3 className="font-black text-foreground">Forma de pagamento</h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {PAYMENT_METHODS.map((m) => (
               <button key={m} onClick={() => setPayment(m)}
                 className={`py-3 rounded-xl text-sm font-bold border transition-colors ${
