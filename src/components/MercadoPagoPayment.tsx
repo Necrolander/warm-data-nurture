@@ -1,0 +1,277 @@
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Copy, Check, Loader2 } from "lucide-react";
+
+const MP_PUBLIC_KEY = "MERCADO_PAGO_PUBLIC_KEY_PLACEHOLDER";
+
+interface Props {
+  orderId: string;
+  amount: number;
+  payerName: string;
+  payerPhone: string;
+  method: "pix" | "card";
+  onApproved: () => void;
+  onPending: () => void;
+}
+
+declare global {
+  interface Window {
+    MercadoPago: any;
+  }
+}
+
+const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending }: Props) => {
+  const [loading, setLoading] = useState(false);
+  const [pix, setPix] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [polling, setPolling] = useState(false);
+  const mpRef = useRef<any>(null);
+  const cardFormRef = useRef<any>(null);
+  const [mpPublicKey, setMpPublicKey] = useState<string>("");
+
+  // Fetch public key from edge function (so we don't hardcode it)
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercadopago-public-key`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const d = await r.json();
+          setMpPublicKey(d.public_key);
+        }
+      } catch (_) {}
+    })();
+  }, []);
+
+  // Load MP SDK for card form
+  useEffect(() => {
+    if (method !== "card" || !mpPublicKey) return;
+    if (document.getElementById("mp-sdk")) {
+      initCardForm();
+      return;
+    }
+    const s = document.createElement("script");
+    s.id = "mp-sdk";
+    s.src = "https://sdk.mercadopago.com/js/v2";
+    s.onload = initCardForm;
+    document.body.appendChild(s);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, mpPublicKey, amount, orderId]);
+
+  const initCardForm = () => {
+    if (!window.MercadoPago || !mpPublicKey) return;
+    mpRef.current = new window.MercadoPago(mpPublicKey, { locale: "pt-BR" });
+    const cardForm = mpRef.current.cardForm({
+      amount: String(amount.toFixed(2)),
+      autoMount: true,
+      form: {
+        id: "form-mp-card",
+        cardNumber: { id: "form-mp-cardNumber", placeholder: "Número do cartão" },
+        expirationDate: { id: "form-mp-expirationDate", placeholder: "MM/AA" },
+        securityCode: { id: "form-mp-securityCode", placeholder: "CVV" },
+        cardholderName: { id: "form-mp-cardholderName", placeholder: "Nome no cartão" },
+        identificationType: { id: "form-mp-identificationType" },
+        identificationNumber: { id: "form-mp-identificationNumber", placeholder: "CPF" },
+        cardholderEmail: { id: "form-mp-cardholderEmail", placeholder: "E-mail" },
+        installments: { id: "form-mp-installments", placeholder: "Parcelas" },
+        issuer: { id: "form-mp-issuer", placeholder: "Banco" },
+      },
+      callbacks: {
+        onFormMounted: (e: any) => { if (e) console.warn("MP mount", e); },
+        onSubmit: async (event: any) => {
+          event.preventDefault();
+          await handleCardSubmit();
+        },
+      },
+    });
+    cardFormRef.current = cardForm;
+  };
+
+  const handleCardSubmit = async () => {
+    if (!cardFormRef.current) return;
+    const data = cardFormRef.current.getCardFormData();
+    if (!data.token) {
+      toast.error("Verifique os dados do cartão");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data: res, error } = await supabase.functions.invoke("mercadopago-create-payment", {
+        body: {
+          method: "card",
+          order_id: orderId,
+          amount,
+          token: data.token,
+          installments: Number(data.installments) || 1,
+          payment_method_id: data.paymentMethodId,
+          issuer_id: data.issuerId,
+          payer: {
+            email: data.cardholderEmail,
+            identification: {
+              type: data.identificationType,
+              number: data.identificationNumber,
+            },
+          },
+        },
+      });
+      if (error) throw error;
+      if (res?.status === "approved") {
+        toast.success("Pagamento aprovado! 🎉");
+        onApproved();
+      } else if (res?.status === "in_process" || res?.status === "pending") {
+        toast.info("Pagamento em análise");
+        onPending();
+      } else {
+        toast.error(`Pagamento recusado: ${res?.status_detail || res?.status}`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao processar cartão");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generatePix = async () => {
+    setLoading(true);
+    try {
+      const [first, ...rest] = (payerName || "Cliente").split(" ");
+      const { data, error } = await supabase.functions.invoke("mercadopago-create-payment", {
+        body: {
+          method: "pix",
+          order_id: orderId,
+          amount,
+          payer: {
+            first_name: first,
+            last_name: rest.join(" ") || "Truebox",
+            phone: payerPhone,
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data?.qr_code) throw new Error("QR Code não gerado");
+      setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+      startPolling();
+    } catch (err: any) {
+      toast.error(err?.message || "Erro ao gerar PIX");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startPolling = () => {
+    setPolling(true);
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("payment_status")
+        .eq("id", orderId)
+        .maybeSingle();
+      if (data?.payment_status === "approved") {
+        clearInterval(interval);
+        setPolling(false);
+        toast.success("Pagamento PIX confirmado! 🎉");
+        onApproved();
+      } else if (data?.payment_status === "rejected" || data?.payment_status === "cancelled") {
+        clearInterval(interval);
+        setPolling(false);
+        toast.error("Pagamento não aprovado");
+      }
+    }, 4000);
+    // stop after 15 min
+    setTimeout(() => { clearInterval(interval); setPolling(false); }, 15 * 60 * 1000);
+  };
+
+  const copyPix = () => {
+    if (!pix?.qr_code) return;
+    navigator.clipboard.writeText(pix.qr_code);
+    setCopied(true);
+    toast.success("Código PIX copiado!");
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  if (method === "pix") {
+    return (
+      <div className="space-y-4">
+        {!pix ? (
+          <Button onClick={generatePix} disabled={loading} className="w-full" size="lg">
+            {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Gerar QR Code PIX
+          </Button>
+        ) : (
+          <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+            <div className="flex justify-center">
+              <img
+                src={`data:image/png;base64,${pix.qr_code_base64}`}
+                alt="QR Code PIX"
+                className="w-56 h-56 bg-white p-2 rounded-lg"
+              />
+            </div>
+            <Button onClick={copyPix} variant="outline" className="w-full">
+              {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+              {copied ? "Copiado!" : "Copiar código PIX"}
+            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              {polling ? "⏳ Aguardando confirmação do pagamento..." : "Após pagar, aguarde a confirmação"}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // CARD
+  return (
+    <form id="form-mp-card" className="space-y-3">
+      <div>
+        <Label className="text-xs">Número do cartão</Label>
+        <div id="form-mp-cardNumber" className="h-12 bg-background border border-border rounded-xl px-3" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label className="text-xs">Validade</Label>
+          <div id="form-mp-expirationDate" className="h-12 bg-background border border-border rounded-xl px-3" />
+        </div>
+        <div>
+          <Label className="text-xs">CVV</Label>
+          <div id="form-mp-securityCode" className="h-12 bg-background border border-border rounded-xl px-3" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs">Nome no cartão</Label>
+        <Input id="form-mp-cardholderName" placeholder="Como está no cartão" />
+      </div>
+      <div>
+        <Label className="text-xs">E-mail</Label>
+        <Input id="form-mp-cardholderEmail" type="email" placeholder="seu@email.com" />
+      </div>
+      <div className="grid grid-cols-[120px_1fr] gap-3">
+        <div>
+          <Label className="text-xs">Documento</Label>
+          <select id="form-mp-identificationType" className="h-10 w-full bg-background border border-border rounded-xl px-2" />
+        </div>
+        <div>
+          <Label className="text-xs">Número</Label>
+          <Input id="form-mp-identificationNumber" placeholder="000.000.000-00" />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs">Banco emissor</Label>
+        <select id="form-mp-issuer" className="h-10 w-full bg-background border border-border rounded-xl px-2" />
+      </div>
+      <div>
+        <Label className="text-xs">Parcelas</Label>
+        <select id="form-mp-installments" className="h-10 w-full bg-background border border-border rounded-xl px-2" />
+      </div>
+      <Button type="submit" disabled={loading} size="lg" className="w-full">
+        {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+        Pagar R$ {amount.toFixed(2).replace(".", ",")}
+      </Button>
+    </form>
+  );
+};
+
+export default MercadoPagoPayment;
