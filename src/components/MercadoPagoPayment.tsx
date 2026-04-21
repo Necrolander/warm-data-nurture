@@ -32,9 +32,41 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [pix, setPix] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
+  const finalizedRef = useRef(false);
+
+  // Realtime: subscribe to order payment_status changes
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`order-payment-${orderId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
+        (payload: any) => {
+          const next = payload.new?.payment_status;
+          const status = payload.new?.status;
+          if (next) setPaymentStatus(next);
+          if (finalizedRef.current) return;
+          if (next === "approved") {
+            finalizedRef.current = true;
+            toast.success("Pagamento confirmado! 🎉");
+            onApproved();
+          } else if (next === "rejected" || status === "cancelled" || next === "cancelled") {
+            finalizedRef.current = true;
+            toast.error("Pagamento não aprovado");
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   // Fetch public key from edge function (so we don't hardcode it)
   useEffect(() => {
