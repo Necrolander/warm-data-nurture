@@ -330,6 +330,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   // CARD
   return (
     <form id="form-mp-card" className="space-y-3">
+      {paymentStatus && (
+        <div className="flex justify-center">{statusBadge()}</div>
+      )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
         <div id="form-mp-cardNumber" className="h-12 bg-background border border-border rounded-xl px-3" />
