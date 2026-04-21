@@ -16,6 +16,7 @@ interface Props {
   method: "pix" | "card";
   onApproved: () => void;
   onPending: () => void;
+  onCancelled?: () => void;
 }
 
 declare global {
@@ -24,8 +25,9 @@ declare global {
   }
 }
 
-const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending }: Props) => {
+const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending, onCancelled }: Props) => {
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [pix, setPix] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
