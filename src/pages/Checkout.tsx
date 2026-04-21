@@ -346,6 +346,40 @@ const Checkout = () => {
           {submitting ? "Enviando..." : "Confirmar pedido ✅"}
         </motion.button>
       </div>
+
+      {/* Mercado Pago payment dialog */}
+      <Dialog open={!!paymentDialog} onOpenChange={(open) => { if (!open) setPaymentDialog(null); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {paymentDialog?.method === "pix" ? "Pagamento via PIX 💸" : "Pagamento com cartão 💳"}
+            </DialogTitle>
+          </DialogHeader>
+          {paymentDialog && (
+            <Suspense fallback={<div className="py-10 text-center text-muted-foreground">Carregando…</div>}>
+              <MercadoPagoPayment
+                orderId={paymentDialog.orderId}
+                amount={total}
+                payerName={name}
+                payerPhone={phone}
+                method={paymentDialog.method}
+                onApproved={() => {
+                  setPaymentDialog(null);
+                  clearCart();
+                  toast.success("Pedido confirmado! 🎉");
+                  navigate("/order-success");
+                }}
+                onPending={() => {
+                  setPaymentDialog(null);
+                  clearCart();
+                  toast.info("Pagamento em análise. Acompanharemos por aqui.");
+                  navigate("/order-success");
+                }}
+              />
+            </Suspense>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
