@@ -201,26 +201,56 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   };
 
   const startPolling = () => {
+    // Realtime is primary; polling stays as fallback (every 8s)
     setPolling(true);
     const interval = setInterval(async () => {
+      if (finalizedRef.current) { clearInterval(interval); setPolling(false); return; }
       const { data } = await supabase
         .from("orders")
-        .select("payment_status")
+        .select("payment_status,status")
         .eq("id", orderId)
         .maybeSingle();
+      if (data?.payment_status) setPaymentStatus(data.payment_status);
       if (data?.payment_status === "approved") {
+        finalizedRef.current = true;
         clearInterval(interval);
         setPolling(false);
         toast.success("Pagamento PIX confirmado! 🎉");
         onApproved();
-      } else if (data?.payment_status === "rejected" || data?.payment_status === "cancelled") {
+      } else if (data?.payment_status === "rejected" || data?.payment_status === "cancelled" || data?.status === "cancelled") {
+        finalizedRef.current = true;
         clearInterval(interval);
         setPolling(false);
         toast.error("Pagamento não aprovado");
       }
-    }, 4000);
+    }, 8000);
     // stop after 15 min
     setTimeout(() => { clearInterval(interval); setPolling(false); }, 15 * 60 * 1000);
+  };
+
+  const statusBadge = () => {
+    const s = paymentStatus;
+    if (!s) return null;
+    if (s === "approved") {
+      return (
+        <Badge className="bg-green-500/15 text-green-600 border-green-500/30 hover:bg-green-500/15">
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Pagamento aprovado
+        </Badge>
+      );
+    }
+    if (s === "rejected" || s === "cancelled") {
+      return (
+        <Badge variant="destructive">
+          <XCircle className="w-3.5 h-3.5 mr-1" /> {s === "cancelled" ? "Cancelado" : "Recusado"}
+        </Badge>
+      );
+    }
+    // pending / in_process / authorized
+    return (
+      <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 hover:bg-amber-500/15">
+        <Clock className="w-3.5 h-3.5 mr-1 animate-pulse" /> Aguardando pagamento
+      </Badge>
+    );
   };
 
   const copyPix = () => {
