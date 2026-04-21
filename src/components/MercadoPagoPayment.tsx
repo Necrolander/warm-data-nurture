@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check, Loader2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 
 
