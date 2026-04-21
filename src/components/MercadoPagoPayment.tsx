@@ -179,12 +179,33 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   };
 
   const handleCardSubmit = async () => {
-    if (!cardFormRef.current) return;
-    const data = cardFormRef.current.getCardFormData();
-    if (!data.token) {
-      toast.error("Verifique os dados do cartão");
+    setCardError(null);
+    if (!cardFormRef.current) {
+      setCardError("Formulário ainda carregando. Aguarde um instante e tente novamente.");
       return;
     }
+    const data = cardFormRef.current.getCardFormData();
+
+    // Pre-validate fields before tokenizing — give specific feedback
+    const missing: string[] = [];
+    if (!data.cardholderName?.trim()) missing.push("Nome no cartão");
+    if (!data.cardholderEmail?.trim()) missing.push("E-mail");
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.cardholderEmail)) {
+      setCardError("E-mail inválido. Verifique o formato (ex: nome@dominio.com).");
+      return;
+    }
+    if (!data.identificationNumber?.trim()) missing.push("CPF");
+    if (!data.installments) missing.push("Parcelas");
+    if (missing.length) {
+      setCardError(`Preencha os campos obrigatórios: ${missing.join(", ")}.`);
+      return;
+    }
+
+    if (!data.token) {
+      setCardError("Não foi possível validar os dados do cartão. Confira número, validade e CVV.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: res, error } = await supabase.functions.invoke("mercadopago-create-payment", {
@@ -205,20 +226,38 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
           },
         },
       });
-      if (error) throw error;
+
+      // Edge function may return 400 with details in body
+      const fnError = (res as any)?.error;
+      const fnDetails = (res as any)?.details;
+      if (error || fnError) {
+        const code = fnDetails?.cause?.[0]?.code || fnDetails?.error;
+        const msg = friendlyMpError(code, fnError || error?.message);
+        setCardError(msg);
+        toast.error(msg);
+        return;
+      }
+
       if (res?.status) setPaymentStatus(res.status);
       if (res?.status === "approved") {
         finalizedRef.current = true;
         toast.success("Pagamento aprovado! 🎉");
         onApproved();
       } else if (res?.status === "in_process" || res?.status === "pending") {
-        toast.info("Pagamento em análise");
+        toast.info("Pagamento em análise — você será notificado quando confirmar.");
         onPending();
       } else {
-        toast.error(`Pagamento recusado: ${res?.status_detail || res?.status}`);
+        // rejected
+        const msg = friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão.");
+        setCardError(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Erro ao processar cartão");
+      const msg = err?.message?.includes("Failed to fetch")
+        ? "Sem conexão com o servidor. Verifique sua internet e tente novamente."
+        : err?.message || "Erro inesperado ao processar o cartão.";
+      setCardError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
