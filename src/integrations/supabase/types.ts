@@ -1056,11 +1056,13 @@ export type Database = {
           estimated_delivery_minutes: number | null
           estimated_prep_minutes: number | null
           id: string
+          mercadopago_payment_id: string | null
           observation: string | null
           order_number: number
           order_source: string | null
           order_type: Database["public"]["Enums"]["order_type"]
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          payment_status: string | null
           predicted_eta: string | null
           ready_at: string | null
           reference: string | null
@@ -1090,11 +1092,13 @@ export type Database = {
           estimated_delivery_minutes?: number | null
           estimated_prep_minutes?: number | null
           id?: string
+          mercadopago_payment_id?: string | null
           observation?: string | null
           order_number?: number
           order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_status?: string | null
           predicted_eta?: string | null
           ready_at?: string | null
           reference?: string | null
@@ -1124,11 +1128,13 @@ export type Database = {
           estimated_delivery_minutes?: number | null
           estimated_prep_minutes?: number | null
           id?: string
+          mercadopago_payment_id?: string | null
           observation?: string | null
           order_number?: number
           order_source?: string | null
           order_type?: Database["public"]["Enums"]["order_type"]
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          payment_status?: string | null
           predicted_eta?: string | null
           ready_at?: string | null
           reference?: string | null
