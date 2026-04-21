@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Copy, Check, Loader2, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 
 
@@ -31,9 +32,41 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [pix, setPix] = useState<{ qr_code: string; qr_code_base64: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
+  const finalizedRef = useRef(false);
+
+  // Realtime: subscribe to order payment_status changes
+  useEffect(() => {
+    if (!orderId) return;
+    const channel = supabase
+      .channel(`order-payment-${orderId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
+        (payload: any) => {
+          const next = payload.new?.payment_status;
+          const status = payload.new?.status;
+          if (next) setPaymentStatus(next);
+          if (finalizedRef.current) return;
+          if (next === "approved") {
+            finalizedRef.current = true;
+            toast.success("Pagamento confirmado! 🎉");
+            onApproved();
+          } else if (next === "rejected" || status === "cancelled" || next === "cancelled") {
+            finalizedRef.current = true;
+            toast.error("Pagamento não aprovado");
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderId]);
 
   // Fetch public key from edge function (so we don't hardcode it)
   useEffect(() => {
@@ -121,7 +154,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         },
       });
       if (error) throw error;
+      if (res?.status) setPaymentStatus(res.status);
       if (res?.status === "approved") {
+        finalizedRef.current = true;
         toast.success("Pagamento aprovado! 🎉");
         onApproved();
       } else if (res?.status === "in_process" || res?.status === "pending") {
@@ -156,6 +191,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       if (error) throw error;
       if (!data?.qr_code) throw new Error("QR Code não gerado");
       setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
+      if (data?.status) setPaymentStatus(data.status);
       startPolling();
     } catch (err: any) {
       toast.error(err?.message || "Erro ao gerar PIX");
@@ -165,26 +201,56 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   };
 
   const startPolling = () => {
+    // Realtime is primary; polling stays as fallback (every 8s)
     setPolling(true);
     const interval = setInterval(async () => {
+      if (finalizedRef.current) { clearInterval(interval); setPolling(false); return; }
       const { data } = await supabase
         .from("orders")
-        .select("payment_status")
+        .select("payment_status,status")
         .eq("id", orderId)
         .maybeSingle();
+      if (data?.payment_status) setPaymentStatus(data.payment_status);
       if (data?.payment_status === "approved") {
+        finalizedRef.current = true;
         clearInterval(interval);
         setPolling(false);
         toast.success("Pagamento PIX confirmado! 🎉");
         onApproved();
-      } else if (data?.payment_status === "rejected" || data?.payment_status === "cancelled") {
+      } else if (data?.payment_status === "rejected" || data?.payment_status === "cancelled" || data?.status === "cancelled") {
+        finalizedRef.current = true;
         clearInterval(interval);
         setPolling(false);
         toast.error("Pagamento não aprovado");
       }
-    }, 4000);
+    }, 8000);
     // stop after 15 min
     setTimeout(() => { clearInterval(interval); setPolling(false); }, 15 * 60 * 1000);
+  };
+
+  const statusBadge = () => {
+    const s = paymentStatus;
+    if (!s) return null;
+    if (s === "approved") {
+      return (
+        <Badge className="bg-green-500/15 text-green-600 border-green-500/30 hover:bg-green-500/15">
+          <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Pagamento aprovado
+        </Badge>
+      );
+    }
+    if (s === "rejected" || s === "cancelled") {
+      return (
+        <Badge variant="destructive">
+          <XCircle className="w-3.5 h-3.5 mr-1" /> {s === "cancelled" ? "Cancelado" : "Recusado"}
+        </Badge>
+      );
+    }
+    // pending / in_process / authorized
+    return (
+      <Badge className="bg-amber-500/15 text-amber-600 border-amber-500/30 hover:bg-amber-500/15">
+        <Clock className="w-3.5 h-3.5 mr-1 animate-pulse" /> Aguardando pagamento
+      </Badge>
+    );
   };
 
   const copyPix = () => {
@@ -218,6 +284,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   if (method === "pix") {
     return (
       <div className="space-y-4">
+        {paymentStatus && (
+          <div className="flex justify-center">{statusBadge()}</div>
+        )}
         {!pix ? (
           <Button onClick={generatePix} disabled={loading} className="w-full" size="lg">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -237,14 +306,18 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
               {copied ? "Copiado!" : "Copiar código PIX"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">
-              {polling ? "⏳ Aguardando confirmação do pagamento..." : "Após pagar, aguarde a confirmação"}
+              {paymentStatus === "approved"
+                ? "✅ Pagamento confirmado!"
+                : polling
+                  ? "⏳ Aguardando confirmação em tempo real..."
+                  : "Após pagar, aguarde a confirmação"}
             </p>
           </div>
         )}
         <Button
           variant="ghost"
           onClick={handleCancel}
-          disabled={cancelling}
+          disabled={cancelling || paymentStatus === "approved"}
           className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
         >
           {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -257,6 +330,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   // CARD
   return (
     <form id="form-mp-card" className="space-y-3">
+      {paymentStatus && (
+        <div className="flex justify-center">{statusBadge()}</div>
+      )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
         <div id="form-mp-cardNumber" className="h-12 bg-background border border-border rounded-xl px-3" />
