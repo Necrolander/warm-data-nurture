@@ -154,7 +154,9 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         },
       });
       if (error) throw error;
+      if (res?.status) setPaymentStatus(res.status);
       if (res?.status === "approved") {
+        finalizedRef.current = true;
         toast.success("Pagamento aprovado! 🎉");
         onApproved();
       } else if (res?.status === "in_process" || res?.status === "pending") {
