@@ -424,6 +424,12 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       {paymentStatus && (
         <div className="flex justify-center">{statusBadge()}</div>
       )}
+      {cardError && (
+        <Alert variant="destructive" className="border-destructive/40">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-sm">{cardError}</AlertDescription>
+        </Alert>
+      )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
         <div id="form-mp-cardNumber" className="h-12 bg-background border border-border rounded-xl px-3" />
