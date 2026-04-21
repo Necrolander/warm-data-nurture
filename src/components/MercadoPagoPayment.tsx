@@ -241,6 +241,15 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
             </p>
           </div>
         )}
+        <Button
+          variant="ghost"
+          onClick={handleCancel}
+          disabled={cancelling}
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+          Cancelar pedido
+        </Button>
       </div>
     );
   }
@@ -288,9 +297,19 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         <Label className="text-xs">Parcelas</Label>
         <select id="form-mp-installments" className="h-10 w-full bg-background border border-border rounded-xl px-2" />
       </div>
-      <Button type="submit" disabled={loading} size="lg" className="w-full">
+      <Button type="submit" disabled={loading || cancelling} size="lg" className="w-full">
         {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
         Pagar R$ {amount.toFixed(2).replace(".", ",")}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={handleCancel}
+        disabled={cancelling || loading}
+        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+      >
+        {cancelling ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+        Cancelar pedido
       </Button>
     </form>
   );
