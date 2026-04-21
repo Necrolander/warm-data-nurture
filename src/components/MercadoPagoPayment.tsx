@@ -74,6 +74,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<string | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
