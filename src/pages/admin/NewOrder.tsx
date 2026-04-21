@@ -476,8 +476,8 @@ const NewOrder = () => {
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, 1)}>
                           <Plus className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeItem(item.uid)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
+                        <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => removeItem(item.uid)}>
+                          <X className="h-3 w-3 text-destructive-foreground" />
                         </Button>
                       </div>
                     </div>
