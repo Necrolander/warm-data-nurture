@@ -159,6 +159,16 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       },
       callbacks: {
         onFormMounted: (e: any) => { if (e) console.warn("MP mount", e); },
+        onValidityChange: (errors: any[], field: string) => {
+          // Clear inline error when user starts fixing fields
+          if (cardError && (!errors || errors.length === 0)) setCardError(null);
+        },
+        onError: (errors: any[]) => {
+          if (!errors?.length) return;
+          const first = errors[0];
+          const msg = friendlyMpError(first?.code, first?.message);
+          setCardError(msg);
+        },
         onSubmit: async (event: any) => {
           event.preventDefault();
           await handleCardSubmit();
