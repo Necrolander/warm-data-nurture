@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 const MapPicker = lazy(() => import("@/components/MapPicker"));
+const MercadoPagoPayment = lazy(() => import("@/components/MercadoPagoPayment"));
 
-const PAYMENT_METHODS = ["Pix", "Dinheiro", "Cartão na entrega"];
+const PAYMENT_METHODS = ["Pix (online)", "Cartão (online)", "Dinheiro", "Cartão na entrega"];
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ const Checkout = () => {
   const [change, setChange] = useState("");
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [paymentDialog, setPaymentDialog] = useState<{ orderId: string; method: "pix" | "card" } | null>(null);
 
   const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
 
@@ -154,12 +156,15 @@ const Checkout = () => {
 
     try {
       const paymentMap: Record<string, string> = {
+        "Pix (online)": "pix",
         "Pix": "pix",
         "Dinheiro": "cash",
+        "Cartão (online)": "credit_card",
         "Cartão na entrega": "credit_card",
       };
 
       const orderId = crypto.randomUUID();
+      const isOnlinePayment = payment === "Pix (online)" || payment === "Cartão (online)";
 
       const { error: orderError } = await supabase
         .from("orders")
@@ -179,6 +184,7 @@ const Checkout = () => {
           delivery_lng: location.lng,
           status: "pending" as const,
           order_source: "site",
+          payment_status: isOnlinePayment ? "pending" : null,
         } as any);
 
       if (orderError) throw orderError;
@@ -194,6 +200,12 @@ const Checkout = () => {
 
       const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
       if (itemsError) throw itemsError;
+
+      if (isOnlinePayment) {
+        setPaymentDialog({ orderId, method: payment === "Pix (online)" ? "pix" : "card" });
+        setSubmitting(false);
+        return;
+      }
 
       clearCart();
       toast.success("Pedido confirmado com sucesso! 🎉");
@@ -268,7 +280,7 @@ const Checkout = () => {
 
         <div className="space-y-3 bg-card rounded-xl border border-border p-4">
           <h3 className="font-black text-foreground">Forma de pagamento</h3>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {PAYMENT_METHODS.map((m) => (
               <button key={m} onClick={() => setPayment(m)}
                 className={`py-3 rounded-xl text-sm font-bold border transition-colors ${
@@ -334,6 +346,40 @@ const Checkout = () => {
           {submitting ? "Enviando..." : "Confirmar pedido ✅"}
         </motion.button>
       </div>
+
+      {/* Mercado Pago payment dialog */}
+      <Dialog open={!!paymentDialog} onOpenChange={(open) => { if (!open) setPaymentDialog(null); }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {paymentDialog?.method === "pix" ? "Pagamento via PIX 💸" : "Pagamento com cartão 💳"}
+            </DialogTitle>
+          </DialogHeader>
+          {paymentDialog && (
+            <Suspense fallback={<div className="py-10 text-center text-muted-foreground">Carregando…</div>}>
+              <MercadoPagoPayment
+                orderId={paymentDialog.orderId}
+                amount={total}
+                payerName={name}
+                payerPhone={phone}
+                method={paymentDialog.method}
+                onApproved={() => {
+                  setPaymentDialog(null);
+                  clearCart();
+                  toast.success("Pedido confirmado! 🎉");
+                  navigate("/order-success");
+                }}
+                onPending={() => {
+                  setPaymentDialog(null);
+                  clearCart();
+                  toast.info("Pagamento em análise. Acompanharemos por aqui.");
+                  navigate("/order-success");
+                }}
+              />
+            </Suspense>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
