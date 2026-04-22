@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertCircle, RefreshCw, Search, TrendingDown } from "lucide-react";
+import { AlertCircle, RefreshCw, Search, TrendingDown, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -100,6 +101,23 @@ const PaymentFailures = () => {
   const cardCount = filtered.filter((r) => r.method === "card").length;
   const pixCount = filtered.filter((r) => r.method === "pix").length;
 
+  // Alertas: motivos com 5+ ocorrências na última hora
+  const ALERT_THRESHOLD = 5;
+  const ALERT_WINDOW_MIN = 60;
+  const spikeAlerts = useMemo(() => {
+    const cutoff = Date.now() - ALERT_WINDOW_MIN * 60 * 1000;
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      if (new Date(r.created_at).getTime() < cutoff) continue;
+      const k = r.status_detail || r.error_code || "desconhecido";
+      map.set(k, (map.get(k) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .filter(([, c]) => c >= ALERT_THRESHOLD)
+      .map(([code, count]) => ({ code, count, label: labelFor(code) }))
+      .sort((a, b) => b.count - a.count);
+  }, [rows]);
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -117,6 +135,34 @@ const PaymentFailures = () => {
           Atualizar
         </Button>
       </div>
+
+      {/* Alerta de pico de recusas */}
+      {spikeAlerts.length > 0 && (
+        <Alert variant="destructive" className="border-destructive/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {spikeAlerts.length === 1
+              ? "Pico de recusas detectado na última hora"
+              : `${spikeAlerts.length} motivos com pico de recusas na última hora`}
+          </AlertTitle>
+          <AlertDescription>
+            <ul className="mt-2 space-y-1 text-sm">
+              {spikeAlerts.map((a) => (
+                <li key={a.code} className="flex items-center gap-2">
+                  <Badge variant="destructive" className="font-mono">
+                    {a.count}×
+                  </Badge>
+                  <span className="font-medium">{a.label}</span>
+                  <span className="text-xs opacity-70 font-mono">({a.code})</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs opacity-80">
+              Limite: {ALERT_THRESHOLD}+ ocorrências do mesmo motivo em {ALERT_WINDOW_MIN} min.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
