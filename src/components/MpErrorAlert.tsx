@@ -1,5 +1,6 @@
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, RefreshCw, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { getMpError, MpErrorEntry } from "@/lib/mpErrors";
 
 interface Props {
@@ -12,6 +13,12 @@ interface Props {
   /** Compact one-line variant, no title */
   compact?: boolean;
   className?: string;
+  /** Optional retry handler — when provided, renders a "Tentar novamente" button */
+  onRetry?: () => void;
+  /** Disable retry while a request is in flight */
+  retrying?: boolean;
+  /** Custom retry button label */
+  retryLabel?: string;
 }
 
 const ICONS = {
