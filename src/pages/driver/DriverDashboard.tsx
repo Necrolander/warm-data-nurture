@@ -58,6 +58,9 @@ const DriverDashboard = () => {
 
   const locationIntervalRef = useRef<any>(null);
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const notifiedOrderIdsRef = useRef<Set<string>>(new Set());
+  const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const activeOrder = currentOrders[selectedOrderIndex] || null;
 
@@ -70,28 +73,102 @@ const DriverDashboard = () => {
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
+
+    // Registra o Service Worker do entregador para notificações em background.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/driver-sw.js")
+        .then((reg) => {
+          swRegRef.current = reg;
+        })
+        .catch(() => {});
+    }
+
+    // Desbloqueia o áudio na primeira interação (necessário em mobile).
+    const unlockAudio = () => {
+      try {
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        }
+        if (audioCtxRef.current?.state === "suspended") {
+          audioCtxRef.current.resume();
+        }
+      } catch {}
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
+    };
+    window.addEventListener("touchstart", unlockAudio, { once: true });
+    window.addEventListener("click", unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("click", unlockAudio);
+    };
   }, [driverId]);
 
   const sendPushNotification = useCallback((title: string, body: string) => {
-    if ("Notification" in window && Notification.permission === "granted") {
+    // 1) Notificação visual: prioriza Service Worker (funciona com app em segundo plano),
+    //    cai para Notification API quando o SW ainda não está pronto.
+    const payload = { title, body, tag: "new-order" };
+    const sw = swRegRef.current || (navigator.serviceWorker && (navigator.serviceWorker as any).controller);
+    if (swRegRef.current && navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: "NEW_ORDER_NOTIFICATION",
+        payload,
+      });
+    } else if ("Notification" in window && Notification.permission === "granted") {
       try {
         const notification = new Notification(title, {
-          body, icon: "/favicon.ico", badge: "/favicon.ico", tag: "new-order", renotify: true,
+          body,
+          icon: "/favicon.ico",
+          badge: "/favicon.ico",
+          tag: "new-order",
+          renotify: true,
         } as NotificationOptions);
         notification.onclick = () => { window.focus(); notification.close(); };
       } catch {
-        navigator.serviceWorker?.ready?.then((reg) => {
-          reg.showNotification(title, { body, icon: "/favicon.ico", tag: "new-order", renotify: true } as NotificationOptions);
-        }).catch(() => {});
+        navigator.serviceWorker?.ready
+          ?.then((reg) => {
+            reg.showNotification(title, {
+              body,
+              icon: "/favicon.ico",
+              tag: "new-order",
+              renotify: true,
+              requireInteraction: true,
+              vibrate: [300, 150, 300, 150, 300],
+            } as NotificationOptions);
+          })
+          .catch(() => {});
       }
     }
+
+    // 2) Vibração no celular (funciona mesmo com tela bloqueada em alguns devices).
     try {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 800; osc.type = "sine"; gain.gain.value = 0.4;
-      osc.start(); osc.stop(ctx.currentTime + 0.5);
+      if ("vibrate" in navigator) navigator.vibrate([300, 150, 300, 150, 300]);
+    } catch {}
+
+    // 3) Som alto e repetido por ~3s para alertar mesmo com app em segunda instância.
+    try {
+      const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+      const playBeep = (offset: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = "square";
+        osc.frequency.setValueAtTime(950, ctx.currentTime + offset);
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
+        gain.gain.exponentialRampToValueAtTime(0.6, ctx.currentTime + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.4);
+        osc.start(ctx.currentTime + offset);
+        osc.stop(ctx.currentTime + offset + 0.45);
+      };
+
+      // 5 beeps espaçados (~2.5s no total).
+      for (let i = 0; i < 5; i++) playBeep(i * 0.55);
     } catch {}
   }, []);
 
@@ -128,8 +205,25 @@ const DriverDashboard = () => {
             loadAvailableOrders();
             const newRow = payload.new;
             if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
-              sendPushNotification("🛵 Novo Pedido Disponível!", `Pedido #${newRow.order_number}`);
-              toast("🛵 Novo pedido disponível!", { duration: 8000 });
+              if (!notifiedOrderIdsRef.current.has(newRow.id)) {
+                notifiedOrderIdsRef.current.add(newRow.id);
+                sendPushNotification("🛵 Novo Pedido Disponível!", `Pedido #${newRow.order_number}`);
+                toast("🛵 Novo pedido disponível!", { duration: 8000 });
+              }
+            }
+            // Notifica também quando um pedido for atribuído diretamente a este motoboy.
+            if (
+              newRow?.delivery_person_id === driverId &&
+              (payload.eventType === "INSERT" || payload.old?.delivery_person_id !== driverId)
+            ) {
+              if (!notifiedOrderIdsRef.current.has(`assigned-${newRow.id}`)) {
+                notifiedOrderIdsRef.current.add(`assigned-${newRow.id}`);
+                sendPushNotification(
+                  "🛵 Novo pedido atribuído a você!",
+                  `Pedido #${newRow.order_number}`,
+                );
+                toast("🛵 Novo pedido atribuído!", { duration: 10000 });
+              }
             }
           }
         })
