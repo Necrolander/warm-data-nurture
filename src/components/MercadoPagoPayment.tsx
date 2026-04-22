@@ -26,6 +26,50 @@ declare global {
   }
 }
 
+const PAYMENT_TIMEOUT_MS = 25000;
+
+/** Wrap supabase.functions.invoke with timeout + offline detection.
+ *  Returns a structured error code we can map to PT-BR via mpErrors. */
+async function invokeWithTimeout<T = any>(
+  fn: string,
+  body: any,
+  timeoutMs = PAYMENT_TIMEOUT_MS,
+): Promise<{ data: T | null; error: { code: string; message: string } | null }> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return { data: null, error: { code: "network_offline", message: "Sem conexão" } };
+  }
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const result = await Promise.race([
+      supabase.functions.invoke(fn, { body }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("__timeout__")), timeoutMs);
+      }),
+    ]);
+    if ((result as any).error) {
+      const msg = (result as any).error?.message || "";
+      if (/Failed to fetch|NetworkError|fetch failed/i.test(msg)) {
+        return { data: null, error: { code: "network_error", message: msg } };
+      }
+      if (/5\d\d/.test(msg)) {
+        return { data: null, error: { code: "server_error", message: msg } };
+      }
+      return { data: (result as any).data ?? null, error: { code: msg, message: msg } };
+    }
+    return { data: (result as any).data, error: null };
+  } catch (err: any) {
+    if (err?.message === "__timeout__") {
+      return { data: null, error: { code: "network_timeout", message: "Tempo esgotado" } };
+    }
+    if (/Failed to fetch|NetworkError|fetch failed/i.test(err?.message || "")) {
+      return { data: null, error: { code: "network_error", message: err.message } };
+    }
+    return { data: null, error: { code: "network_error", message: err?.message || "Erro de rede" } };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending, onCancelled }: Props) => {
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -34,6 +78,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [cardError, setCardError] = useState<{ code?: string | null; message?: string | null } | null>(null);
+  const [pixError, setPixError] = useState<{ code?: string | null; message?: string | null } | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
@@ -166,24 +211,29 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
 
     setLoading(true);
     try {
-      const { data: res, error } = await supabase.functions.invoke("mercadopago-create-payment", {
-        body: {
-          method: "card",
-          order_id: orderId,
-          amount,
-          token: data.token,
-          installments: Number(data.installments) || 1,
-          payment_method_id: data.paymentMethodId,
-          issuer_id: data.issuerId,
-          payer: {
-            email: data.cardholderEmail,
-            identification: {
-              type: data.identificationType,
-              number: data.identificationNumber,
-            },
+      const { data: res, error } = await invokeWithTimeout("mercadopago-create-payment", {
+        method: "card",
+        order_id: orderId,
+        amount,
+        token: data.token,
+        installments: Number(data.installments) || 1,
+        payment_method_id: data.paymentMethodId,
+        issuer_id: data.issuerId,
+        payer: {
+          email: data.cardholderEmail,
+          identification: {
+            type: data.identificationType,
+            number: data.identificationNumber,
           },
         },
       });
+
+      // Network/timeout/server error → friendly recovery message
+      if (error && ["network_offline", "network_timeout", "network_error", "server_error"].includes(error.code)) {
+        setCardError({ code: error.code, message: error.message });
+        toast.error(friendlyMpError(error.code, error.message));
+        return;
+      }
 
       // Edge function may return 400 with details in body
       const fnError = (res as any)?.error;
@@ -204,16 +254,13 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         toast.info("Pagamento em análise — você será notificado quando confirmar.");
         onPending();
       } else {
-        // rejected
         setCardError({ code: res?.status_detail, message: "Pagamento recusado pelo emissor do cartão." });
         toast.error(friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão."));
       }
     } catch (err: any) {
-      const msg = err?.message?.includes("Failed to fetch")
-        ? "Sem conexão com o servidor. Verifique sua internet e tente novamente."
-        : err?.message || "Erro inesperado ao processar o cartão.";
-      setCardError({ message: msg });
-      toast.error(msg);
+      // invokeWithTimeout already handles network errors, but keep a safety net
+      setCardError({ code: "network_error", message: err?.message });
+      toast.error(friendlyMpError("network_error", err?.message));
     } finally {
       setLoading(false);
     }
@@ -221,27 +268,35 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
 
   const generatePix = async () => {
     setLoading(true);
+    setPixError(null);
     try {
       const [first, ...rest] = (payerName || "Cliente").split(" ");
-      const { data, error } = await supabase.functions.invoke("mercadopago-create-payment", {
-        body: {
-          method: "pix",
-          order_id: orderId,
-          amount,
-          payer: {
-            first_name: first,
-            last_name: rest.join(" ") || "Truebox",
-            phone: payerPhone,
-          },
+      const { data, error } = await invokeWithTimeout("mercadopago-create-payment", {
+        method: "pix",
+        order_id: orderId,
+        amount,
+        payer: {
+          first_name: first,
+          last_name: rest.join(" ") || "Truebox",
+          phone: payerPhone,
         },
       });
-      if (error) throw error;
-      if (!data?.qr_code) throw new Error("QR Code não gerado");
+      if (error) {
+        setPixError({ code: error.code, message: error.message });
+        toast.error(friendlyMpError(error.code, error.message));
+        return;
+      }
+      if (!data?.qr_code) {
+        setPixError({ code: "server_error", message: "QR Code não gerado" });
+        toast.error(friendlyMpError("server_error", "QR Code não gerado"));
+        return;
+      }
       setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
       if (data?.status) setPaymentStatus(data.status);
       startPolling();
     } catch (err: any) {
-      toast.error(friendlyMpError(null, err?.message || "Erro ao gerar PIX"));
+      setPixError({ code: "network_error", message: err?.message });
+      toast.error(friendlyMpError("network_error", err?.message));
     } finally {
       setLoading(false);
     }
@@ -333,6 +388,18 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       <div className="space-y-4">
         {paymentStatus && (
           <div className="flex justify-center">{statusBadge()}</div>
+        )}
+        {pixError && (
+          <MpErrorAlert
+            code={pixError.code}
+            fallback={pixError.message}
+            compact
+            retrying={loading}
+            onRetry={() => {
+              setPixError(null);
+              generatePix();
+            }}
+          />
         )}
         {!pix ? (
           <Button onClick={generatePix} disabled={loading} className="w-full" size="lg">
