@@ -138,6 +138,7 @@ const AdminDriverChat = () => {
   };
 
   const startAlarm = () => {
+    if (alarmRef.current) return; // já tocando
     setEmergencyActive(true);
     const play = () => {
       try {
@@ -161,12 +162,23 @@ const AdminDriverChat = () => {
     alarmRef.current = setInterval(play, 2500);
   };
 
-  const stopAlarm = () => {
+  const stopAlarm = async () => {
     setEmergencyActive(false);
     if (alarmRef.current) {
       clearInterval(alarmRef.current);
       alarmRef.current = null;
     }
+    // Marca TODAS as mensagens de emergência pendentes como lidas para que
+    // o fetchThreads (a cada 5s) não reative o alarme logo em seguida.
+    try {
+      await supabase
+        .from("driver_messages")
+        .update({ read_by_admin: true } as any)
+        .eq("is_emergency", true)
+        .eq("sender", "driver")
+        .eq("read_by_admin", false);
+      fetchThreads();
+    } catch {}
   };
 
   const selectedKeyRef = useRef<string | null>(null);
