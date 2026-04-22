@@ -248,14 +248,53 @@ const OrderCard = ({
           {order.delivery_person_id && (() => {
             const dp = deliveryPersons.find((d) => d.id === order.delivery_person_id);
             if (!dp) return null;
+
+            // Real-time driver status
+            const isOnline = !!(dp as any).is_online;
+            const driverStatus = (dp as any).status || "offline";
+            const arriving = !!order.arrived_at_destination && order.status === "out_for_delivery";
+
+            const statusMeta: Record<string, { label: string; cls: string; dot: string }> = {
+              available: { label: "Disponível", cls: "bg-emerald-100 text-emerald-700 border-emerald-300", dot: "bg-emerald-500" },
+              on_route: { label: "Em rota", cls: "bg-blue-100 text-blue-700 border-blue-300", dot: "bg-blue-500" },
+              paused: { label: "Pausado", cls: "bg-amber-100 text-amber-700 border-amber-300", dot: "bg-amber-500" },
+              offline: { label: "Offline", cls: "bg-gray-200 text-gray-600 border-gray-300", dot: "bg-gray-400" },
+            };
+            const meta = statusMeta[driverStatus] || statusMeta.offline;
+            const effectiveMeta = arriving
+              ? { label: "Chegando", cls: "bg-purple-100 text-purple-700 border-purple-300 animate-pulse", dot: "bg-purple-500" }
+              : !isOnline
+                ? statusMeta.offline
+                : meta;
+
+            const lastSeen = (dp as any).location_updated_at
+              ? Math.round((Date.now() - new Date((dp as any).location_updated_at).getTime()) / 60000)
+              : null;
+            const isStale = lastSeen !== null && lastSeen > 3;
+
             return (
               <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
-                <div className="flex items-center gap-1.5">
-                   <Truck className="h-3.5 w-3.5 text-gray-600" />
-                  <span className="font-medium text-gray-900">{dp.name}</span>
-                  <span className="text-gray-500 text-xs">({dp.phone})</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <Truck className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+                  <span className="font-medium text-gray-900 truncate">{dp.name}</span>
+                  <span
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${effectiveMeta.cls}`}
+                    title={
+                      lastSeen !== null
+                        ? `Localização atualizada há ${lastSeen} min`
+                        : "Sem localização recente"
+                    }
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${effectiveMeta.dot} ${isOnline && !arriving ? "animate-pulse" : ""}`} />
+                    {effectiveMeta.label}
+                  </span>
+                  {isOnline && lastSeen !== null && (
+                    <span className={`text-[10px] ${isStale ? "text-red-600 font-medium" : "text-gray-500"}`}>
+                      • {lastSeen === 0 ? "agora" : `${lastSeen}m`}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-0.5">
+                <div className="flex items-center gap-0.5 shrink-0">
                   <Button size="icon" variant="ghost" className="h-6 w-6 text-gray-500 hover:text-amber-600" onClick={(e) => { e.stopPropagation(); onChangeDelivery(order); }} title="Trocar entregador">
                     <RefreshCw className="h-3.5 w-3.5" />
                   </Button>
@@ -550,7 +589,26 @@ const Orders = () => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Realtime updates for driver status (online/available/on_route/paused/offline + location)
+    const driversChannel = supabase
+      .channel("orders-drivers-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_persons" },
+        () => fetchDeliveryPersons()
+      )
+      .subscribe();
+
+    // Periodic refresh so "X min ago" stays accurate even without DB events
+    const tick = setInterval(() => {
+      fetchDeliveryPersons();
+    }, 20000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(driversChannel);
+      clearInterval(tick);
+    };
   }, [autoPrintOrder, playIfoodAlert]);
 
   const acceptOrder = async (order: OrderWithItems) => {
