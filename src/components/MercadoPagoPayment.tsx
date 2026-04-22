@@ -389,6 +389,18 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         {paymentStatus && (
           <div className="flex justify-center">{statusBadge()}</div>
         )}
+        {pixError && (
+          <MpErrorAlert
+            code={pixError.code}
+            fallback={pixError.message}
+            compact
+            retrying={loading}
+            onRetry={() => {
+              setPixError(null);
+              generatePix();
+            }}
+          />
+        )}
         {!pix ? (
           <Button onClick={generatePix} disabled={loading} className="w-full" size="lg">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
