@@ -10,7 +10,7 @@ export const STORE_CONFIG = {
     open: "18:00",
     close: "23:00",
   },
-  minOrder: 20,
+  minOrder: 1,
   deliveryFees: [
     { maxKm: 3, fee: 5 },
     { maxKm: 5, fee: 7 },

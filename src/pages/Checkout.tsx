@@ -51,7 +51,7 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
   const [paymentDialog, setPaymentDialog] = useState<{ orderId: string; method: "pix" | "card" } | null>(null);
 
-  const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 10;
+  const minOrder = settings?.min_order ? parseFloat(settings.min_order) : 1;
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
