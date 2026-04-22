@@ -101,6 +101,23 @@ const PaymentFailures = () => {
   const cardCount = filtered.filter((r) => r.method === "card").length;
   const pixCount = filtered.filter((r) => r.method === "pix").length;
 
+  // Alertas: motivos com 5+ ocorrências na última hora
+  const ALERT_THRESHOLD = 5;
+  const ALERT_WINDOW_MIN = 60;
+  const spikeAlerts = useMemo(() => {
+    const cutoff = Date.now() - ALERT_WINDOW_MIN * 60 * 1000;
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      if (new Date(r.created_at).getTime() < cutoff) continue;
+      const k = r.status_detail || r.error_code || "desconhecido";
+      map.set(k, (map.get(k) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .filter(([, c]) => c >= ALERT_THRESHOLD)
+      .map(([code, count]) => ({ code, count, label: labelFor(code) }))
+      .sort((a, b) => b.count - a.count);
+  }, [rows]);
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
