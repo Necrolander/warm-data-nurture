@@ -169,6 +169,9 @@ const AdminDriverChat = () => {
     }
   };
 
+  const selectedKeyRef = useRef<string | null>(null);
+  useEffect(() => { selectedKeyRef.current = selectedKey; }, [selectedKey]);
+
   useEffect(() => {
     fetchThreads();
     const channel = supabase
@@ -188,7 +191,7 @@ const AdminDriverChat = () => {
           }
         }
         const msgKey = threadKey(msg.driver_id, msg.order_id);
-        if (msgKey === selectedKey) {
+        if (msgKey === selectedKeyRef.current) {
           setMessages(prev => [...prev, msg]);
           if (msg.sender === "driver") {
             supabase.from("driver_messages").update({ read_by_admin: true } as any).eq("id", msg.id);
@@ -197,11 +200,15 @@ const AdminDriverChat = () => {
       })
       .subscribe();
 
+    // Polling de fallback caso o realtime não esteja habilitado na tabela
+    const poll = setInterval(fetchThreads, 5000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(poll);
       stopAlarm();
     };
-  }, [selectedKey]);
+  }, []);
 
   useEffect(() => {
     if (selectedKey) {
