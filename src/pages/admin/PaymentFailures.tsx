@@ -29,6 +29,13 @@ interface PaymentFailure {
   installments: number | null;
   raw_response: any;
   created_at: string;
+  customer_phone: string | null;
+  customer_name: string | null;
+  user_id: string | null;
+  card_first_six: string | null;
+  card_last_four: string | null;
+  card_holder_name: string | null;
+  previous_payment_id: string | null;
 }
 
 const labelFor = (code: string | null) => mpErrorLabel(code);
