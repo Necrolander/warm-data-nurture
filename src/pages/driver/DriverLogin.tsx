@@ -17,17 +17,15 @@ const DriverLogin = () => {
       toast.error("Preencha o telefone");
       return;
     }
+
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("delivery_persons")
-      .select("id, name, phone")
-      .eq("phone", phone.trim())
-      .eq("is_active", true)
-      .single();
+    const { data, error } = await supabase.functions.invoke("driver-phone-login", {
+      body: { phone },
+    });
 
-    if (error || !data) {
-      toast.error("Entregador não encontrado ou inativo");
+    if (error || !data?.id) {
+      toast.error(data?.error || "Entregador não encontrado ou inativo");
       setLoading(false);
       return;
     }
@@ -69,7 +67,7 @@ const DriverLogin = () => {
         </div>
 
         <p className="text-xs text-center text-muted-foreground">
-          Use o telefone cadastrado pelo administrador.
+          Aceita telefone com ou sem máscara, DDD ou +55.
         </p>
       </div>
     </div>
