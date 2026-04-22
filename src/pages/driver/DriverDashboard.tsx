@@ -641,6 +641,11 @@ const DriverDashboard = () => {
             </Popover>
             <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
               <MessageSquare className="h-5 w-5" />
+              {unreadAdminMessages > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] leading-none font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                  {unreadAdminMessages > 9 ? "9+" : unreadAdminMessages}
+                </span>
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
               <History className="h-5 w-5" />
