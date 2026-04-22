@@ -288,7 +288,7 @@ const PaymentFailures = () => {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por código, mensagem ou ID do pedido…"
+            placeholder="Buscar por código, mensagem, telefone, final do cartão, pedido…"
             className="pl-10"
           />
         </div>
