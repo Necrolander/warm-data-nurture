@@ -925,10 +925,39 @@ const Orders = () => {
           <TabsContent key={tab} value={tab}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {columns.map((col) => {
-                const colOrders = orders.filter((o) =>
-                  o.status === col.status &&
-                  (tab === "delivery" ? (o.order_type === "delivery" || o.order_type === "pickup") : o.order_type === "dine_in")
-                );
+                const colOrders = orders
+                  .filter((o) =>
+                    o.status === col.status &&
+                    (tab === "delivery" ? (o.order_type === "delivery" || o.order_type === "pickup") : o.order_type === "dine_in")
+                  )
+                  .sort((a, b) => {
+                    // Priority sort: only meaningful for "out_for_delivery" column.
+                    // 1) "Chegando" (arrived_at_destination) first
+                    // 2) Driver online + most recent GPS update (smaller staleness = higher priority)
+                    // 3) Fallback: oldest order first (FIFO)
+                    const dpA = deliveryPersons.find((d) => d.id === a.delivery_person_id);
+                    const dpB = deliveryPersons.find((d) => d.id === b.delivery_person_id);
+
+                    const arrA = a.status === "out_for_delivery" && !!a.arrived_at_destination ? 1 : 0;
+                    const arrB = b.status === "out_for_delivery" && !!b.arrived_at_destination ? 1 : 0;
+                    if (arrA !== arrB) return arrB - arrA;
+
+                    const onlineA = dpA && (dpA as any).is_online ? 1 : 0;
+                    const onlineB = dpB && (dpB as any).is_online ? 1 : 0;
+                    if (onlineA !== onlineB) return onlineB - onlineA;
+
+                    const tsA = dpA && (dpA as any).location_updated_at
+                      ? new Date((dpA as any).location_updated_at).getTime()
+                      : 0;
+                    const tsB = dpB && (dpB as any).location_updated_at
+                      ? new Date((dpB as any).location_updated_at).getTime()
+                      : 0;
+                    if (tsA !== tsB) return tsB - tsA; // most recent first
+
+                    const cA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const cB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return cA - cB; // oldest first as tiebreaker
+                  });
                 return (
                   <div key={col.status} className={`border-t-2 ${col.color} rounded-lg`}>
                     <div className="flex items-center justify-between p-3">
