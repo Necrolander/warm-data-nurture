@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed, RefreshCw } from "lucide-react";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed, RefreshCw, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -271,12 +271,28 @@ const OrderCard = ({
               ? Math.round((Date.now() - new Date((dp as any).location_updated_at).getTime()) / 60000)
               : null;
             const isStale = lastSeen !== null && lastSeen > 3;
+            // Trigger only for orders being delivered
+            const inDelivery = order.status === "out_for_delivery";
+            const inAlert = inDelivery && !arriving && (!isOnline || isStale);
+            const alertReason = !isOnline ? "Offline" : `GPS sem sinal há ${lastSeen}m`;
 
             return (
-              <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
+              <div
+                className={`flex items-center justify-between rounded p-1.5 mt-1 border ${
+                  inAlert
+                    ? "bg-red-50 border-red-300 ring-2 ring-red-400 animate-pulse"
+                    : "bg-gray-100 border-transparent"
+                }`}
+              >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <Truck className="h-3.5 w-3.5 text-gray-600 shrink-0" />
-                  <span className="font-medium text-gray-900 truncate">{dp.name}</span>
+                  {inAlert ? (
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                  ) : (
+                    <Truck className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+                  )}
+                  <span className={`font-medium truncate ${inAlert ? "text-red-700" : "text-gray-900"}`}>
+                    {dp.name}
+                  </span>
                   <span
                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${effectiveMeta.cls}`}
                     title={
@@ -288,7 +304,12 @@ const OrderCard = ({
                     <span className={`w-1.5 h-1.5 rounded-full ${effectiveMeta.dot} ${isOnline && !arriving ? "animate-pulse" : ""}`} />
                     {effectiveMeta.label}
                   </span>
-                  {isOnline && lastSeen !== null && (
+                  {inAlert && (
+                    <span className="text-[10px] text-red-700 font-semibold whitespace-nowrap">
+                      ⚠ {alertReason}
+                    </span>
+                  )}
+                  {!inAlert && isOnline && lastSeen !== null && (
                     <span className={`text-[10px] ${isStale ? "text-red-600 font-medium" : "text-gray-500"}`}>
                       • {lastSeen === 0 ? "agora" : `${lastSeen}m`}
                     </span>
@@ -513,6 +534,70 @@ const Orders = () => {
   useEffect(() => {
     return () => stopSound();
   }, [stopSound]);
+
+  // --- Driver offline / GPS-stale alert detector ---
+  // Plays a short beep + toast when an assigned driver goes offline OR has stale GPS (>3min)
+  // for an order currently out_for_delivery. Cooldown of 2 minutes per driver to avoid spam.
+  const driverAlertCooldownRef = useRef<Map<string, number>>(new Map());
+
+  const playDriverAlertBeep = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const playTone = (freq: number, start: number, dur: number, vol: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = "triangle";
+        gain.gain.setValueAtTime(vol, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + dur);
+      };
+      // Two descending warning tones
+      playTone(880, 0, 0.18, 0.5);
+      playTone(540, 0.22, 0.28, 0.6);
+      setTimeout(() => ctx.close().catch(() => {}), 800);
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    const activeDelivery = orders.filter(
+      (o) => o.status === "out_for_delivery" && o.delivery_person_id && !o.arrived_at_destination,
+    );
+    if (activeDelivery.length === 0) return;
+
+    const now = Date.now();
+    const COOLDOWN = 2 * 60 * 1000; // 2 min
+
+    for (const order of activeDelivery) {
+      const dp = deliveryPersons.find((d) => d.id === order.delivery_person_id);
+      if (!dp) continue;
+
+      const isOnline = !!(dp as any).is_online;
+      const lastSeenMs = (dp as any).location_updated_at
+        ? now - new Date((dp as any).location_updated_at).getTime()
+        : null;
+      const isStale = lastSeenMs !== null && lastSeenMs > 3 * 60 * 1000;
+
+      if (!isOnline || isStale) {
+        const last = driverAlertCooldownRef.current.get(dp.id) || 0;
+        if (now - last < COOLDOWN) continue;
+        driverAlertCooldownRef.current.set(dp.id, now);
+
+        const reason = !isOnline
+          ? "ficou OFFLINE"
+          : `está com GPS sem sinal há ${Math.round((lastSeenMs as number) / 60000)} min`;
+
+        playDriverAlertBeep();
+        toast.error(`⚠️ Motoboy ${dp.name} ${reason}`, {
+          description: `Pedido #${order.order_number} em entrega — verifique com o entregador.`,
+          duration: 10000,
+        });
+      }
+    }
+  }, [orders, deliveryPersons, playDriverAlertBeep]);
 
   const fetchOrders = async () => {
     const { data, error } = await supabase
