@@ -186,10 +186,13 @@ const DriverDashboard = () => {
 
     // 2) Vibração no celular (funciona mesmo com tela bloqueada em alguns devices).
     try {
-      if ("vibrate" in navigator) navigator.vibrate([300, 150, 300, 150, 300]);
+      if (vibrationEnabledRef.current && "vibrate" in navigator) {
+        navigator.vibrate([300, 150, 300, 150, 300]);
+      }
     } catch {}
 
     // 3) Som alto e repetido por ~3s para alertar mesmo com app em segunda instância.
+    if (!soundEnabledRef.current) return;
     try {
       const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
       audioCtxRef.current = ctx;
