@@ -416,9 +416,7 @@ const DriverDashboard = () => {
 
   const handleLogout = () => {
     stopLocationSharing();
-    localStorage.removeItem("driver_id");
-    localStorage.removeItem("driver_name");
-    localStorage.removeItem("driver_phone");
+    clearDriverSession();
     navigate("/entregador/login");
   };
 
