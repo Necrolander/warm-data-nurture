@@ -40,7 +40,7 @@ const CustomerAuth = () => {
           password,
           options: {
             data: { display_name: displayName, phone },
-            emailRedirectTo: window.location.origin + "/checkout",
+            emailRedirectTo: window.location.origin + "/finalizar",
           },
         });
         if (error) throw error;
