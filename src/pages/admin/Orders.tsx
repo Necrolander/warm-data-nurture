@@ -271,12 +271,28 @@ const OrderCard = ({
               ? Math.round((Date.now() - new Date((dp as any).location_updated_at).getTime()) / 60000)
               : null;
             const isStale = lastSeen !== null && lastSeen > 3;
+            // Trigger only for orders being delivered
+            const inDelivery = order.status === "out_for_delivery";
+            const inAlert = inDelivery && !arriving && (!isOnline || isStale);
+            const alertReason = !isOnline ? "Offline" : `GPS sem sinal há ${lastSeen}m`;
 
             return (
-              <div className="flex items-center justify-between bg-gray-100 rounded p-1.5 mt-1">
+              <div
+                className={`flex items-center justify-between rounded p-1.5 mt-1 border ${
+                  inAlert
+                    ? "bg-red-50 border-red-300 ring-2 ring-red-400 animate-pulse"
+                    : "bg-gray-100 border-transparent"
+                }`}
+              >
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <Truck className="h-3.5 w-3.5 text-gray-600 shrink-0" />
-                  <span className="font-medium text-gray-900 truncate">{dp.name}</span>
+                  {inAlert ? (
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                  ) : (
+                    <Truck className="h-3.5 w-3.5 text-gray-600 shrink-0" />
+                  )}
+                  <span className={`font-medium truncate ${inAlert ? "text-red-700" : "text-gray-900"}`}>
+                    {dp.name}
+                  </span>
                   <span
                     className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium ${effectiveMeta.cls}`}
                     title={
@@ -288,7 +304,12 @@ const OrderCard = ({
                     <span className={`w-1.5 h-1.5 rounded-full ${effectiveMeta.dot} ${isOnline && !arriving ? "animate-pulse" : ""}`} />
                     {effectiveMeta.label}
                   </span>
-                  {isOnline && lastSeen !== null && (
+                  {inAlert && (
+                    <span className="text-[10px] text-red-700 font-semibold whitespace-nowrap">
+                      ⚠ {alertReason}
+                    </span>
+                  )}
+                  {!inAlert && isOnline && lastSeen !== null && (
                     <span className={`text-[10px] ${isStale ? "text-red-600 font-medium" : "text-gray-500"}`}>
                       • {lastSeen === 0 ? "agora" : `${lastSeen}m`}
                     </span>
