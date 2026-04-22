@@ -15,6 +15,7 @@ import Orders from "./pages/admin/Orders";
 import NewOrder from "./pages/admin/NewOrder";
 import MenuManager from "./pages/admin/MenuManager";
 import Invoices from "./pages/admin/Invoices";
+import PaymentFailures from "./pages/admin/PaymentFailures";
 import BotManager from "./pages/admin/BotManager";
 
 import AdminDriverChat from "./components/admin/AdminDriverChat";
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="new-order" element={<NewOrder />} />
               <Route path="menu-manager" element={<MenuManager />} />
               <Route path="invoices" element={<Invoices />} />
+              <Route path="payment-failures" element={<PaymentFailures />} />
               <Route path="bot" element={<BotManager />} />
               <Route path="driver-chat" element={<AdminDriverChat />} />
               <Route path="salon" element={<SalonManager />} />

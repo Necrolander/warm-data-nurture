@@ -1157,6 +1157,62 @@ export type Database = {
           },
         ]
       }
+      payment_failures: {
+        Row: {
+          amount: number | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          installments: number | null
+          method: string
+          mp_payment_id: string | null
+          order_id: string | null
+          payment_method_id: string | null
+          raw_response: Json | null
+          status: string | null
+          status_detail: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          installments?: number | null
+          method?: string
+          mp_payment_id?: string | null
+          order_id?: string | null
+          payment_method_id?: string | null
+          raw_response?: Json | null
+          status?: string | null
+          status_detail?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          installments?: number | null
+          method?: string
+          mp_payment_id?: string | null
+          order_id?: string | null
+          payment_method_id?: string | null
+          raw_response?: Json | null
+          status?: string | null
+          status_detail?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_failures_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       print_queue: {
         Row: {
           content: string
