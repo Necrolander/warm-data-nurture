@@ -367,13 +367,13 @@ const Checkout = () => {
                   setPaymentDialog(null);
                   clearCart();
                   toast.success("Pedido confirmado! 🎉");
-                  navigate("/order-success");
+                  navigate("/pedido-confirmado");
                 }}
                 onPending={() => {
                   setPaymentDialog(null);
                   clearCart();
                   toast.info("Pagamento em análise. Acompanharemos por aqui.");
-                  navigate("/order-success");
+                  navigate("/pedido-confirmado");
                 }}
                 onCancelled={() => {
                   setPaymentDialog(null);
