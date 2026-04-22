@@ -9,7 +9,7 @@ import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
   Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare, History,
-  Route, Map, UserCog, Cog,
+  Route, Map, UserCog, Cog, CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
