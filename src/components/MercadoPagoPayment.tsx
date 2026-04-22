@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Copy, Check, Loader2, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { friendlyMpError, getMpError } from "@/lib/mpErrors";
+import { friendlyMpError, getMpError, mpToast } from "@/lib/mpErrors";
 import { MpErrorAlert } from "@/components/MpErrorAlert";
 
 interface Props {
@@ -103,7 +103,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
             onApproved();
           } else if (next === "rejected" || status === "cancelled" || next === "cancelled") {
             finalizedRef.current = true;
-            toast.error("Pagamento não aprovado");
+            mpToast(next, { status, fallback: "Pagamento não aprovado" });
           }
         },
       )
@@ -231,7 +231,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       // Network/timeout/server error → friendly recovery message
       if (error && ["network_offline", "network_timeout", "network_error", "server_error"].includes(error.code)) {
         setCardError({ code: error.code, message: error.message });
-        toast.error(friendlyMpError(error.code, error.message));
+        mpToast(error.code, { fallback: error.message });
         return;
       }
 
@@ -247,7 +247,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
           fnDetails?.cause?.[0]?.code ||
           fnDetails?.error;
         setCardError({ code, message: fnError || error?.message });
-        toast.error(friendlyMpError(code, fnError || error?.message));
+        mpToast(code, { fallback: fnError || error?.message });
         return;
       }
 
@@ -261,12 +261,12 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         onPending();
       } else {
         setCardError({ code: res?.status_detail, message: "Pagamento recusado pelo emissor do cartão." });
-        toast.error(friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão."));
+        mpToast(res?.status_detail, { status: res?.status, fallback: "Pagamento recusado pelo emissor do cartão." });
       }
     } catch (err: any) {
       // invokeWithTimeout already handles network errors, but keep a safety net
       setCardError({ code: "network_error", message: err?.message });
-      toast.error(friendlyMpError("network_error", err?.message));
+      mpToast("network_error", { fallback: err?.message });
     } finally {
       setLoading(false);
     }
@@ -289,19 +289,19 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       });
       if (error) {
         setPixError({ code: error.code, message: error.message });
-        toast.error(friendlyMpError(error.code, error.message));
+        mpToast(error.code, { fallback: error.message });
         return;
       }
       const fnError = (data as any)?.error;
       const fnErrorCode = (data as any)?.error_code;
       if (fnError) {
         setPixError({ code: fnErrorCode || fnError, message: fnError });
-        toast.error(friendlyMpError(fnErrorCode || fnError, fnError));
+        mpToast(fnErrorCode || fnError, { fallback: fnError });
         return;
       }
       if (!data?.qr_code) {
         setPixError({ code: "server_error", message: "QR Code não gerado" });
-        toast.error(friendlyMpError("server_error", "QR Code não gerado"));
+        mpToast("server_error", { fallback: "QR Code não gerado" });
         return;
       }
       setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
@@ -309,7 +309,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       startPolling();
     } catch (err: any) {
       setPixError({ code: "network_error", message: err?.message });
-      toast.error(friendlyMpError("network_error", err?.message));
+      mpToast("network_error", { fallback: err?.message });
     } finally {
       setLoading(false);
     }
@@ -336,7 +336,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         finalizedRef.current = true;
         clearInterval(interval);
         setPolling(false);
-        toast.error("Pagamento não aprovado");
+        mpToast("rejected", { status: "rejected", fallback: "Pagamento não aprovado" });
       }
     }, 8000);
     // stop after 15 min
@@ -390,7 +390,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       toast.success("Pedido cancelado");
       onCancelled?.();
     } catch (err: any) {
-      toast.error(err?.message || "Erro ao cancelar");
+      mpToast(null, { fallback: err?.message || "Erro ao cancelar" });
     } finally {
       setCancelling(false);
     }
