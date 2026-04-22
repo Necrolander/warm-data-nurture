@@ -410,23 +410,11 @@ const NewOrder = () => {
               </h3>
             </div>
 
-            {/* Order type */}
-            <div className="grid grid-cols-3 gap-1.5 mb-3 shrink-0">
-              {[
-                { value: "delivery", label: "🛵 Delivery" },
-                { value: "pickup", label: "🏪 Retirada" },
-                { value: "dine_in", label: "🍽️ Mesa" },
-              ].map(t => (
-                <button
-                  key={t.value}
-                  onClick={() => setOrderType(t.value as any)}
-                  className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                    orderType === t.value ? "bg-primary text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+            {/* Order type — somente delivery */}
+            <div className="mb-3 shrink-0">
+              <div className="py-2 rounded-lg text-xs font-bold bg-primary text-primary-foreground shadow-sm text-center">
+                🛵 Delivery
+              </div>
             </div>
 
             {/* Customer info */}
