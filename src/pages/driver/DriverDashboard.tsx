@@ -237,6 +237,12 @@ const DriverDashboard = () => {
                   `Pedido #${newRow.order_number}`,
                 );
                 toast("🛵 Novo pedido atribuído!", { duration: 10000 });
+                pushAssignmentEntry({
+                  id: newRow.id,
+                  orderNumber: newRow.order_number,
+                  receivedAt: new Date().toISOString(),
+                  address: newRow.observation || newRow.reference || null,
+                });
               }
             }
           }
