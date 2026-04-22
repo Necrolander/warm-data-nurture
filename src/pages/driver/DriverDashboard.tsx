@@ -7,10 +7,13 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Bike, MapPin, Phone, Package, Navigation, CheckCircle,
-  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route, Bell
+  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route, Bell,
+  Settings, Volume2, VolumeX, Vibrate
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import logo from "@/assets/logo-truebox-new.png";
 import DriverOrderView from "@/components/driver/DriverOrderView";
 import DriverRouteView from "@/components/driver/DriverRouteView";
@@ -68,6 +71,26 @@ const DriverDashboard = () => {
       return next;
     });
   }, [ASSIGN_HISTORY_KEY]);
+
+  // Preferências de alerta (som e vibração) — persistidas por motoboy
+  const SOUND_KEY = `driver_alert_sound_${driverId ?? "anon"}`;
+  const VIBRATION_KEY = `driver_alert_vibration_${driverId ?? "anon"}`;
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(SOUND_KEY) !== "0"; } catch { return true; }
+  });
+  const [vibrationEnabled, setVibrationEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(VIBRATION_KEY) !== "0"; } catch { return true; }
+  });
+  const soundEnabledRef = useRef(soundEnabled);
+  const vibrationEnabledRef = useRef(vibrationEnabled);
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+    try { localStorage.setItem(SOUND_KEY, soundEnabled ? "1" : "0"); } catch {}
+  }, [soundEnabled, SOUND_KEY]);
+  useEffect(() => {
+    vibrationEnabledRef.current = vibrationEnabled;
+    try { localStorage.setItem(VIBRATION_KEY, vibrationEnabled ? "1" : "0"); } catch {}
+  }, [vibrationEnabled, VIBRATION_KEY]);
 
   // Route state
   const [activeRoute, setActiveRoute] = useState<any>(null);
@@ -163,10 +186,13 @@ const DriverDashboard = () => {
 
     // 2) Vibração no celular (funciona mesmo com tela bloqueada em alguns devices).
     try {
-      if ("vibrate" in navigator) navigator.vibrate([300, 150, 300, 150, 300]);
+      if (vibrationEnabledRef.current && "vibrate" in navigator) {
+        navigator.vibrate([300, 150, 300, 150, 300]);
+      }
     } catch {}
 
     // 3) Som alto e repetido por ~3s para alertar mesmo com app em segunda instância.
+    if (!soundEnabledRef.current) return;
     try {
       const ctx = audioCtxRef.current || new (window.AudioContext || (window as any).webkitAudioContext)();
       audioCtxRef.current = ctx;
@@ -555,6 +581,33 @@ const DriverDashboard = () => {
               </span>
               <Switch checked={isOnline} onCheckedChange={toggleOnline} />
             </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Configurações de alerta">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                <p className="text-sm font-bold text-foreground">Alertas de pedido</p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sound-toggle" className="flex items-center gap-2 text-sm cursor-pointer">
+                    {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+                    Som
+                  </Label>
+                  <Switch id="sound-toggle" checked={soundEnabled} onCheckedChange={setSoundEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="vibration-toggle" className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Vibrate className={`h-4 w-4 ${vibrationEnabled ? "text-primary" : "text-muted-foreground"}`} />
+                    Vibração
+                  </Label>
+                  <Switch id="vibration-toggle" checked={vibrationEnabled} onCheckedChange={setVibrationEnabled} />
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  As preferências são salvas neste dispositivo. Notificações visuais continuam funcionando normalmente.
+                </p>
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
               <MessageSquare className="h-5 w-5" />
             </Button>
