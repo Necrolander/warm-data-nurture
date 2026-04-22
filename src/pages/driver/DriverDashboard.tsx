@@ -297,10 +297,10 @@ const DriverDashboard = () => {
     }
   }, [pushAssignmentEntry, sendPushNotification]);
 
-  const refreshDashboard = useCallback(async () => {
+  async function refreshDashboard() {
     const dashboard = await invokeDriverApp("dashboard");
     applyDashboardData(dashboard);
-  }, [applyDashboardData]);
+  }
 
   useEffect(() => {
     if (!driverId) return;
