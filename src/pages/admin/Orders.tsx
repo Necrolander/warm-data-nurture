@@ -700,6 +700,20 @@ const Orders = () => {
     if (error) {
       toast.error("Erro ao atualizar pedido");
     } else {
+      // Notifica o motoboy via WhatsApp para abrir o app
+      const driver = deliveryPersons.find((d) => d.id === selectedDeliveryPerson);
+      if (driver?.phone) {
+        const msg = isReassign
+          ? `🔄 *Pedido #${selectedOrder.order_number} foi transferido para você!*\n\nCliente: ${selectedOrder.customer_name}\nAbra o app de entregador para ver os detalhes.`
+          : `🛵 *Novo pedido atribuído: #${selectedOrder.order_number}*\n\nCliente: ${selectedOrder.customer_name}\nTotal: R$ ${Number(selectedOrder.total).toFixed(2).replace(".", ",")}\n\nAbra o app de entregador para iniciar a entrega.`;
+        await supabase.from("whatsapp_outbox").insert({
+          phone: driver.phone,
+          message: msg,
+          order_id: selectedOrder.id,
+          kind: "driver_assigned",
+        });
+      }
+
       toast.success(isReassign
         ? `Entregador do pedido #${selectedOrder.order_number} alterado!`
         : `Pedido #${selectedOrder.order_number} saiu para entrega!`
@@ -825,18 +839,27 @@ const Orders = () => {
                 <SelectValue placeholder="Selecione o entregador" />
               </SelectTrigger>
               <SelectContent>
-                {deliveryPersons.map((dp) => {
-                  const activeCount = orders.filter(o =>
-                    o.delivery_person_id === dp.id &&
-                    ["ready", "out_for_delivery"].includes(o.status) &&
-                    o.id !== selectedOrder?.id
-                  ).length;
-                  return (
-                    <SelectItem key={dp.id} value={dp.id} disabled={activeCount >= 3}>
-                      {dp.name} - {dp.phone} ({activeCount}/3 pedidos)
-                    </SelectItem>
-                  );
-                })}
+                {[...deliveryPersons]
+                  .sort((a, b) => Number(b.is_online ?? false) - Number(a.is_online ?? false))
+                  .map((dp) => {
+                    const activeCount = orders.filter(o =>
+                      o.delivery_person_id === dp.id &&
+                      ["ready", "out_for_delivery"].includes(o.status) &&
+                      o.id !== selectedOrder?.id
+                    ).length;
+                    const online = dp.is_online;
+                    return (
+                      <SelectItem key={dp.id} value={dp.id} disabled={activeCount >= 3}>
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            className={`inline-block h-2 w-2 rounded-full ${online ? "bg-green-500" : "bg-muted-foreground/40"}`}
+                            aria-hidden
+                          />
+                          {dp.name} - {dp.phone} ({activeCount}/3) {online ? "• online" : "• offline"}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
               </SelectContent>
             </Select>
             <Button onClick={confirmDelivery} className="w-full">
