@@ -187,7 +187,9 @@ const DriverDashboard = () => {
         setCurrentStopIndex(firstPending >= 0 ? firstPending : enrichedStops.length);
       }
 
-      setViewMode("route");
+      // Só força o modo "route" no primeiro carregamento (quando ainda não há pedidos avulsos carregados).
+      // Se o motoboy tem pedidos avulsos atribuídos manualmente, deixamos ele escolher entre as duas abas.
+      setViewMode((prev) => (prev === "orders" ? "orders" : "route"));
     } else {
       setActiveRoute(null);
       setRouteStops([]);
