@@ -222,3 +222,20 @@ function json(data: any, status: number) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
+
+async function logPaymentFailure(record: Record<string, unknown>) {
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/payment_failures`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(record),
+    });
+  } catch (e) {
+    console.error("logPaymentFailure failed:", e);
+  }
+}
