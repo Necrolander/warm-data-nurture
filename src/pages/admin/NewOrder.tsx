@@ -481,7 +481,7 @@ const NewOrder = () => {
                         </Button>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => removeItem(item.uid)} aria-label="Remover item do carrinho">
+                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => setPendingRemoveUid(item.uid)} aria-label="Remover item do carrinho">
                               <X className="h-3 w-3 text-destructive-foreground" />
                             </Button>
                           </TooltipTrigger>
