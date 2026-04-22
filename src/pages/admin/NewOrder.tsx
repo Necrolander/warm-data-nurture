@@ -206,8 +206,27 @@ const NewOrder = () => {
   };
 
   const removeItem = (uid: string) => {
+    const idx = cart.findIndex(c => c.uid === uid);
+    if (idx === -1) return;
+    const removed = cart[idx];
     setCart(cart.filter(c => c.uid !== uid));
     if (expandedCartItem === uid) setExpandedCartItem(null);
+
+    toast.success(`"${removed.product.name}" removido`, {
+      duration: 5000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          // Restore the item at its original position
+          setCart(prev => {
+            if (prev.some(c => c.uid === removed.uid)) return prev;
+            const next = [...prev];
+            next.splice(Math.min(idx, next.length), 0, removed);
+            return next;
+          });
+        },
+      },
+    });
   };
 
   const updateItemObservation = (uid: string, obs: string) => {
