@@ -72,6 +72,26 @@ const DriverDashboard = () => {
     });
   }, [ASSIGN_HISTORY_KEY]);
 
+  // Preferências de alerta (som e vibração) — persistidas por motoboy
+  const SOUND_KEY = `driver_alert_sound_${driverId ?? "anon"}`;
+  const VIBRATION_KEY = `driver_alert_vibration_${driverId ?? "anon"}`;
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(SOUND_KEY) !== "0"; } catch { return true; }
+  });
+  const [vibrationEnabled, setVibrationEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem(VIBRATION_KEY) !== "0"; } catch { return true; }
+  });
+  const soundEnabledRef = useRef(soundEnabled);
+  const vibrationEnabledRef = useRef(vibrationEnabled);
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+    try { localStorage.setItem(SOUND_KEY, soundEnabled ? "1" : "0"); } catch {}
+  }, [soundEnabled, SOUND_KEY]);
+  useEffect(() => {
+    vibrationEnabledRef.current = vibrationEnabled;
+    try { localStorage.setItem(VIBRATION_KEY, vibrationEnabled ? "1" : "0"); } catch {}
+  }, [vibrationEnabled, VIBRATION_KEY]);
+
   // Route state
   const [activeRoute, setActiveRoute] = useState<any>(null);
   const [routeStops, setRouteStops] = useState<any[]>([]);
