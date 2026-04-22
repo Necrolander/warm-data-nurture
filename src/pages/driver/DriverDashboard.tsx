@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Bike, MapPin, Phone, Package, Navigation, CheckCircle,
-  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route
+  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route, Bell
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -49,6 +49,25 @@ const DriverDashboard = () => {
   const [showChecklist, setShowChecklist] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [pendingChecklistItems, setPendingChecklistItems] = useState<any[]>([]);
+
+  // Histórico das últimas atribuições recebidas (persistido localmente)
+  type AssignmentEntry = { id: string; orderNumber: number; receivedAt: string; address?: string | null };
+  const ASSIGN_HISTORY_KEY = `driver_assignments_${driverId ?? "anon"}`;
+  const [assignmentHistory, setAssignmentHistory] = useState<AssignmentEntry[]>(() => {
+    try {
+      const raw = localStorage.getItem(`driver_assignments_${localStorage.getItem("driver_id") ?? "anon"}`);
+      return raw ? (JSON.parse(raw) as AssignmentEntry[]) : [];
+    } catch { return []; }
+  });
+
+  const pushAssignmentEntry = useCallback((entry: AssignmentEntry) => {
+    setAssignmentHistory((prev) => {
+      if (prev.some((e) => e.id === entry.id)) return prev;
+      const next = [entry, ...prev].slice(0, 20);
+      try { localStorage.setItem(ASSIGN_HISTORY_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [ASSIGN_HISTORY_KEY]);
 
   // Route state
   const [activeRoute, setActiveRoute] = useState<any>(null);
@@ -218,6 +237,12 @@ const DriverDashboard = () => {
                   `Pedido #${newRow.order_number}`,
                 );
                 toast("🛵 Novo pedido atribuído!", { duration: 10000 });
+                pushAssignmentEntry({
+                  id: newRow.id,
+                  orderNumber: newRow.order_number,
+                  receivedAt: new Date().toISOString(),
+                  address: newRow.observation || newRow.reference || null,
+                });
               }
             }
           }
@@ -229,7 +254,7 @@ const DriverDashboard = () => {
       supabase.removeChannel(routeChannel);
       supabase.removeChannel(availChannel);
     };
-  }, [driverId, isOnline, sendPushNotification]);
+  }, [driverId, isOnline, sendPushNotification, pushAssignmentEntry]);
 
   const loadDriverStatus = async () => {
     const { data } = await supabase.from("delivery_persons").select("is_online").eq("id", driverId!).single();
@@ -554,6 +579,53 @@ const DriverDashboard = () => {
               <Package className="w-4 h-4 mr-1" /> Pedidos ({currentOrders.length})
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Histórico de atribuições recebidas (últimos pedidos enviados a este motoboy) */}
+      {assignmentHistory.length > 0 && (
+        <div className="max-w-lg mx-auto px-4 pt-3">
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-primary" />
+                  Atribuições recentes ({assignmentHistory.length})
+                </h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setAssignmentHistory([]);
+                    try { localStorage.removeItem(ASSIGN_HISTORY_KEY); } catch {}
+                  }}
+                >
+                  Limpar
+                </Button>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-1.5">
+                {assignmentHistory.map((entry) => {
+                  const date = new Date(entry.receivedAt);
+                  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between text-xs bg-muted/50 rounded-md px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">Pedido #{entry.orderNumber}</p>
+                        {entry.address && (
+                          <p className="text-muted-foreground truncate">{entry.address}</p>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground shrink-0 ml-2">{time}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
 
