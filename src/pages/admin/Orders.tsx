@@ -447,6 +447,9 @@ const Orders = () => {
   const [autoAccept, setAutoAccept] = useState(() => {
     return localStorage.getItem("truebox_auto_accept") === "true";
   });
+  const [autoAssign, setAutoAssign] = useState(() => {
+    return localStorage.getItem("truebox_auto_assign_driver") === "true";
+  });
 
   const soundIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -622,6 +625,79 @@ const Orders = () => {
   useEffect(() => {
     autoAcceptRef.current = autoAccept;
   }, [autoAccept]);
+
+  // --- Auto-assign driver: pick the best available driver for ready orders ---
+  // Best driver = is_active && is_online && status='available' && fewest active orders (<3) && freshest GPS
+  const autoAssignAttemptRef = useRef<Map<string, number>>(new Map()); // orderId -> last attempt ts
+
+  useEffect(() => {
+    if (!autoAssign) return;
+    const readyUnassigned = orders.filter(
+      (o) => o.status === "ready" && !o.delivery_person_id && o.order_type === "delivery"
+    );
+    if (readyUnassigned.length === 0) return;
+
+    const COOLDOWN = 30_000; // avoid retrying same order more than once per 30s
+    const now = Date.now();
+
+    (async () => {
+      // Snapshot active counts per driver from current orders to avoid double-assign in same tick
+      const activeByDriver = new Map<string, number>();
+      orders.forEach((o) => {
+        if (o.delivery_person_id && (o.status === "ready" || o.status === "out_for_delivery")) {
+          activeByDriver.set(o.delivery_person_id, (activeByDriver.get(o.delivery_person_id) || 0) + 1);
+        }
+      });
+
+      for (const order of readyUnassigned) {
+        const lastAttempt = autoAssignAttemptRef.current.get(order.id) || 0;
+        if (now - lastAttempt < COOLDOWN) continue;
+
+        // Rank candidates
+        const candidates = deliveryPersons
+          .filter((d) => d.is_active && d.is_online && (d.status === "available" || d.status === "on_route"))
+          .filter((d) => (activeByDriver.get(d.id) || 0) < 3)
+          .map((d) => {
+            const active = activeByDriver.get(d.id) || 0;
+            const gpsTs = d.location_updated_at ? new Date(d.location_updated_at).getTime() : 0;
+            const availableBonus = d.status === "available" ? 1 : 0;
+            return { d, active, gpsTs, availableBonus };
+          })
+          .sort((a, b) => {
+            if (a.active !== b.active) return a.active - b.active; // fewer active first
+            if (a.availableBonus !== b.availableBonus) return b.availableBonus - a.availableBonus; // available > on_route
+            return b.gpsTs - a.gpsTs; // freshest GPS first
+          });
+
+        if (candidates.length === 0) continue;
+        const chosen = candidates[0].d;
+        autoAssignAttemptRef.current.set(order.id, now);
+
+        const { error } = await supabase
+          .from("orders")
+          .update({ delivery_person_id: chosen.id, status: "out_for_delivery" })
+          .eq("id", order.id)
+          .eq("status", "ready") // optimistic guard
+          .is("delivery_person_id", null);
+
+        if (!error) {
+          activeByDriver.set(chosen.id, (activeByDriver.get(chosen.id) || 0) + 1);
+          if (chosen.phone) {
+            await supabase.from("whatsapp_outbox").insert({
+              phone: chosen.phone,
+              message: `🤖 *Pedido #${order.order_number} atribuído automaticamente!*\n\nCliente: ${order.customer_name}\nTotal: R$ ${Number(order.total).toFixed(2).replace(".", ",")}\n\nAbra o app de entregador para iniciar a entrega.`,
+              order_id: order.id,
+              kind: "driver_auto_assigned",
+            });
+          }
+          toast.success(`🤖 Pedido #${order.order_number} → ${chosen.name}`, {
+            description: "Atribuído automaticamente",
+          });
+        }
+      }
+    })();
+  }, [orders, deliveryPersons, autoAssign]);
+
 
   // Auto-print helper: fetch full order with items then print
   const autoPrintOrder = useCallback(async (orderId: string) => {
@@ -874,6 +950,12 @@ const Orders = () => {
     toast.success(checked ? "⚡ Aceitar automaticamente ATIVADO" : "🔔 Aceitar automaticamente DESATIVADO");
   };
 
+  const handleAutoAssignToggle = (checked: boolean) => {
+    setAutoAssign(checked);
+    localStorage.setItem("truebox_auto_assign_driver", String(checked));
+    toast.success(checked ? "🤖 Atribuição automática de motoboy ATIVADA" : "👤 Atribuição automática de motoboy DESATIVADA");
+  };
+
   const columns = [
     { title: "🕐 Pendente", icon: Clock, status: "pending", color: "border-yellow-500/50" },
     { title: "🔥 Em Produção", icon: Clock, status: "production", color: "border-blue-500/50" },
@@ -894,11 +976,16 @@ const Orders = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Zap className={`h-4 w-4 ${autoAccept ? "text-green-400" : "text-muted-foreground"}`} />
             <span className="text-sm font-medium">Aceitar automaticamente</span>
             <Switch checked={autoAccept} onCheckedChange={handleAutoAcceptToggle} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Truck className={`h-4 w-4 ${autoAssign ? "text-green-400" : "text-muted-foreground"}`} />
+            <span className="text-sm font-medium">Motoboy automático</span>
+            <Switch checked={autoAssign} onCheckedChange={handleAutoAssignToggle} />
           </div>
         </div>
       </div>
