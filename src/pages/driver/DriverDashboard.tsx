@@ -581,6 +581,33 @@ const DriverDashboard = () => {
               </span>
               <Switch checked={isOnline} onCheckedChange={toggleOnline} />
             </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Configurações de alerta">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-3 space-y-3">
+                <p className="text-sm font-bold text-foreground">Alertas de pedido</p>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sound-toggle" className="flex items-center gap-2 text-sm cursor-pointer">
+                    {soundEnabled ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+                    Som
+                  </Label>
+                  <Switch id="sound-toggle" checked={soundEnabled} onCheckedChange={setSoundEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="vibration-toggle" className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Vibrate className={`h-4 w-4 ${vibrationEnabled ? "text-primary" : "text-muted-foreground"}`} />
+                    Vibração
+                  </Label>
+                  <Switch id="vibration-toggle" checked={vibrationEnabled} onCheckedChange={setVibrationEnabled} />
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  As preferências são salvas neste dispositivo. Notificações visuais continuam funcionando normalmente.
+                </p>
+              </PopoverContent>
+            </Popover>
             <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
               <MessageSquare className="h-5 w-5" />
             </Button>
