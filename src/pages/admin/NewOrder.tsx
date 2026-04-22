@@ -198,11 +198,16 @@ const NewOrder = () => {
   ) : false;
 
   const updateQuantity = (uid: string, delta: number) => {
-    setCart(prev => prev.map(c => {
-      if (c.uid !== uid) return c;
-      const newQty = c.quantity + delta;
-      return newQty > 0 ? { ...c, quantity: newQty } : c;
-    }).filter(c => c.quantity > 0));
+    const current = cart.find(c => c.uid === uid);
+    if (!current) return;
+    const newQty = current.quantity + delta;
+    if (newQty < 1) {
+      toast.warning("Quantidade mínima é 1", {
+        description: "Para retirar este item do pedido, use o botão X.",
+      });
+      return;
+    }
+    setCart(prev => prev.map(c => (c.uid === uid ? { ...c, quantity: newQty } : c)));
   };
 
   const removeItem = (uid: string) => {
@@ -491,7 +496,14 @@ const NewOrder = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, -1)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 disabled:opacity-40"
+                          disabled={item.quantity <= 1}
+                          aria-label={item.quantity <= 1 ? "Quantidade mínima atingida" : "Diminuir quantidade"}
+                          onClick={() => updateQuantity(item.uid, -1)}
+                        >
                           <Minus className="h-3 w-3" />
                         </Button>
                         <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
