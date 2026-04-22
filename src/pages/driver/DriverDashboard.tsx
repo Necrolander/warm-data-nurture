@@ -582,6 +582,53 @@ const DriverDashboard = () => {
         </div>
       )}
 
+      {/* Histórico de atribuições recebidas (últimos pedidos enviados a este motoboy) */}
+      {assignmentHistory.length > 0 && (
+        <div className="max-w-lg mx-auto px-4 pt-3">
+          <Card>
+            <CardContent className="p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-primary" />
+                  Atribuições recentes ({assignmentHistory.length})
+                </h3>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => {
+                    setAssignmentHistory([]);
+                    try { localStorage.removeItem(ASSIGN_HISTORY_KEY); } catch {}
+                  }}
+                >
+                  Limpar
+                </Button>
+              </div>
+              <div className="max-h-40 overflow-y-auto space-y-1.5">
+                {assignmentHistory.map((entry) => {
+                  const date = new Date(entry.receivedAt);
+                  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between text-xs bg-muted/50 rounded-md px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground">Pedido #{entry.orderNumber}</p>
+                        {entry.address && (
+                          <p className="text-muted-foreground truncate">{entry.address}</p>
+                        )}
+                      </div>
+                      <span className="text-muted-foreground shrink-0 ml-2">{time}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       <div className="max-w-lg mx-auto p-4 space-y-4">
         {showChecklist && showPendingOrder ? (
           <DriverChecklist
