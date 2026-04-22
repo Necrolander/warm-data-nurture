@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Product {
   id: string;
@@ -80,6 +81,7 @@ const NewOrder = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null);
+  const [pendingRemoveUid, setPendingRemoveUid] = useState<string | null>(null);
 
   // Extras modal
   const [extrasModal, setExtrasModal] = useState<Product | null>(null);
@@ -479,7 +481,7 @@ const NewOrder = () => {
                         </Button>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => removeItem(item.uid)} aria-label="Remover item do carrinho">
+                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => setPendingRemoveUid(item.uid)} aria-label="Remover item do carrinho">
                               <X className="h-3 w-3 text-destructive-foreground" />
                             </Button>
                           </TooltipTrigger>
@@ -597,6 +599,34 @@ const NewOrder = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!pendingRemoveUid} onOpenChange={(o) => !o && setPendingRemoveUid(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover item do pedido?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const it = cart.find(c => c.uid === pendingRemoveUid);
+                return it
+                  ? `"${it.product.name}" será removido do carrinho. Esta ação não pode ser desfeita.`
+                  : "Esta ação não pode ser desfeita.";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingRemoveUid) removeItem(pendingRemoveUid);
+                setPendingRemoveUid(null);
+              }}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
