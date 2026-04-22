@@ -230,6 +230,8 @@ async function buildDashboardData(supabaseAdmin: ReturnType<typeof createClient>
   }
 
   let availableOrders: unknown[] = [];
+  const availableOrderItems: Record<string, unknown[]> = {};
+
   if (driver.is_online) {
     const { data } = await supabaseAdmin
       .from("orders")
@@ -238,7 +240,21 @@ async function buildDashboardData(supabaseAdmin: ReturnType<typeof createClient>
       .is("delivery_person_id", null)
       .eq("order_type", "delivery")
       .order("created_at", { ascending: true });
+
     availableOrders = data || [];
+    const availableOrderIds = (availableOrders as Array<Record<string, unknown>>).map((order) => String(order.id));
+
+    if (availableOrderIds.length > 0) {
+      const { data: items } = await supabaseAdmin
+        .from("order_items")
+        .select("*")
+        .in("order_id", availableOrderIds);
+
+      for (const item of items || []) {
+        if (!availableOrderItems[item.order_id]) availableOrderItems[item.order_id] = [];
+        availableOrderItems[item.order_id].push(item);
+      }
+    }
   }
 
   return {
@@ -246,6 +262,7 @@ async function buildDashboardData(supabaseAdmin: ReturnType<typeof createClient>
     currentOrders: currentOrders || [],
     currentOrderItems,
     availableOrders,
+    availableOrderItems,
     activeRoute,
     routeStops,
     currentStopIndex,

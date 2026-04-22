@@ -42,6 +42,7 @@ const DriverDashboard = () => {
 
   const [isOnline, setIsOnline] = useState(false);
   const [availableOrders, setAvailableOrders] = useState<any[]>([]);
+  const [availableOrderItems, setAvailableOrderItems] = useState<Record<string, any[]>>({});
   const [currentOrders, setCurrentOrders] = useState<any[]>([]);
   const [currentOrderItems, setCurrentOrderItems] = useState<Record<string, any[]>>({});
   const [selectedOrderIndex, setSelectedOrderIndex] = useState(0);
@@ -133,15 +134,16 @@ const DriverDashboard = () => {
   const arrivedNotifiedRef = useRef<Set<string>>(new Set());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const notifiedOrderIdsRef = useRef<Set<string>>(new Set());
+  const knownAssignedOrderIdsRef = useRef<Set<string>>(new Set());
+  const knownRouteIdRef = useRef<string | null>(null);
+  const dashboardLoadedRef = useRef(false);
   const swRegRef = useRef<ServiceWorkerRegistration | null>(null);
 
   const activeOrder = currentOrders[selectedOrderIndex] || null;
 
   useEffect(() => {
     if (!driverId) { navigate("/entregador/login"); return; }
-    loadCurrentOrders();
-    loadDriverStatus();
-    loadActiveRoute();
+    refreshDashboard().catch(() => {});
 
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
@@ -177,7 +179,7 @@ const DriverDashboard = () => {
       window.removeEventListener("touchstart", unlockAudio);
       window.removeEventListener("click", unlockAudio);
     };
-  }, [driverId]);
+  }, [driverId, navigate, refreshDashboard]);
 
   const sendPushNotification = useCallback((title: string, body: string) => {
     // 1) Notificação visual: prioriza Service Worker (funciona com app em segundo plano),
@@ -248,176 +250,112 @@ const DriverDashboard = () => {
     } catch {}
   }, []);
 
-  // Realtime listeners
+  const applyDashboardData = useCallback((dashboard: any) => {
+    const nextDriver = dashboard?.driver || null;
+    const nextCurrentOrders = dashboard?.currentOrders || [];
+    const nextAvailableOrders = dashboard?.availableOrders || [];
+    const nextActiveRoute = dashboard?.activeRoute || null;
+
+    if (dashboardLoadedRef.current) {
+      for (const order of nextCurrentOrders) {
+        if (!knownAssignedOrderIdsRef.current.has(order.id) && !notifiedOrderIdsRef.current.has(`assigned-${order.id}`)) {
+          notifiedOrderIdsRef.current.add(`assigned-${order.id}`);
+          sendPushNotification("🛵 Novo pedido atribuído a você!", `Pedido #${order.order_number}`);
+          toast("🛵 Novo pedido atribuído!", { duration: 10000 });
+          pushAssignmentEntry({
+            id: order.id,
+            orderNumber: order.order_number,
+            receivedAt: new Date().toISOString(),
+            address: order.observation || order.reference || null,
+          });
+        }
+      }
+
+      if (nextActiveRoute?.id && nextActiveRoute.id !== knownRouteIdRef.current) {
+        sendPushNotification("🛣️ Nova rota atribuída!", `Rota ${nextActiveRoute.code} com entrega(s) para você`);
+        toast("🛣️ Nova rota atribuída!", { duration: 8000 });
+      }
+    } else {
+      dashboardLoadedRef.current = true;
+    }
+
+    knownAssignedOrderIdsRef.current = new Set(nextCurrentOrders.map((order: any) => order.id));
+    knownRouteIdRef.current = nextActiveRoute?.id ?? null;
+
+    setIsOnline(Boolean(nextDriver?.is_online));
+    setCurrentOrders(nextCurrentOrders);
+    setCurrentOrderItems(dashboard?.currentOrderItems || {});
+    setAvailableOrders(nextAvailableOrders);
+    setAvailableOrderItems(dashboard?.availableOrderItems || {});
+    setActiveRoute(nextActiveRoute);
+    setRouteStops(dashboard?.routeStops || []);
+    setCurrentStopIndex(dashboard?.currentStopIndex || 0);
+    setSelectedOrderIndex((prev) => (nextCurrentOrders.length === 0 ? 0 : Math.min(prev, nextCurrentOrders.length - 1)));
+
+    if (!nextActiveRoute) {
+      setViewMode("orders");
+    }
+  }, [pushAssignmentEntry, sendPushNotification]);
+
+  const refreshDashboard = useCallback(async () => {
+    const dashboard = await invokeDriverApp("dashboard");
+    applyDashboardData(dashboard);
+  }, [applyDashboardData]);
+
   useEffect(() => {
     if (!driverId) return;
 
-    const channel = supabase
-      .channel("driver-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `delivery_person_id=eq.${driverId}` },
-        () => { loadCurrentOrders(); })
-      .subscribe();
+    const syncDashboard = () => {
+      refreshDashboard().catch(() => {});
+    };
 
-    const routeChannel = supabase
-      .channel("driver-routes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "routes" },
-        (payload: any) => {
-          const row = payload.new;
-          if (row?.driver_id === driverId) {
-            loadActiveRoute();
-            if (payload.eventType === "UPDATE" && row.status === "assigned") {
-              sendPushNotification("🛣️ Nova Rota Atribuída!", `Rota ${row.code} com entrega(s) para você`);
-              toast("🛣️ Nova rota atribuída!", { duration: 8000 });
-            }
-          }
-        })
-      .subscribe();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        syncDashboard();
+      }
+    };
 
-    const availChannel = supabase
-      .channel("available-orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" },
-        (payload: any) => {
-          if (isOnline) {
-            loadAvailableOrders();
-            const newRow = payload.new;
-            // Som/push APENAS quando o pedido é atribuído a este motoboy.
-            // Pedidos meramente "disponíveis" não disparam mais alerta sonoro
-            // para evitar notificações duplicadas para todos os entregadores.
-            if (
-              newRow?.delivery_person_id === driverId &&
-              (payload.eventType === "INSERT" || payload.old?.delivery_person_id !== driverId)
-            ) {
-              if (!notifiedOrderIdsRef.current.has(`assigned-${newRow.id}`)) {
-                notifiedOrderIdsRef.current.add(`assigned-${newRow.id}`);
-                sendPushNotification(
-                  "🛵 Novo pedido atribuído a você!",
-                  `Pedido #${newRow.order_number}`,
-                );
-                toast("🛵 Novo pedido atribuído!", { duration: 10000 });
-                pushAssignmentEntry({
-                  id: newRow.id,
-                  orderNumber: newRow.order_number,
-                  receivedAt: new Date().toISOString(),
-                  address: newRow.observation || newRow.reference || null,
-                });
-              }
-            }
-          }
-        })
-      .subscribe();
+    const interval = window.setInterval(syncDashboard, isOnline ? 5000 : 12000);
+    window.addEventListener("focus", syncDashboard);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(routeChannel);
-      supabase.removeChannel(availChannel);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", syncDashboard);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [driverId, isOnline, sendPushNotification, pushAssignmentEntry]);
+  }, [driverId, isOnline, refreshDashboard]);
 
   const loadDriverStatus = async () => {
-    const { data } = await supabase.from("delivery_persons").select("is_online").eq("id", driverId!).single();
-    if (data) setIsOnline(data.is_online ?? false);
+    await refreshDashboard();
   };
 
   const loadActiveRoute = async () => {
-    // Check for assigned/in_delivery route for this driver
-    const { data: routes } = await supabase
-      .from("routes")
-      .select("*")
-      .eq("driver_id", driverId!)
-      .in("status", ["assigned", "in_delivery"])
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (routes && routes.length > 0) {
-      const route = routes[0];
-      setActiveRoute(route);
-
-      // Load stops with order data and items
-      const { data: stops } = await supabase
-        .from("route_orders")
-        .select("*")
-        .eq("route_id", route.id)
-        .order("stop_order");
-
-      if (stops && stops.length > 0) {
-        const orderIds = stops.map((s: any) => s.order_id);
-        const [{ data: orders }, { data: items }] = await Promise.all([
-          supabase.from("orders").select("*").in("id", orderIds),
-          supabase.from("order_items").select("*").in("order_id", orderIds),
-        ]);
-
-        const enrichedStops = stops.map((s: any) => ({
-          ...s,
-          order: (orders || []).find((o: any) => o.id === s.order_id),
-          items: (items || []).filter((i: any) => i.order_id === s.order_id),
-        }));
-
-        setRouteStops(enrichedStops);
-
-        // Determine current stop index (first non-delivered)
-        const firstPending = enrichedStops.findIndex((s: any) => s.order?.status !== "delivered");
-        setCurrentStopIndex(firstPending >= 0 ? firstPending : enrichedStops.length);
-      }
-
-      // Só força o modo "route" no primeiro carregamento (quando ainda não há pedidos avulsos carregados).
-      // Se o motoboy tem pedidos avulsos atribuídos manualmente, deixamos ele escolher entre as duas abas.
-      setViewMode((prev) => (prev === "orders" ? "orders" : "route"));
-    } else {
-      setActiveRoute(null);
-      setRouteStops([]);
-      setViewMode("orders");
-    }
+    await refreshDashboard();
   };
 
   const loadCurrentOrders = async () => {
-    const { data } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("delivery_person_id", driverId!)
-      .in("status", ["ready", "out_for_delivery"])
-      .order("created_at", { ascending: true });
-
-    if (data && data.length > 0) {
-      setCurrentOrders(data);
-      const itemsMap: Record<string, any[]> = {};
-      await Promise.all(data.map(async (order) => {
-        const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order.id);
-        itemsMap[order.id] = items || [];
-      }));
-      setCurrentOrderItems(itemsMap);
-      setSelectedOrderIndex(prev => prev >= data.length ? 0 : prev);
-    } else {
-      setCurrentOrders([]);
-      setCurrentOrderItems({});
-      setSelectedOrderIndex(0);
-      if (isOnline) loadAvailableOrders();
-    }
+    await refreshDashboard();
   };
 
   const loadAvailableOrders = async () => {
-    const { data } = await supabase
-      .from("orders").select("*")
-      .eq("status", "ready").is("delivery_person_id", null)
-      .eq("order_type", "delivery").order("created_at", { ascending: true });
-    setAvailableOrders(data || []);
+    await refreshDashboard();
   };
 
   const toggleOnline = async (online: boolean) => {
-    await supabase.from("delivery_persons").update({
-      is_online: online,
-      status: online ? "available" : "offline",
-    } as any).eq("id", driverId!);
-    setIsOnline(online);
+    try {
+      const dashboard = await invokeDriverApp("set_online", { online });
+      applyDashboardData(dashboard);
 
-    if (online) {
-      loadAvailableOrders();
-      loadActiveRoute();
-      startLocationSharing();
-      toast.success("Você está ONLINE!");
-    } else {
-      stopLocationSharing();
-      setAvailableOrders([]);
-      toast("Você está OFFLINE");
+      if (online) {
+        startLocationSharing();
+        toast.success("Você está ONLINE!");
+      } else {
+        stopLocationSharing();
+        toast("Você está OFFLINE");
+      }
+    } catch (error: any) {
+      toast.error(error?.message || "Não foi possível atualizar seu status");
     }
   };
 
@@ -426,42 +364,20 @@ const DriverDashboard = () => {
     const sendLocation = () => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const { latitude, longitude } = pos.coords;
+          try {
+            const { latitude, longitude } = pos.coords;
+            const result = await invokeDriverApp<{ success: boolean; arrivedOrderNumbers?: number[] }>("location_update", {
+              latitude,
+              longitude,
+            });
 
-          // Update delivery_persons position
-          await supabase.from("delivery_persons").update({
-            current_lat: latitude,
-            current_lng: longitude,
-            location_updated_at: new Date().toISOString(),
-          }).eq("id", driverId!);
-
-          // Save to driver_locations history
-          await supabase.from("driver_locations").insert({
-            driver_id: driverId!,
-            latitude,
-            longitude,
-          } as any);
-
-          // Update delivery_tracking for active orders
-          for (const order of currentOrders) {
-            if (order.status === "out_for_delivery") {
-              await supabase.from("delivery_tracking").update({
-                current_lat: latitude, current_lng: longitude,
-              }).eq("order_id", order.id).eq("is_active", true);
-
-              // GPS arrival detection
-              if (order.delivery_lat && order.delivery_lng && !arrivedNotifiedRef.current.has(order.id)) {
-                const dist = distanceMeters(latitude, longitude, order.delivery_lat, order.delivery_lng);
-                if (dist <= 50) {
-                  arrivedNotifiedRef.current.add(order.id);
-                  await supabase.from("orders").update({ arrived_at_destination: true } as any).eq("id", order.id);
-                  await supabase.functions.invoke("whatsapp-bot", {
-                    body: { action: "notify_status", order_id: order.id, new_status: "arrived" },
-                  });
-                  toast.success(`📍 Chegada detectada - Pedido #${order.order_number}!`);
-                }
-              }
+            if (result.arrivedOrderNumbers?.length) {
+              const label = result.arrivedOrderNumbers.join(", #");
+              toast.success(`📍 Chegada detectada - Pedido #${label}!`);
+              await refreshDashboard();
             }
+          } catch {
+            // Ignora falhas pontuais de GPS/sincronização.
           }
         },
         () => {},
@@ -523,9 +439,8 @@ const DriverDashboard = () => {
       toast.error(`Máximo de ${MAX_ACTIVE_ORDERS} pedidos ativos!`);
       return;
     }
-    const { data: items } = await supabase.from("order_items").select("*").eq("order_id", order.id);
     setShowPendingOrder(order);
-    setPendingChecklistItems(items || []);
+    setPendingChecklistItems(availableOrderItems[order.id] || []);
     setShowChecklist(true);
   };
 
@@ -534,30 +449,15 @@ const DriverDashboard = () => {
     if (!order) return;
     setShowChecklist(false);
 
-    await supabase.from("orders").update({
-      delivery_person_id: driverId,
-      status: "out_for_delivery" as const,
-      checklist_confirmed: true,
-    } as any).eq("id", order.id);
-
-    await supabase.from("delivery_tracking").insert({
-      order_id: order.id, delivery_person_id: driverId, is_active: true,
-    });
-
-    const code = String(Math.floor(1000 + Math.random() * 9000));
-    await supabase.from("orders").update({ delivery_code: code } as any).eq("id", order.id);
-
-    await supabase.functions.invoke("whatsapp-bot", {
-      body: { action: "notify_status", order_id: order.id, new_status: "out_for_delivery" },
-    });
-    await supabase.functions.invoke("whatsapp-bot", {
-      body: { action: "notify_status", order_id: order.id, new_status: "delivery_code", delivery_code: code },
-    });
-
-    setShowPendingOrder(null);
-    setPendingChecklistItems([]);
-    toast.success("Entrega aceita! 🛵");
-    loadCurrentOrders();
+    try {
+      const dashboard = await invokeDriverApp("start_delivery", { orderId: order.id });
+      applyDashboardData(dashboard);
+      setShowPendingOrder(null);
+      setPendingChecklistItems([]);
+      toast.success("Entrega aceita! 🛵");
+    } catch (error: any) {
+      toast.error(error?.message || "Não foi possível aceitar a entrega");
+    }
   };
 
   const rejectOrder = () => {
