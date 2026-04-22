@@ -129,6 +129,20 @@ export const MP_ERROR_CATALOG: Record<string, MpErrorEntry> = {
     "Meio de pagamento inválido. Recarregue a página e tente novamente.",
     "Meio inválido",
   ),
+  order_not_found: E(
+    "Pedido não encontrado. Recarregue a página e tente novamente.",
+    "Pedido não encontrado",
+  ),
+  order_cancelled: E(
+    "Este pedido foi cancelado. Crie um novo pedido para pagar.",
+    "Pedido cancelado",
+    "warning",
+  ),
+  payment_already_approved: E(
+    "Pagamento deste pedido já foi aprovado.",
+    "Já aprovado",
+    "info",
+  ),
 
   // ---- Network / connectivity ----
   network_timeout: E(

@@ -238,8 +238,14 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       // Edge function may return 400 with details in body
       const fnError = (res as any)?.error;
       const fnDetails = (res as any)?.details;
+      const fnErrorCode = (res as any)?.error_code;
+      const fnStatusDetail = (res as any)?.error_status_detail;
       if (error || fnError) {
-        const code = fnDetails?.cause?.[0]?.code || fnDetails?.error;
+        const code =
+          fnErrorCode ||
+          fnStatusDetail ||
+          fnDetails?.cause?.[0]?.code ||
+          fnDetails?.error;
         setCardError({ code, message: fnError || error?.message });
         toast.error(friendlyMpError(code, fnError || error?.message));
         return;
@@ -284,6 +290,13 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       if (error) {
         setPixError({ code: error.code, message: error.message });
         toast.error(friendlyMpError(error.code, error.message));
+        return;
+      }
+      const fnError = (data as any)?.error;
+      const fnErrorCode = (data as any)?.error_code;
+      if (fnError) {
+        setPixError({ code: fnErrorCode || fnError, message: fnError });
+        toast.error(friendlyMpError(fnErrorCode || fnError, fnError));
         return;
       }
       if (!data?.qr_code) {
