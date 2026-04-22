@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed, RefreshCw } from "lucide-react";
+import { ChevronRight, Clock, Truck, CheckCircle, MapPin, Phone, User, Volume2, Zap, X, ExternalLink, CreditCard, MessageSquare, Printer, UtensilsCrossed, RefreshCw, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
