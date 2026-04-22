@@ -66,62 +66,98 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<CustomerAuth />} />
+            <Route path="/entrar" element={<CustomerAuth />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/finalizar" element={<Checkout />} />
             <Route path="/order-success" element={<OrderSuccess />} />
+            <Route path="/pedido-confirmado" element={<OrderSuccess />} />
 
-            {/* Admin */}
+            {/* Admin (rotas em inglês = canônicas; português = aliases) */}
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Orders />} />
-              <Route path="order-history" element={<OrderHistory />} />
-              <Route path="new-order" element={<NewOrder />} />
-              <Route path="menu-manager" element={<MenuManager />} />
-              <Route path="invoices" element={<Invoices />} />
-              <Route path="payment-failures" element={<PaymentFailures />} />
-              <Route path="bot" element={<BotManager />} />
-              <Route path="driver-chat" element={<AdminDriverChat />} />
-              <Route path="salon" element={<SalonManager />} />
-              <Route path="salon-settings" element={<SalonSettings />} />
-              <Route path="contacts" element={<Contacts />} />
-              <Route path="cashback" element={<CashbackCoupons />} />
-              <Route path="reports" element={<Reports />} />
-              <Route path="delivery-fees" element={<DeliveryFees />} />
-              <Route path="digital-menu" element={<DigitalMenu />} />
-              <Route path="establishment" element={<Establishment />} />
-              <Route path="delivery-persons" element={<DeliveryPersons />} />
-              <Route path="delivery-alerts" element={<DeliveryAlerts />} />
-              <Route path="ifood" element={<IfoodIntegration />} />
-              <Route path="ifood-bot" element={<IfoodBot />} />
-              <Route path="ifood-bot/metricas" element={<IfoodBotMetrics />} />
-              <Route path="ifood-bot/avaliacoes" element={<IfoodReviews />} />
-              <Route path="ifood-bot/chat" element={<IfoodChat />} />
-              <Route path="whatsapp-outbox" element={<WhatsAppOutbox />} />
-              <Route path="whatsapp-connect" element={<WhatsAppConnect />} />
-              <Route path="external-integrations" element={<ExternalIntegrations />} />
-              <Route path="routing" element={<RoutingDashboard />} />
-              <Route path="routes" element={<RoutesList />} />
-              <Route path="operational-map" element={<OperationalMap />} />
-              <Route path="drivers-mgmt" element={<DriversManagement />} />
-              <Route path="routing-config" element={<RoutingConfig />} />
-            </Route>
+            <Route path="/painel/login" element={<AdminLogin />} />
+            {[`/admin`, `/painel`].map((base) => (
+              <Route key={base} path={base} element={<AdminLayout />}>
+                <Route index element={<Orders />} />
+                <Route path="order-history" element={<OrderHistory />} />
+                <Route path="historico-pedidos" element={<OrderHistory />} />
+                <Route path="new-order" element={<NewOrder />} />
+                <Route path="novo-pedido" element={<NewOrder />} />
+                <Route path="menu-manager" element={<MenuManager />} />
+                <Route path="cardapio" element={<MenuManager />} />
+                <Route path="invoices" element={<Invoices />} />
+                <Route path="notas-fiscais" element={<Invoices />} />
+                <Route path="payment-failures" element={<PaymentFailures />} />
+                <Route path="falhas-pagamento" element={<PaymentFailures />} />
+                <Route path="bot" element={<BotManager />} />
+                <Route path="driver-chat" element={<AdminDriverChat />} />
+                <Route path="chat-entregador" element={<AdminDriverChat />} />
+                <Route path="salon" element={<SalonManager />} />
+                <Route path="salao" element={<SalonManager />} />
+                <Route path="salon-settings" element={<SalonSettings />} />
+                <Route path="config-salao" element={<SalonSettings />} />
+                <Route path="contacts" element={<Contacts />} />
+                <Route path="contatos" element={<Contacts />} />
+                <Route path="cashback" element={<CashbackCoupons />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="relatorios" element={<Reports />} />
+                <Route path="delivery-fees" element={<DeliveryFees />} />
+                <Route path="taxas-entrega" element={<DeliveryFees />} />
+                <Route path="digital-menu" element={<DigitalMenu />} />
+                <Route path="cardapio-digital" element={<DigitalMenu />} />
+                <Route path="establishment" element={<Establishment />} />
+                <Route path="estabelecimento" element={<Establishment />} />
+                <Route path="delivery-persons" element={<DeliveryPersons />} />
+                <Route path="entregadores" element={<DeliveryPersons />} />
+                <Route path="delivery-alerts" element={<DeliveryAlerts />} />
+                <Route path="alertas-entrega" element={<DeliveryAlerts />} />
+                <Route path="ifood" element={<IfoodIntegration />} />
+                <Route path="ifood-bot" element={<IfoodBot />} />
+                <Route path="ifood-bot/metricas" element={<IfoodBotMetrics />} />
+                <Route path="ifood-bot/avaliacoes" element={<IfoodReviews />} />
+                <Route path="ifood-bot/chat" element={<IfoodChat />} />
+                <Route path="whatsapp-outbox" element={<WhatsAppOutbox />} />
+                <Route path="whatsapp-fila" element={<WhatsAppOutbox />} />
+                <Route path="whatsapp-connect" element={<WhatsAppConnect />} />
+                <Route path="whatsapp-conectar" element={<WhatsAppConnect />} />
+                <Route path="external-integrations" element={<ExternalIntegrations />} />
+                <Route path="integracoes-externas" element={<ExternalIntegrations />} />
+                <Route path="routing" element={<RoutingDashboard />} />
+                <Route path="roteirizacao" element={<RoutingDashboard />} />
+                <Route path="routes" element={<RoutesList />} />
+                <Route path="rotas" element={<RoutesList />} />
+                <Route path="operational-map" element={<OperationalMap />} />
+                <Route path="mapa-operacional" element={<OperationalMap />} />
+                <Route path="drivers-mgmt" element={<DriversManagement />} />
+                <Route path="gestao-entregadores" element={<DriversManagement />} />
+                <Route path="routing-config" element={<RoutingConfig />} />
+                <Route path="config-roteirizacao" element={<RoutingConfig />} />
+              </Route>
+            ))}
 
-            {/* Waiter App */}
+            {/* Waiter / Garçom */}
             <Route path="/waiter/login" element={<WaiterLogin />} />
+            <Route path="/garcom/login" element={<WaiterLogin />} />
             <Route path="/waiter" element={<WaiterDashboard />} />
+            <Route path="/garcom" element={<WaiterDashboard />} />
             <Route path="/waiter/new-order" element={<WaiterNewOrder />} />
+            <Route path="/garcom/novo-pedido" element={<WaiterNewOrder />} />
 
-            {/* Table QR Print */}
+            {/* Table QR Print / Mesa */}
             <Route path="/table-qr/:tableNumber" element={<TableQRPrint />} />
+            <Route path="/mesa-qr/:tableNumber" element={<TableQRPrint />} />
 
-            {/* Delivery Tracking */}
+            {/* Delivery Tracking / Rastreio */}
             <Route path="/tracking/:token" element={<DeliveryTracking />} />
+            <Route path="/rastreio/:token" element={<DeliveryTracking />} />
 
             {/* Public Map Demo */}
             <Route path="/mapa" element={<MapDemo />} />
 
-            {/* Driver App */}
+            {/* Driver / Entregador */}
             <Route path="/driver/login" element={<DriverLogin />} />
+            <Route path="/entregador/login" element={<DriverLogin />} />
             <Route path="/driver" element={<DriverDashboard />} />
+            <Route path="/entregador" element={<DriverDashboard />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
