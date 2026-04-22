@@ -26,6 +26,50 @@ declare global {
   }
 }
 
+const PAYMENT_TIMEOUT_MS = 25000;
+
+/** Wrap supabase.functions.invoke with timeout + offline detection.
+ *  Returns a structured error code we can map to PT-BR via mpErrors. */
+async function invokeWithTimeout<T = any>(
+  fn: string,
+  body: any,
+  timeoutMs = PAYMENT_TIMEOUT_MS,
+): Promise<{ data: T | null; error: { code: string; message: string } | null }> {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return { data: null, error: { code: "network_offline", message: "Sem conexão" } };
+  }
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    const result = await Promise.race([
+      supabase.functions.invoke(fn, { body }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("__timeout__")), timeoutMs);
+      }),
+    ]);
+    if ((result as any).error) {
+      const msg = (result as any).error?.message || "";
+      if (/Failed to fetch|NetworkError|fetch failed/i.test(msg)) {
+        return { data: null, error: { code: "network_error", message: msg } };
+      }
+      if (/5\d\d/.test(msg)) {
+        return { data: null, error: { code: "server_error", message: msg } };
+      }
+      return { data: (result as any).data ?? null, error: { code: msg, message: msg } };
+    }
+    return { data: (result as any).data, error: null };
+  } catch (err: any) {
+    if (err?.message === "__timeout__") {
+      return { data: null, error: { code: "network_timeout", message: "Tempo esgotado" } };
+    }
+    if (/Failed to fetch|NetworkError|fetch failed/i.test(err?.message || "")) {
+      return { data: null, error: { code: "network_error", message: err.message } };
+    }
+    return { data: null, error: { code: "network_error", message: err?.message || "Erro de rede" } };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, onApproved, onPending, onCancelled }: Props) => {
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -34,6 +78,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
   const [cardError, setCardError] = useState<{ code?: string | null; message?: string | null } | null>(null);
+  const [pixError, setPixError] = useState<{ code?: string | null; message?: string | null } | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
