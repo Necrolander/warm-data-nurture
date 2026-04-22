@@ -29,12 +29,31 @@ const OperationalMap = () => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 15000);
+    // Auto-refresh a cada 15s para refletir GPS/status do motoboy.
+    // Pausa quando a aba está oculta e dispara um refresh imediato ao voltar ao foco.
+    let interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") loadData();
+    }, 15000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") loadData();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("focus", handleVisibility);
+
     const channel = supabase.channel("op-map")
       .on("postgres_changes", { event: "*", schema: "public", table: "delivery_persons" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "driver_locations" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "routes" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, loadData)
       .subscribe();
-    return () => { clearInterval(interval); supabase.removeChannel(channel); };
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", handleVisibility);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
