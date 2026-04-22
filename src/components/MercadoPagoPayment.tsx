@@ -33,7 +33,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const [copied, setCopied] = useState(false);
   const [polling, setPolling] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-  const [cardError, setCardError] = useState<string | null>(null);
+  const [cardError, setCardError] = useState<{ code?: string | null; message?: string | null } | null>(null);
   const mpRef = useRef<any>(null);
   const cardFormRef = useRef<any>(null);
   const [mpPublicKey, setMpPublicKey] = useState<string>("");
@@ -125,8 +125,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         onError: (errors: any[]) => {
           if (!errors?.length) return;
           const first = errors[0];
-          const msg = friendlyMpError(first?.code, first?.message);
-          setCardError(msg);
+          setCardError({ code: first?.code, message: first?.message });
         },
         onSubmit: async (event: any) => {
           event.preventDefault();
@@ -140,7 +139,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
   const handleCardSubmit = async () => {
     setCardError(null);
     if (!cardFormRef.current) {
-      setCardError("Formulário ainda carregando. Aguarde um instante e tente novamente.");
+      setCardError({ message: "Formulário ainda carregando. Aguarde um instante e tente novamente." });
       return;
     }
     const data = cardFormRef.current.getCardFormData();
@@ -150,18 +149,18 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
     if (!data.cardholderName?.trim()) missing.push("Nome no cartão");
     if (!data.cardholderEmail?.trim()) missing.push("E-mail");
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.cardholderEmail)) {
-      setCardError("E-mail inválido. Verifique o formato (ex: nome@dominio.com).");
+      setCardError({ message: "E-mail inválido. Verifique o formato (ex: nome@dominio.com)." });
       return;
     }
     if (!data.identificationNumber?.trim()) missing.push("CPF");
     if (!data.installments) missing.push("Parcelas");
     if (missing.length) {
-      setCardError(`Preencha os campos obrigatórios: ${missing.join(", ")}.`);
+      setCardError({ message: `Preencha os campos obrigatórios: ${missing.join(", ")}.` });
       return;
     }
 
     if (!data.token) {
-      setCardError("Não foi possível validar os dados do cartão. Confira número, validade e CVV.");
+      setCardError({ message: "Não foi possível validar os dados do cartão. Confira número, validade e CVV." });
       return;
     }
 
@@ -191,9 +190,8 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       const fnDetails = (res as any)?.details;
       if (error || fnError) {
         const code = fnDetails?.cause?.[0]?.code || fnDetails?.error;
-        const msg = friendlyMpError(code, fnError || error?.message);
-        setCardError(msg);
-        toast.error(msg);
+        setCardError({ code, message: fnError || error?.message });
+        toast.error(friendlyMpError(code, fnError || error?.message));
         return;
       }
 
@@ -207,15 +205,14 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         onPending();
       } else {
         // rejected
-        const msg = friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão.");
-        setCardError(msg);
-        toast.error(msg);
+        setCardError({ code: res?.status_detail, message: "Pagamento recusado pelo emissor do cartão." });
+        toast.error(friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão."));
       }
     } catch (err: any) {
       const msg = err?.message?.includes("Failed to fetch")
         ? "Sem conexão com o servidor. Verifique sua internet e tente novamente."
         : err?.message || "Erro inesperado ao processar o cartão.";
-      setCardError(msg);
+      setCardError({ message: msg });
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -384,10 +381,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         <div className="flex justify-center">{statusBadge()}</div>
       )}
       {cardError && (
-        <Alert variant="destructive" className="border-destructive/40">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-sm">{cardError}</AlertDescription>
-        </Alert>
+        <MpErrorAlert code={cardError.code} fallback={cardError.message} compact />
       )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
