@@ -10,6 +10,7 @@ import { Plus, Minus, ShoppingCart, Trash2, Search, X, Check } from "lucide-reac
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Product {
   id: string;
@@ -476,9 +477,14 @@ const NewOrder = () => {
                         <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, 1)}>
                           <Plus className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => removeItem(item.uid)}>
-                          <X className="h-3 w-3 text-destructive-foreground" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 bg-destructive hover:bg-destructive/90 ml-1" onClick={() => removeItem(item.uid)} aria-label="Remover item do carrinho">
+                              <X className="h-3 w-3 text-destructive-foreground" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">Remover item do carrinho</TooltipContent>
+                        </Tooltip>
                       </div>
                     </div>
 
