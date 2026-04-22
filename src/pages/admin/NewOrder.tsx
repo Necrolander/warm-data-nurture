@@ -81,6 +81,7 @@ const NewOrder = () => {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandedCartItem, setExpandedCartItem] = useState<string | null>(null);
+  const [pendingRemoveUid, setPendingRemoveUid] = useState<string | null>(null);
 
   // Extras modal
   const [extrasModal, setExtrasModal] = useState<Product | null>(null);
