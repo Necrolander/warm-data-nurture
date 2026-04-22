@@ -167,6 +167,21 @@ Deno.serve(async (req) => {
     });
 
     const mpData = await mpRes.json();
+
+    // Common context for failure logging
+    const failureContext = {
+      customer_phone: order.customer_phone || null,
+      customer_name: order.customer_name || null,
+      user_id: authUserId,
+      previous_payment_id: previousPaymentId,
+    };
+    const cardFromMp = mpData?.card || {};
+    const cardInfo = {
+      card_first_six: cardFromMp.first_six_digits || null,
+      card_last_four: cardFromMp.last_four_digits || null,
+      card_holder_name: cardFromMp.cardholder?.name || null,
+    };
+
     if (!mpRes.ok) {
       console.error("MP error:", mpData);
       await logPaymentFailure({
@@ -181,6 +196,8 @@ Deno.serve(async (req) => {
         payment_method_id: (body as CardBody).payment_method_id || body.method,
         installments: (body as CardBody).installments || null,
         raw_response: mpData,
+        ...failureContext,
+        ...cardInfo,
       });
       return json({ error: mpData?.message || "Erro Mercado Pago", details: mpData }, 400);
     }
@@ -198,6 +215,8 @@ Deno.serve(async (req) => {
         payment_method_id: (body as CardBody).payment_method_id,
         installments: (body as CardBody).installments || 1,
         raw_response: mpData,
+        ...failureContext,
+        ...cardInfo,
       });
     }
 
