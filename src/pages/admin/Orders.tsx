@@ -411,6 +411,18 @@ const OrderCard = ({
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
+                {order.status === "ready" && order.order_type === "delivery" && !order.delivery_person_id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500 text-amber-700 hover:bg-amber-50"
+                    onClick={() => onSelectDelivery(order)}
+                    title="Atribuir motoboy manualmente (sem enviar ainda)"
+                  >
+                    <Truck className="h-3.5 w-3.5 mr-1" />
+                    Motoboy
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   onClick={() => {
