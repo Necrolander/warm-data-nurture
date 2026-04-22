@@ -5,7 +5,9 @@
  *  - Payment creation (edge function response)
  *  - Payment status (status / status_detail after charge)
  *  - Admin audit screen (payment_failures listing)
+ *  - Toasts (via mpToast helper) — guarantees toasts and MpErrorAlert show the same copy
  */
+import { toast } from "sonner";
 
 export type MpErrorSeverity = "info" | "warning" | "error";
 
@@ -213,6 +215,32 @@ export const friendlyMpError = (
   const entry = getMpError(code, null);
   if (entry === DEFAULT_ENTRY && fallback) return fallback;
   return entry.message;
+};
+
+/**
+ * Unified toast helper — uses the same catalog entry as `<MpErrorAlert />`,
+ * so toast text and inline alert copy stay in sync. Picks the toast variant
+ * based on the entry severity (error → toast.error, warning → toast.warning,
+ * info → toast.info).
+ */
+export const mpToast = (
+  code?: string | number | null,
+  options?: { status?: string | null; fallback?: string | null; description?: string },
+) => {
+  const entry = getMpError(code, options?.status ?? null);
+  const message =
+    entry.message === DEFAULT_ENTRY.message && options?.fallback ? options.fallback : entry.message;
+  const description = options?.description ?? entry.hint;
+  const opts = description ? { description } : undefined;
+  switch (entry.severity) {
+    case "warning":
+      return toast.warning(message, opts);
+    case "info":
+      return toast.info(message, opts);
+    case "error":
+    default:
+      return toast.error(message, opts);
+  }
 };
 
 /** Short label for tables / badges */
