@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { STORE_CONFIG } from "@/config/store";
 import { supabase } from "@/integrations/supabase/client";
+import { getDriverPresence } from "@/lib/driverPresence";
 
 const STORE = STORE_CONFIG.coordinates;
 
@@ -39,7 +40,7 @@ const MapDemo = () => {
 
   const loadRealData = async () => {
     const [{ data: d }, { data: r }, { data: o }] = await Promise.all([
-      supabase.from("delivery_persons").select("*").eq("is_active", true).eq("is_online", true),
+      supabase.from("delivery_persons").select("*").eq("is_active", true),
       supabase.from("routes").select("*").in("status", ["created", "assigned", "in_delivery"]),
       supabase.from("orders").select("*").eq("status", "ready").is("route_id", null).eq("order_type", "delivery"),
     ]);
@@ -94,12 +95,21 @@ const MapDemo = () => {
       // Real data
       realDrivers.forEach(d => {
         if (!d.current_lat || !d.current_lng) return;
-        const color = d.status === "on_route" ? "#3b82f6" : "#22c55e";
+        const presence = getDriverPresence(d);
+        const color = presence.state === "on_route"
+          ? "hsl(var(--primary))"
+          : presence.state === "stale"
+            ? "hsl(var(--warning))"
+            : presence.state === "paused"
+              ? "hsl(var(--muted-foreground))"
+              : presence.state === "available"
+                ? "hsl(var(--success))"
+                : "hsl(var(--muted))";
         const icon = L.divIcon({
           html: `<div style="background:${color};color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,.3)">🏍️</div>`,
           iconSize: [30, 30], className: "",
         });
-        markersRef.current.push(L.marker([d.current_lat, d.current_lng], { icon }).addTo(map).bindPopup(`<b>${d.name}</b><br>${d.status}`));
+        markersRef.current.push(L.marker([d.current_lat, d.current_lng], { icon }).addTo(map).bindPopup(`<b>${d.name}</b><br>${presence.label}${presence.lastSeenMin !== null ? `<br>Último GPS: ${presence.lastSeenMin === 0 ? "agora" : `${presence.lastSeenMin}m`}` : ""}`));
       });
       realOrders.forEach(o => {
         if (!o.delivery_lat || !o.delivery_lng) return;
@@ -143,7 +153,7 @@ const MapDemo = () => {
     }
   }, [useReal, realDrivers, realOrders, realRoutes]);
 
-  const driverCount = useReal ? realDrivers.length : MOCK_DRIVERS.length;
+  const driverCount = useReal ? realDrivers.filter((driver) => getDriverPresence(driver).isEffectivelyOnline).length : MOCK_DRIVERS.length;
   const orderCount = useReal ? realOrders.length : MOCK_ORDERS.length;
   const routeCount = useReal ? realRoutes.length : MOCK_ROUTE_LINES.length;
 
@@ -176,6 +186,7 @@ const MapDemo = () => {
         <span className="flex items-center gap-1">📦 Pedido Aguardando</span>
         <span className="flex items-center gap-1">🟢 Motoboy Disponível</span>
         <span className="flex items-center gap-1">🔵 Motoboy Em Rota</span>
+        <span className="flex items-center gap-1">🟠 GPS parado</span>
         <span className="flex items-center gap-1">--- Rota de Entrega</span>
       </div>
     </div>

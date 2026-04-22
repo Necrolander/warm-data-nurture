@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getStoreCoords } from "@/services/routing/distanceUtils";
+import { getDriverPresence } from "@/lib/driverPresence";
 
 const OperationalMap = () => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -91,7 +92,14 @@ const OperationalMap = () => {
     // Drivers
     drivers.forEach(d => {
       if (!d.current_lat || !d.current_lng) return;
-      const color = d.status === "on_route" ? "#3b82f6" : "#22c55e";
+      const presence = getDriverPresence(d);
+      const color = presence.state === "on_route"
+        ? "hsl(var(--primary))"
+        : presence.state === "stale"
+          ? "hsl(var(--warning))"
+          : presence.state === "paused"
+            ? "hsl(var(--muted-foreground))"
+            : "hsl(var(--success))";
       const icon = L.divIcon({
         html: `<div style="background:${color};color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,.3)">🏍️</div>`,
         iconSize: [28, 28],
@@ -100,7 +108,7 @@ const OperationalMap = () => {
       markersRef.current.push(
         L.marker([d.current_lat, d.current_lng], { icon })
           .addTo(map)
-          .bindPopup(`${d.name}<br>Status: ${d.status || "online"}`)
+          .bindPopup(`${d.name}<br>Status: ${presence.label}${presence.lastSeenMin !== null ? `<br>Último GPS: ${presence.lastSeenMin === 0 ? "agora" : `${presence.lastSeenMin}m`}` : ""}`)
       );
     });
 
@@ -117,7 +125,7 @@ const OperationalMap = () => {
         <h2 className="text-2xl font-bold text-foreground">Mapa Operacional</h2>
         <div className="flex gap-3">
           <Badge variant="outline" className="gap-1">📦 {pendingOrders.length} aguardando</Badge>
-          <Badge variant="outline" className="gap-1">🏍️ {drivers.length} online</Badge>
+          <Badge variant="outline" className="gap-1">🏍️ {drivers.filter((driver) => getDriverPresence(driver).isEffectivelyOnline).length} online</Badge>
           <Badge variant="outline" className="gap-1">🛣️ {routes.length} rotas ativas</Badge>
         </div>
       </div>
@@ -133,6 +141,7 @@ const OperationalMap = () => {
         <span className="flex items-center gap-1">📦 Pedido Aguardando</span>
         <span className="flex items-center gap-1 text-green-500">🏍️ Disponível</span>
         <span className="flex items-center gap-1 text-blue-500">🏍️ Em Rota</span>
+        <span className="flex items-center gap-1 text-amber-500">🏍️ GPS parado</span>
       </div>
     </div>
   );
