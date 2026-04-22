@@ -50,6 +50,25 @@ const DriverDashboard = () => {
   const [showChat, setShowChat] = useState(false);
   const [pendingChecklistItems, setPendingChecklistItems] = useState<any[]>([]);
 
+  // Histórico das últimas atribuições recebidas (persistido localmente)
+  type AssignmentEntry = { id: string; orderNumber: number; receivedAt: string; address?: string | null };
+  const ASSIGN_HISTORY_KEY = `driver_assignments_${driverId ?? "anon"}`;
+  const [assignmentHistory, setAssignmentHistory] = useState<AssignmentEntry[]>(() => {
+    try {
+      const raw = localStorage.getItem(`driver_assignments_${localStorage.getItem("driver_id") ?? "anon"}`);
+      return raw ? (JSON.parse(raw) as AssignmentEntry[]) : [];
+    } catch { return []; }
+  });
+
+  const pushAssignmentEntry = useCallback((entry: AssignmentEntry) => {
+    setAssignmentHistory((prev) => {
+      if (prev.some((e) => e.id === entry.id)) return prev;
+      const next = [entry, ...prev].slice(0, 20);
+      try { localStorage.setItem(ASSIGN_HISTORY_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, [ASSIGN_HISTORY_KEY]);
+
   // Route state
   const [activeRoute, setActiveRoute] = useState<any>(null);
   const [routeStops, setRouteStops] = useState<any[]>([]);
