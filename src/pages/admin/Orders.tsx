@@ -1111,22 +1111,42 @@ const Orders = () => {
               </SelectTrigger>
               <SelectContent>
                 {[...deliveryPersons]
-                  .sort((a, b) => Number(b.is_online ?? false) - Number(a.is_online ?? false))
                   .map((dp) => {
+                    const lastSeenMs = dp.location_updated_at
+                      ? Date.now() - new Date(dp.location_updated_at).getTime()
+                      : null;
+                    const lastSeenMin = lastSeenMs !== null ? Math.round(lastSeenMs / 60000) : null;
+                    // Considera realmente online apenas se is_online E GPS atualizado nos últimos 5 min
+                    const isFresh = lastSeenMs !== null && lastSeenMs <= 5 * 60 * 1000;
+                    const reallyOnline = !!dp.is_online && isFresh;
+                    const staleOnline = !!dp.is_online && !isFresh;
+                    return { dp, reallyOnline, staleOnline, lastSeenMin };
+                  })
+                  .sort((a, b) => Number(b.reallyOnline) - Number(a.reallyOnline))
+                  .map(({ dp, reallyOnline, staleOnline, lastSeenMin }) => {
                     const activeCount = orders.filter(o =>
                       o.delivery_person_id === dp.id &&
                       ["ready", "out_for_delivery"].includes(o.status) &&
                       o.id !== selectedOrder?.id
                     ).length;
-                    const online = dp.is_online;
+                    const statusLabel = reallyOnline
+                      ? "online"
+                      : staleOnline
+                        ? `GPS parado ${lastSeenMin}m`
+                        : "offline";
+                    const dotCls = reallyOnline
+                      ? "bg-green-500"
+                      : staleOnline
+                        ? "bg-amber-500"
+                        : "bg-muted-foreground/40";
                     return (
                       <SelectItem key={dp.id} value={dp.id} disabled={activeCount >= 3}>
                         <span className="inline-flex items-center gap-2">
                           <span
-                            className={`inline-block h-2 w-2 rounded-full ${online ? "bg-green-500" : "bg-muted-foreground/40"}`}
+                            className={`inline-block h-2 w-2 rounded-full ${dotCls}`}
                             aria-hidden
                           />
-                          {dp.name} - {dp.phone} ({activeCount}/3) {online ? "• online" : "• offline"}
+                          {dp.name} - {dp.phone} ({activeCount}/3) • {statusLabel}
                         </span>
                       </SelectItem>
                     );
