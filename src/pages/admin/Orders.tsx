@@ -589,7 +589,26 @@ const Orders = () => {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Realtime updates for driver status (online/available/on_route/paused/offline + location)
+    const driversChannel = supabase
+      .channel("orders-drivers-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "delivery_persons" },
+        () => fetchDeliveryPersons()
+      )
+      .subscribe();
+
+    // Periodic refresh so "X min ago" stays accurate even without DB events
+    const tick = setInterval(() => {
+      fetchDeliveryPersons();
+    }, 20000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      supabase.removeChannel(driversChannel);
+      clearInterval(tick);
+    };
   }, [autoPrintOrder, playIfoodAlert]);
 
   const acceptOrder = async (order: OrderWithItems) => {
