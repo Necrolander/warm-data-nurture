@@ -241,7 +241,7 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
       if (data?.status) setPaymentStatus(data.status);
       startPolling();
     } catch (err: any) {
-      toast.error(err?.message || "Erro ao gerar PIX");
+      toast.error(friendlyMpError(null, err?.message || "Erro ao gerar PIX"));
     } finally {
       setLoading(false);
     }
