@@ -27,9 +27,9 @@ const ICONS = {
   error: AlertCircle,
 } as const;
 
-const VARIANT: Record<MpErrorEntry["severity"], "default" | "destructive"> = {
-  info: "default",
-  warning: "default",
+const VARIANT: Record<MpErrorEntry["severity"], "info" | "warning" | "destructive"> = {
+  info: "info",
+  warning: "warning",
   error: "destructive",
 };
 
