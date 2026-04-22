@@ -381,7 +381,19 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         <div className="flex justify-center">{statusBadge()}</div>
       )}
       {cardError && (
-        <MpErrorAlert code={cardError.code} fallback={cardError.message} compact />
+        <MpErrorAlert
+          code={cardError.code}
+          fallback={cardError.message}
+          compact
+          retrying={loading}
+          onRetry={() => {
+            // Revalidate form + re-tokenize + retry payment
+            setCardError(null);
+            const formEl = document.getElementById("form-mp-card") as HTMLFormElement | null;
+            if (formEl?.requestSubmit) formEl.requestSubmit();
+            else formEl?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+          }}
+        />
       )}
       <div>
         <Label className="text-xs">Número do cartão</Label>
