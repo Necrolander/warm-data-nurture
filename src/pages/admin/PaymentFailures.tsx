@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+import { mpErrorLabel } from "@/lib/mpErrors";
+
 interface PaymentFailure {
   id: string;
   order_id: string | null;
@@ -28,25 +30,7 @@ interface PaymentFailure {
   created_at: string;
 }
 
-const STATUS_DETAIL_LABEL: Record<string, string> = {
-  cc_rejected_bad_filled_card_number: "Número do cartão incorreto",
-  cc_rejected_bad_filled_date: "Data de validade incorreta",
-  cc_rejected_bad_filled_security_code: "CVV incorreto",
-  cc_rejected_bad_filled_other: "Dados do cartão incorretos",
-  cc_rejected_call_for_authorize: "Requer autorização do banco",
-  cc_rejected_card_disabled: "Cartão desabilitado",
-  cc_rejected_card_error: "Erro no cartão",
-  cc_rejected_duplicated_payment: "Pagamento duplicado",
-  cc_rejected_high_risk: "Recusado por risco",
-  cc_rejected_insufficient_amount: "Saldo insuficiente",
-  cc_rejected_invalid_installments: "Parcelas inválidas",
-  cc_rejected_max_attempts: "Limite de tentativas",
-  cc_rejected_other_reason: "Recusado pelo emissor",
-  cc_rejected_blacklist: "Cartão bloqueado",
-};
-
-const labelFor = (code: string | null) =>
-  (code && STATUS_DETAIL_LABEL[code]) || code || "—";
+const labelFor = (code: string | null) => mpErrorLabel(code);
 
 const PERIOD_OPTIONS = [
   { v: "1", label: "Últimas 24h" },
