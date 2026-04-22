@@ -86,11 +86,44 @@ const PaymentFailures = () => {
     const s = search.trim().toLowerCase();
     if (!s) return rows;
     return rows.filter((r) =>
-      [r.status_detail, r.error_code, r.error_message, r.mp_payment_id, r.order_id]
+      [
+        r.status_detail,
+        r.error_code,
+        r.error_message,
+        r.mp_payment_id,
+        r.order_id,
+        r.customer_phone,
+        r.customer_name,
+        r.card_last_four,
+        r.card_first_six,
+        r.card_holder_name,
+        r.previous_payment_id,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(s)),
     );
   }, [rows, search]);
+
+  // Recorrência por cliente (telefone) e por cartão (BIN+4 últimos)
+  const recurrenceByPhone = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.customer_phone) continue;
+      m.set(r.customer_phone, (m.get(r.customer_phone) || 0) + 1);
+    }
+    return m;
+  }, [rows]);
+  const recurrenceByCard = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.card_last_four
+        ? `${r.card_first_six || "??????"}-${r.card_last_four}`
+        : null;
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }, [rows]);
 
   const aggregated = useMemo(() => {
     const map = new Map<string, number>();
