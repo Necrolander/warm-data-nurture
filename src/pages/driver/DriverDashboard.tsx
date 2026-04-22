@@ -7,7 +7,8 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Bike, MapPin, Phone, Package, Navigation, CheckCircle,
-  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route, Bell
+  AlertTriangle, Clock, LogOut, History, DollarSign, X, MessageSquare, Route, Bell,
+  Settings, Volume2, VolumeX, Vibrate
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
