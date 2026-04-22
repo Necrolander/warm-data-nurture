@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { DollarSign, Package, Clock } from "lucide-react";
+import { invokeDriverApp } from "@/lib/driverApp";
 
 interface DriverHistoryProps {
   driverId: string;
@@ -13,21 +13,11 @@ const DriverHistory = ({ driverId }: DriverHistoryProps) => {
 
   useEffect(() => {
     loadHistory();
-  }, []);
+  }, [driverId]);
 
   const loadHistory = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const { data } = await supabase
-      .from("orders")
-      .select("*")
-      .eq("delivery_person_id", driverId)
-      .eq("status", "delivered")
-      .gte("created_at", today.toISOString())
-      .order("created_at", { ascending: false });
-
-    const list = data || [];
+    const data = await invokeDriverApp<{ orders: any[] }>("history");
+    const list = data.orders || [];
     setOrders(list);
     setTodayStats({
       count: list.length,
@@ -37,7 +27,6 @@ const DriverHistory = ({ driverId }: DriverHistoryProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Today stats */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-muted rounded-xl p-3 text-center">
           <Package className="h-5 w-5 mx-auto text-primary mb-1" />
@@ -53,7 +42,6 @@ const DriverHistory = ({ driverId }: DriverHistoryProps) => {
         </div>
       </div>
 
-      {/* Orders list */}
       {orders.length === 0 ? (
         <p className="text-center text-muted-foreground py-4">Nenhuma entrega hoje</p>
       ) : (

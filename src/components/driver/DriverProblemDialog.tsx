@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertTriangle } from "lucide-react";
+import { invokeDriverApp } from "@/lib/driverApp";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -19,19 +20,20 @@ const issues = [
   { key: "order_problem", label: "Problema no pedido", icon: "⚠️" },
 ];
 
-const DriverProblemDialog = ({ open, onOpenChange, orderId, driverId, onSubmitted }: Props) => {
+const DriverProblemDialog = ({ open, onOpenChange, orderId, onSubmitted }: Props) => {
   const [loading, setLoading] = useState(false);
 
   const submit = async (issueType: string) => {
     if (!orderId) return;
     setLoading(true);
-    await supabase.from("delivery_issues").insert({
-      order_id: orderId,
-      delivery_person_id: driverId,
-      issue_type: issueType,
-    });
-    setLoading(false);
-    onSubmitted();
+    try {
+      await invokeDriverApp("report_issue", { orderId, issueType });
+      onSubmitted();
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao reportar problema");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
