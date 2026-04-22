@@ -903,11 +903,16 @@ const Orders = () => {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <Zap className={`h-4 w-4 ${autoAccept ? "text-green-400" : "text-muted-foreground"}`} />
             <span className="text-sm font-medium">Aceitar automaticamente</span>
             <Switch checked={autoAccept} onCheckedChange={handleAutoAcceptToggle} />
+          </div>
+          <div className="flex items-center gap-2">
+            <Truck className={`h-4 w-4 ${autoAssign ? "text-green-400" : "text-muted-foreground"}`} />
+            <span className="text-sm font-medium">Motoboy automático</span>
+            <Switch checked={autoAssign} onCheckedChange={handleAutoAssignToggle} />
           </div>
         </div>
       </div>
