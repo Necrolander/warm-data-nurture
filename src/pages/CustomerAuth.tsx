@@ -28,7 +28,7 @@ const CustomerAuth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         toast.success("Login realizado! ✅");
-        navigate("/checkout");
+        navigate("/finalizar");
       } else {
         if (!displayName.trim()) {
           toast.error("Preencha seu nome");
@@ -40,7 +40,7 @@ const CustomerAuth = () => {
           password,
           options: {
             data: { display_name: displayName, phone },
-            emailRedirectTo: window.location.origin + "/checkout",
+            emailRedirectTo: window.location.origin + "/finalizar",
           },
         });
         if (error) throw error;

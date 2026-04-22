@@ -162,19 +162,19 @@ export default function IfoodBot() {
           <p className="text-sm text-muted-foreground">Status, 2FA, screenshots e falhas</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <a href="/admin/ifood-bot/avaliacoes">
+          <a href="/painel/ifood-bot/avaliacoes">
             <Button variant="outline" className="gap-2">
               <Activity className="h-4 w-4" />
               Avaliações
             </Button>
           </a>
-          <a href="/admin/ifood-bot/chat">
+          <a href="/painel/ifood-bot/chat">
             <Button variant="outline" className="gap-2">
               <Activity className="h-4 w-4" />
-              Chat clientes
+              Chat
             </Button>
           </a>
-          <a href="/admin/ifood-bot/metricas">
+          <a href="/painel/ifood-bot/metricas">
             <Button variant="default" className="gap-2">
               <Activity className="h-4 w-4" />
               Ver métricas

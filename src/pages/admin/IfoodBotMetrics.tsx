@@ -177,7 +177,7 @@ export default function IfoodBotMetrics() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Link to="/admin/ifood-bot">
+          <Link to="/painel/ifood-bot">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>

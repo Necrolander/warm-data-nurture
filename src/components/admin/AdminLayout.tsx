@@ -17,34 +17,34 @@ import { toast } from "sonner";
 import logo from "@/assets/logo-truebox-new.png";
 
 const menuItems = [
-  { title: "Meus Pedidos", url: "/admin", icon: ClipboardList },
-  { title: "Histórico Pedidos", url: "/admin/order-history", icon: History },
-  { title: "Fazer Pedido", url: "/admin/new-order", icon: PlusCircle },
-  { title: "Gestor de Cardápio", url: "/admin/menu-manager", icon: UtensilsCrossed },
-  { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
-  { title: "Falhas Pagamento", url: "/admin/payment-failures", icon: CreditCard },
-  { title: "Robô", url: "/admin/bot", icon: Bot },
-  { title: "WhatsApp", url: "/admin/whatsapp-connect", icon: MessageSquare },
-  { title: "WhatsApp Outbox", url: "/admin/whatsapp-outbox", icon: MessageSquare },
-  { title: "Gestão Salão", url: "/admin/salon", icon: Armchair },
-  { title: "Config. Salão", url: "/admin/salon-settings", icon: Settings },
-  { title: "Contatos", url: "/admin/contacts", icon: Users },
-  { title: "Cashback & Cupons", url: "/admin/cashback", icon: Gift },
-  { title: "Relatórios", url: "/admin/reports", icon: BarChart3 },
-  { title: "Frete", url: "/admin/delivery-fees", icon: Truck },
-  { title: "Entregadores", url: "/admin/delivery-persons", icon: Bike },
-  { title: "Alertas Entrega", url: "/admin/delivery-alerts", icon: AlertTriangle },
-  { title: "Chat Entregadores", url: "/admin/driver-chat", icon: MessageSquare },
-  { title: "Cardápio Digital", url: "/admin/digital-menu", icon: Smartphone },
-  { title: "Estabelecimento", url: "/admin/establishment", icon: Store },
-  { title: "iFood", url: "/admin/ifood", icon: Store },
-  { title: "Bot iFood", url: "/admin/ifood-bot", icon: Bot },
-  { title: "Bots Externos", url: "/admin/external-integrations", icon: Bot },
-  { title: "Roteirização", url: "/admin/routing", icon: Route },
-  { title: "Rotas", url: "/admin/routes", icon: Map },
-  { title: "Mapa Operacional", url: "/admin/operational-map", icon: Map },
-  { title: "Gestão Motoboys", url: "/admin/drivers-mgmt", icon: UserCog },
-  { title: "Config. Logística", url: "/admin/routing-config", icon: Cog },
+  { title: "Meus Pedidos", url: "/painel", icon: ClipboardList },
+  { title: "Histórico Pedidos", url: "/painel/historico-pedidos", icon: History },
+  { title: "Fazer Pedido", url: "/painel/novo-pedido", icon: PlusCircle },
+  { title: "Gestor de Cardápio", url: "/painel/cardapio", icon: UtensilsCrossed },
+  { title: "Notas Fiscais", url: "/painel/notas-fiscais", icon: Receipt },
+  { title: "Falhas Pagamento", url: "/painel/falhas-pagamento", icon: CreditCard },
+  { title: "Robô", url: "/painel/bot", icon: Bot },
+  { title: "WhatsApp", url: "/painel/whatsapp-conectar", icon: MessageSquare },
+  { title: "WhatsApp Fila", url: "/painel/whatsapp-fila", icon: MessageSquare },
+  { title: "Gestão Salão", url: "/painel/salao", icon: Armchair },
+  { title: "Config. Salão", url: "/painel/config-salao", icon: Settings },
+  { title: "Contatos", url: "/painel/contatos", icon: Users },
+  { title: "Cashback & Cupons", url: "/painel/cashback", icon: Gift },
+  { title: "Relatórios", url: "/painel/relatorios", icon: BarChart3 },
+  { title: "Frete", url: "/painel/taxas-entrega", icon: Truck },
+  { title: "Entregadores", url: "/painel/entregadores", icon: Bike },
+  { title: "Alertas Entrega", url: "/painel/alertas-entrega", icon: AlertTriangle },
+  { title: "Chat Entregadores", url: "/painel/chat-entregador", icon: MessageSquare },
+  { title: "Cardápio Digital", url: "/painel/cardapio-digital", icon: Smartphone },
+  { title: "Estabelecimento", url: "/painel/estabelecimento", icon: Store },
+  { title: "iFood", url: "/painel/ifood", icon: Store },
+  { title: "Bot iFood", url: "/painel/ifood-bot", icon: Bot },
+  { title: "Bots Externos", url: "/painel/integracoes-externas", icon: Bot },
+  { title: "Roteirização", url: "/painel/roteirizacao", icon: Route },
+  { title: "Rotas", url: "/painel/rotas", icon: Map },
+  { title: "Mapa Operacional", url: "/painel/mapa-operacional", icon: Map },
+  { title: "Gestão Motoboys", url: "/painel/gestao-entregadores", icon: UserCog },
+  { title: "Config. Logística", url: "/painel/config-roteirizacao", icon: Cog },
 ];
 
 const URGENCY_SOUND_URL = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==";
@@ -155,16 +155,16 @@ const AdminLayout = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { navigate("/admin/login"); return; }
+      if (!session) { navigate("/painel/login"); return; }
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", session.user.id);
       const hasAccess = roles?.some(r => r.role === "admin" || r.role === "staff");
-      if (!hasAccess) { await supabase.auth.signOut(); navigate("/admin/login"); return; }
+      if (!hasAccess) { await supabase.auth.signOut(); navigate("/painel/login"); return; }
       setLoading(false);
       fetchStoreStatus();
     };
     checkAuth();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") navigate("/admin/login");
+      if (event === "SIGNED_OUT") navigate("/painel/login");
     });
     return () => subscription.unsubscribe();
   }, [navigate]);
@@ -181,7 +181,7 @@ const AdminLayout = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast.success("Logout realizado");
-    navigate("/admin/login");
+    navigate("/painel/login");
   };
 
   if (loading) {
@@ -213,10 +213,10 @@ const AdminLayout = () => {
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton asChild>
-                        <NavLink to={item.url} end={item.url === "/admin"} className="hover:bg-muted/50 flex items-center" activeClassName="bg-muted text-primary font-medium">
+                        <NavLink to={item.url} end={item.url === "/painel"} className="hover:bg-muted/50 flex items-center" activeClassName="bg-muted text-primary font-medium">
                           <item.icon className="mr-2 h-4 w-4" />
                           <span className="flex-1">{item.title}</span>
-                          {item.url === "/admin/delivery-alerts" && pendingAlerts > 0 && (
+                          {item.url === "/painel/alertas-entrega" && pendingAlerts > 0 && (
                             <Badge variant="destructive" className="ml-auto h-5 min-w-5 flex items-center justify-center text-[10px] px-1.5 animate-pulse">
                               {pendingAlerts}
                             </Badge>
@@ -241,7 +241,7 @@ const AdminLayout = () => {
           <header className="h-14 flex items-center border-b border-border px-4">
             <SidebarTrigger className="mr-4" />
             <h1 className="text-lg font-semibold text-foreground flex-1">
-              {menuItems.find(i => i.url === "/admin" ? location.pathname === "/admin" : location.pathname.startsWith(i.url))?.title || "Painel"}
+              {menuItems.find(i => i.url === "/painel" ? location.pathname === "/painel" : location.pathname.startsWith(i.url))?.title || "Painel"}
             </h1>
             <button onClick={toggleStore} disabled={toggling}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${storeOpen ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}>

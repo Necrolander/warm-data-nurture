@@ -37,7 +37,7 @@ const DriverLogin = () => {
     localStorage.setItem("driver_phone", data.phone);
 
     toast.success(`Bem-vindo, ${data.name}!`);
-    navigate("/driver");
+    navigate("/entregador");
     setLoading(false);
   };
 

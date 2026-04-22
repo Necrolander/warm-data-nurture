@@ -61,7 +61,7 @@ const DriverDashboard = () => {
   const activeOrder = currentOrders[selectedOrderIndex] || null;
 
   useEffect(() => {
-    if (!driverId) { navigate("/driver/login"); return; }
+    if (!driverId) { navigate("/entregador/login"); return; }
     loadCurrentOrders();
     loadDriverStatus();
     loadActiveRoute();
@@ -431,7 +431,7 @@ const DriverDashboard = () => {
     localStorage.removeItem("driver_id");
     localStorage.removeItem("driver_name");
     localStorage.removeItem("driver_phone");
-    navigate("/driver/login");
+    navigate("/entregador/login");
   };
 
   if (!driverId) return null;
