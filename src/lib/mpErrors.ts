@@ -5,7 +5,9 @@
  *  - Payment creation (edge function response)
  *  - Payment status (status / status_detail after charge)
  *  - Admin audit screen (payment_failures listing)
+ *  - Toasts (via mpToast helper) — guarantees toasts and MpErrorAlert show the same copy
  */
+import { toast } from "sonner";
 
 export type MpErrorSeverity = "info" | "warning" | "error";
 
