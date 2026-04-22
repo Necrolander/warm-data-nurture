@@ -204,14 +204,9 @@ const DriverDashboard = () => {
           if (isOnline) {
             loadAvailableOrders();
             const newRow = payload.new;
-            if (newRow?.status === "ready" && !newRow?.delivery_person_id && newRow?.order_type === "delivery") {
-              if (!notifiedOrderIdsRef.current.has(newRow.id)) {
-                notifiedOrderIdsRef.current.add(newRow.id);
-                sendPushNotification("🛵 Novo Pedido Disponível!", `Pedido #${newRow.order_number}`);
-                toast("🛵 Novo pedido disponível!", { duration: 8000 });
-              }
-            }
-            // Notifica também quando um pedido for atribuído diretamente a este motoboy.
+            // Som/push APENAS quando o pedido é atribuído a este motoboy.
+            // Pedidos meramente "disponíveis" não disparam mais alerta sonoro
+            // para evitar notificações duplicadas para todos os entregadores.
             if (
               newRow?.delivery_person_id === driverId &&
               (payload.eventType === "INSERT" || payload.old?.delivery_person_id !== driverId)
