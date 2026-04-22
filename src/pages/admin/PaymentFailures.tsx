@@ -136,6 +136,34 @@ const PaymentFailures = () => {
         </Button>
       </div>
 
+      {/* Alerta de pico de recusas */}
+      {spikeAlerts.length > 0 && (
+        <Alert variant="destructive" className="border-destructive/50">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            {spikeAlerts.length === 1
+              ? "Pico de recusas detectado na última hora"
+              : `${spikeAlerts.length} motivos com pico de recusas na última hora`}
+          </AlertTitle>
+          <AlertDescription>
+            <ul className="mt-2 space-y-1 text-sm">
+              {spikeAlerts.map((a) => (
+                <li key={a.code} className="flex items-center gap-2">
+                  <Badge variant="destructive" className="font-mono">
+                    {a.count}×
+                  </Badge>
+                  <span className="font-medium">{a.label}</span>
+                  <span className="text-xs opacity-70 font-mono">({a.code})</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs opacity-80">
+              Limite: {ALERT_THRESHOLD}+ ocorrências do mesmo motivo em {ALERT_WINDOW_MIN} min.
+            </p>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
