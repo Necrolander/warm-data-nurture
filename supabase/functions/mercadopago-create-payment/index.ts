@@ -152,10 +152,38 @@ Deno.serve(async (req) => {
     const mpData = await mpRes.json();
     if (!mpRes.ok) {
       console.error("MP error:", mpData);
+      await logPaymentFailure({
+        order_id: body.order_id,
+        method: body.method,
+        amount: body.amount,
+        mp_payment_id: mpData?.id ? String(mpData.id) : null,
+        status: mpData?.status || "error",
+        status_detail: mpData?.status_detail || mpData?.error || null,
+        error_code: mpData?.cause?.[0]?.code ? String(mpData.cause[0].code) : null,
+        error_message: mpData?.message || mpData?.error || null,
+        payment_method_id: (body as CardBody).payment_method_id || body.method,
+        installments: (body as CardBody).installments || null,
+        raw_response: mpData,
+      });
       return json({ error: mpData?.message || "Erro Mercado Pago", details: mpData }, 400);
     }
 
-    // Save payment id on order
+    if (body.method === "card" && mpData.status === "rejected") {
+      await logPaymentFailure({
+        order_id: body.order_id,
+        method: "card",
+        amount: body.amount,
+        mp_payment_id: String(mpData.id),
+        status: mpData.status,
+        status_detail: mpData.status_detail || null,
+        error_code: mpData.status_detail || null,
+        error_message: mpData.status_detail || "Pagamento recusado",
+        payment_method_id: (body as CardBody).payment_method_id,
+        installments: (body as CardBody).installments || 1,
+        raw_response: mpData,
+      });
+    }
+
     await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}`, {
       method: "PATCH",
       headers: {
