@@ -22,6 +22,7 @@ const menuItems = [
   { title: "Fazer Pedido", url: "/admin/new-order", icon: PlusCircle },
   { title: "Gestor de Cardápio", url: "/admin/menu-manager", icon: UtensilsCrossed },
   { title: "Notas Fiscais", url: "/admin/invoices", icon: Receipt },
+  { title: "Falhas Pagamento", url: "/admin/payment-failures", icon: CreditCard },
   { title: "Robô", url: "/admin/bot", icon: Bot },
   { title: "WhatsApp", url: "/admin/whatsapp-connect", icon: MessageSquare },
   { title: "WhatsApp Outbox", url: "/admin/whatsapp-outbox", icon: MessageSquare },
