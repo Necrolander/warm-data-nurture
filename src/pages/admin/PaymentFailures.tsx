@@ -29,6 +29,13 @@ interface PaymentFailure {
   installments: number | null;
   raw_response: any;
   created_at: string;
+  customer_phone: string | null;
+  customer_name: string | null;
+  user_id: string | null;
+  card_first_six: string | null;
+  card_last_four: string | null;
+  card_holder_name: string | null;
+  previous_payment_id: string | null;
 }
 
 const labelFor = (code: string | null) => mpErrorLabel(code);
@@ -79,11 +86,44 @@ const PaymentFailures = () => {
     const s = search.trim().toLowerCase();
     if (!s) return rows;
     return rows.filter((r) =>
-      [r.status_detail, r.error_code, r.error_message, r.mp_payment_id, r.order_id]
+      [
+        r.status_detail,
+        r.error_code,
+        r.error_message,
+        r.mp_payment_id,
+        r.order_id,
+        r.customer_phone,
+        r.customer_name,
+        r.card_last_four,
+        r.card_first_six,
+        r.card_holder_name,
+        r.previous_payment_id,
+      ]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(s)),
     );
   }, [rows, search]);
+
+  // Recorrência por cliente (telefone) e por cartão (BIN+4 últimos)
+  const recurrenceByPhone = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.customer_phone) continue;
+      m.set(r.customer_phone, (m.get(r.customer_phone) || 0) + 1);
+    }
+    return m;
+  }, [rows]);
+  const recurrenceByCard = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of rows) {
+      const k = r.card_last_four
+        ? `${r.card_first_six || "??????"}-${r.card_last_four}`
+        : null;
+      if (!k) continue;
+      m.set(k, (m.get(k) || 0) + 1);
+    }
+    return m;
+  }, [rows]);
 
   const aggregated = useMemo(() => {
     const map = new Map<string, number>();
@@ -248,7 +288,7 @@ const PaymentFailures = () => {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por código, mensagem ou ID do pedido…"
+            placeholder="Buscar por código, mensagem, telefone, final do cartão, pedido…"
             className="pl-10"
           />
         </div>
@@ -263,6 +303,8 @@ const PaymentFailures = () => {
                 <TableRow>
                   <TableHead>Quando</TableHead>
                   <TableHead>Método</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cartão</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Código</TableHead>
                   <TableHead>Parcelas</TableHead>
@@ -274,47 +316,90 @@ const PaymentFailures = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Carregando…
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Nenhuma falha registrada.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {format(new Date(r.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={r.method === "card" ? "default" : "secondary"}>
-                          {r.method === "card" ? "Cartão" : "PIX"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[260px] truncate">
-                        {labelFor(r.status_detail || r.error_code)}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {r.status_detail || r.error_code || "—"}
-                      </TableCell>
-                      <TableCell>{r.installments ?? "—"}</TableCell>
-                      <TableCell>
-                        {r.amount != null ? `R$ ${Number(r.amount).toFixed(2).replace(".", ",")}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {r.order_id ? r.order_id.slice(0, 8) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => setDetail(r)}>
-                          Ver
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filtered.map((r) => {
+                    const phoneCount = r.customer_phone ? recurrenceByPhone.get(r.customer_phone) || 0 : 0;
+                    const cardKey = r.card_last_four
+                      ? `${r.card_first_six || "??????"}-${r.card_last_four}`
+                      : null;
+                    const cardCount2 = cardKey ? recurrenceByCard.get(cardKey) || 0 : 0;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {format(new Date(r.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={r.method === "card" ? "default" : "secondary"}>
+                            {r.method === "card" ? "Cartão" : "PIX"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {r.customer_name || r.customer_phone ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{r.customer_name || "—"}</span>
+                                <span className="text-muted-foreground font-mono">{r.customer_phone || ""}</span>
+                              </div>
+                              {phoneCount > 1 && (
+                                <Badge variant="destructive" className="h-5 text-[10px]">
+                                  {phoneCount}×
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {r.card_last_four ? (
+                            <div className="flex items-center gap-1.5">
+                              <span>•••• {r.card_last_four}</span>
+                              {cardCount2 > 1 && (
+                                <Badge variant="destructive" className="h-5 text-[10px]">
+                                  {cardCount2}×
+                                </Badge>
+                              )}
+                              {r.previous_payment_id && (
+                                <Badge variant="outline" className="h-5 text-[10px]" title="Tentativa após pagamento anterior">
+                                  retry
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate">
+                          {labelFor(r.status_detail || r.error_code)}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.status_detail || r.error_code || "—"}
+                        </TableCell>
+                        <TableCell>{r.installments ?? "—"}</TableCell>
+                        <TableCell>
+                          {r.amount != null ? `R$ ${Number(r.amount).toFixed(2).replace(".", ",")}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.order_id ? r.order_id.slice(0, 8) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => setDetail(r)}>
+                            Ver
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -365,6 +450,34 @@ const PaymentFailures = () => {
                 <div>
                   <p className="text-muted-foreground">MP Payment ID</p>
                   <p className="font-mono text-xs">{detail.mp_payment_id || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cliente</p>
+                  <p>{detail.customer_name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Telefone</p>
+                  <p className="font-mono text-xs">{detail.customer_phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cartão</p>
+                  <p className="font-mono text-xs">
+                    {detail.card_last_four
+                      ? `${detail.card_first_six || "??????"} •••• ${detail.card_last_four}`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Titular</p>
+                  <p className="text-xs">{detail.card_holder_name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Tentativa anterior</p>
+                  <p className="font-mono text-xs">{detail.previous_payment_id || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Usuário (auth)</p>
+                  <p className="font-mono text-xs">{detail.user_id ? detail.user_id.slice(0, 8) : "—"}</p>
                 </div>
               </div>
               <div>

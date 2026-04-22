@@ -1160,7 +1160,12 @@ export type Database = {
       payment_failures: {
         Row: {
           amount: number | null
+          card_first_six: string | null
+          card_holder_name: string | null
+          card_last_four: string | null
           created_at: string
+          customer_name: string | null
+          customer_phone: string | null
           error_code: string | null
           error_message: string | null
           id: string
@@ -1169,13 +1174,20 @@ export type Database = {
           mp_payment_id: string | null
           order_id: string | null
           payment_method_id: string | null
+          previous_payment_id: string | null
           raw_response: Json | null
           status: string | null
           status_detail: string | null
+          user_id: string | null
         }
         Insert: {
           amount?: number | null
+          card_first_six?: string | null
+          card_holder_name?: string | null
+          card_last_four?: string | null
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           error_code?: string | null
           error_message?: string | null
           id?: string
@@ -1184,13 +1196,20 @@ export type Database = {
           mp_payment_id?: string | null
           order_id?: string | null
           payment_method_id?: string | null
+          previous_payment_id?: string | null
           raw_response?: Json | null
           status?: string | null
           status_detail?: string | null
+          user_id?: string | null
         }
         Update: {
           amount?: number | null
+          card_first_six?: string | null
+          card_holder_name?: string | null
+          card_last_four?: string | null
           created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
           error_code?: string | null
           error_message?: string | null
           id?: string
@@ -1199,9 +1218,11 @@ export type Database = {
           mp_payment_id?: string | null
           order_id?: string | null
           payment_method_id?: string | null
+          previous_payment_id?: string | null
           raw_response?: Json | null
           status?: string | null
           status_detail?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {

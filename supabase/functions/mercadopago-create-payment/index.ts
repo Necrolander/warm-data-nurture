@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     // ---- Idempotency check ----
     const orderRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}&select=id,mercadopago_payment_id,payment_status,status`,
+      `${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}&select=id,mercadopago_payment_id,payment_status,status,customer_name,customer_phone`,
       { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
     );
     const orders = await orderRes.json();
@@ -50,6 +50,23 @@ Deno.serve(async (req) => {
     if (order.status === "cancelled") {
       return json({ error: "Pedido cancelado. Crie um novo pedido." }, 409);
     }
+
+    // Optional auth user (if frontend forwarded a JWT)
+    let authUserId: string | null = null;
+    try {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SERVICE_KEY, Authorization: authHeader },
+        });
+        if (userRes.ok) {
+          const u = await userRes.json();
+          authUserId = u?.id || null;
+        }
+      }
+    } catch { /* ignore */ }
+
+    const previousPaymentId: string | null = order.mercadopago_payment_id || null;
 
     if (order.mercadopago_payment_id) {
       // Fetch live status from MP to decide whether to reuse
@@ -150,6 +167,21 @@ Deno.serve(async (req) => {
     });
 
     const mpData = await mpRes.json();
+
+    // Common context for failure logging
+    const failureContext = {
+      customer_phone: order.customer_phone || null,
+      customer_name: order.customer_name || null,
+      user_id: authUserId,
+      previous_payment_id: previousPaymentId,
+    };
+    const cardFromMp = mpData?.card || {};
+    const cardInfo = {
+      card_first_six: cardFromMp.first_six_digits || null,
+      card_last_four: cardFromMp.last_four_digits || null,
+      card_holder_name: cardFromMp.cardholder?.name || null,
+    };
+
     if (!mpRes.ok) {
       console.error("MP error:", mpData);
       await logPaymentFailure({
@@ -164,6 +196,8 @@ Deno.serve(async (req) => {
         payment_method_id: (body as CardBody).payment_method_id || body.method,
         installments: (body as CardBody).installments || null,
         raw_response: mpData,
+        ...failureContext,
+        ...cardInfo,
       });
       return json({ error: mpData?.message || "Erro Mercado Pago", details: mpData }, 400);
     }
@@ -181,6 +215,8 @@ Deno.serve(async (req) => {
         payment_method_id: (body as CardBody).payment_method_id,
         installments: (body as CardBody).installments || 1,
         raw_response: mpData,
+        ...failureContext,
+        ...cardInfo,
       });
     }
 
