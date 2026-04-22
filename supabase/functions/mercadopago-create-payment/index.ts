@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     // ---- Idempotency check ----
     const orderRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}&select=id,mercadopago_payment_id,payment_status,status`,
+      `${SUPABASE_URL}/rest/v1/orders?id=eq.${body.order_id}&select=id,mercadopago_payment_id,payment_status,status,customer_name,customer_phone`,
       { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } },
     );
     const orders = await orderRes.json();
@@ -50,6 +50,23 @@ Deno.serve(async (req) => {
     if (order.status === "cancelled") {
       return json({ error: "Pedido cancelado. Crie um novo pedido." }, 409);
     }
+
+    // Optional auth user (if frontend forwarded a JWT)
+    let authUserId: string | null = null;
+    try {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: SERVICE_KEY, Authorization: authHeader },
+        });
+        if (userRes.ok) {
+          const u = await userRes.json();
+          authUserId = u?.id || null;
+        }
+      }
+    } catch { /* ignore */ }
+
+    const previousPaymentId: string | null = order.mercadopago_payment_id || null;
 
     if (order.mercadopago_payment_id) {
       // Fetch live status from MP to decide whether to reuse
