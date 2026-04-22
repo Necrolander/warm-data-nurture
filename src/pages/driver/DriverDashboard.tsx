@@ -315,16 +315,56 @@ const DriverDashboard = () => {
       }
     };
 
-    const interval = window.setInterval(syncDashboard, isOnline ? 5000 : 12000);
+    // Polling de fallback (caso o realtime caia ou o app esteja em background).
+    const interval = window.setInterval(syncDashboard, isOnline ? 8000 : 20000);
     window.addEventListener("focus", syncDashboard);
     document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Realtime: reage imediatamente a qualquer mudança em pedidos ou rotas
+    // para que pedidos que viram "ready" apareçam sem esperar o polling.
+    const ordersChannel = supabase
+      .channel(`driver-dashboard-orders-${driverId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        (payload: any) => {
+          const next = payload.new ?? {};
+          const prev = payload.old ?? {};
+          const isMine =
+            next.delivery_person_id === driverId ||
+            prev.delivery_person_id === driverId;
+          const becameReadyDelivery =
+            next.order_type === "delivery" &&
+            next.status === "ready" &&
+            !next.delivery_person_id;
+          const leftReadyPool =
+            prev.status === "ready" &&
+            (next.status !== "ready" || next.delivery_person_id);
+
+          if (isMine || becameReadyDelivery || leftReadyPool) {
+            syncDashboard();
+          }
+        },
+      )
+      .subscribe();
+
+    const routesChannel = supabase
+      .channel(`driver-dashboard-routes-${driverId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "routes", filter: `driver_id=eq.${driverId}` },
+        () => syncDashboard(),
+      )
+      .subscribe();
 
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", syncDashboard);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(routesChannel);
     };
-  }, [driverId, isOnline, refreshDashboard]);
+  }, [driverId, isOnline]);
 
   const loadDriverStatus = async () => {
     await refreshDashboard();
