@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, AlertTriangle, MessageSquare, X, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { invokeDriverApp } from "@/lib/driverApp";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DriverChatProps {
   driverId: string;
@@ -27,7 +28,7 @@ interface Message {
   created_at: string;
 }
 
-const DriverChat = ({ currentOrderId, customerPhone, customerName, onClose }: DriverChatProps) => {
+const DriverChat = ({ driverId, currentOrderId, customerPhone, customerName, onClose }: DriverChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -36,16 +37,42 @@ const DriverChat = ({ currentOrderId, customerPhone, customerName, onClose }: Dr
   const emergencyIntervalRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Mostra TODAS as mensagens deste motoboy (não só do pedido atual),
+  // assim ele nunca perde uma resposta enviada pelo admin em outra thread.
   const fetchMessages = async () => {
-    const data = await invokeDriverApp<{ messages: Message[] }>("chat_list", { orderId: currentOrderId || null });
-    setMessages(data.messages || []);
+    try {
+      const data = await invokeDriverApp<{ messages: Message[] }>("chat_list", { orderId: null });
+      setMessages(data.messages || []);
+    } catch (error: any) {
+      // silencioso — polling/realtime tentam novamente
+    }
   };
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 3000);
-    return () => clearInterval(interval);
-  }, [currentOrderId]);
+    // Polling de fallback caso o realtime não esteja disponível
+    const interval = setInterval(fetchMessages, 5000);
+
+    // Realtime: nova resposta do admin aparece instantaneamente
+    const channel = supabase
+      .channel(`driver-chat-${driverId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "driver_messages",
+          filter: `driver_id=eq.${driverId}`,
+        },
+        () => fetchMessages()
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [driverId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,6 +130,7 @@ const DriverChat = ({ currentOrderId, customerPhone, customerName, onClose }: Dr
     }
   };
 
+  // Para a emergência assim que o admin responder QUALQUER mensagem
   useEffect(() => {
     const lastAdminMessage = [...messages].reverse().find((msg) => msg.sender === "admin");
     if (lastAdminMessage && emergencyActiveRef.current) {

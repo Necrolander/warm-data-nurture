@@ -92,6 +92,37 @@ const DriverDashboard = () => {
     try { localStorage.setItem(VIBRATION_KEY, vibrationEnabled ? "1" : "0"); } catch {}
   }, [vibrationEnabled, VIBRATION_KEY]);
 
+  // Contador de mensagens não lidas do admin (mostra badge no botão de chat)
+  const [unreadAdminMessages, setUnreadAdminMessages] = useState(0);
+  useEffect(() => {
+    if (!driverId) return;
+    let active = true;
+    const loadUnread = async () => {
+      const { count } = await supabase
+        .from("driver_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("driver_id", driverId)
+        .eq("sender", "admin")
+        .eq("read_by_driver", false);
+      if (active) setUnreadAdminMessages(count ?? 0);
+    };
+    loadUnread();
+    const interval = setInterval(loadUnread, 8000);
+    const channel = supabase
+      .channel(`driver-unread-${driverId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "driver_messages", filter: `driver_id=eq.${driverId}` },
+        () => loadUnread()
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [driverId, showChat]);
+
   // Route state
   const [activeRoute, setActiveRoute] = useState<any>(null);
   const [routeStops, setRouteStops] = useState<any[]>([]);
@@ -610,6 +641,11 @@ const DriverDashboard = () => {
             </Popover>
             <Button variant="ghost" size="icon" onClick={() => setShowChat(true)} className="relative">
               <MessageSquare className="h-5 w-5" />
+              {unreadAdminMessages > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 bg-destructive text-destructive-foreground text-[10px] leading-none font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                  {unreadAdminMessages > 9 ? "9+" : unreadAdminMessages}
+                </span>
+              )}
             </Button>
             <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
               <History className="h-5 w-5" />
