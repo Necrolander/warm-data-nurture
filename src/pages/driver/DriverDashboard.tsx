@@ -18,6 +18,7 @@ import DriverHistory from "@/components/driver/DriverHistory";
 import DriverProblemDialog from "@/components/driver/DriverProblemDialog";
 import DriverChecklist from "@/components/driver/DriverChecklist";
 import DriverChat from "@/components/driver/DriverChat";
+import { invokeDriverApp, clearDriverSession } from "@/lib/driverApp";
 
 const MAX_ACTIVE_ORDERS = 3;
 
@@ -309,45 +310,35 @@ const DriverDashboard = () => {
     return () => stopLocationSharing();
   }, [isOnline, currentOrders.length]);
 
-  // --- Route handlers ---
-  const handleStopDelivered = async (stopIndex: number) => {
+  // --- Route handlers (server-side via edge function) ---
+  const handleStopDelivered = async (stopIndex: number, code: string) => {
     const stop = routeStops[stopIndex];
-    if (!stop) return;
+    if (!stop) throw new Error("Parada não encontrada");
 
-    await supabase.from("orders").update({ status: "delivered" as any }).eq("id", stop.order_id);
-    await supabase.from("delivery_tracking").update({ is_active: false }).eq("order_id", stop.order_id);
-    await supabase.functions.invoke("whatsapp-bot", {
-      body: { action: "notify_status", order_id: stop.order_id, new_status: "delivered" },
+    await invokeDriverApp("complete_delivery", {
+      orderId: stop.order_id,
+      confirmCode: code,
     });
-
-    // Save to delivery_history
-    await supabase.from("delivery_history").insert({
-      order_id: stop.order_id,
-      route_id: activeRoute?.id,
-      driver_id: driverId,
-      distance_km: stop.stop_distance_km || 0,
-      estimated_time_min: stop.stop_duration_min || 0,
-    } as any);
 
     toast.success(`Entrega #${stop.order?.order_number} finalizada! 🎉`);
     setCurrentStopIndex(stopIndex + 1);
-    loadActiveRoute();
-    loadCurrentOrders();
+    await loadActiveRoute();
+    await loadCurrentOrders();
   };
 
   const handleCompleteRoute = async () => {
     if (!activeRoute) return;
-    await supabase.from("routes").update({ status: "completed" } as any).eq("id", activeRoute.id);
-    await supabase.from("delivery_persons").update({
-      current_route_id: null,
-      status: "available",
-    } as any).eq("id", driverId!);
-    toast.success("Rota finalizada! 🏁");
-    setActiveRoute(null);
-    setRouteStops([]);
-    setViewMode("orders");
-    loadCurrentOrders();
-    loadAvailableOrders();
+    try {
+      await invokeDriverApp("complete_route", { routeId: activeRoute.id });
+      toast.success("Rota finalizada! 🏁");
+      setActiveRoute(null);
+      setRouteStops([]);
+      setViewMode("orders");
+      await loadCurrentOrders();
+      await loadAvailableOrders();
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao finalizar rota");
+    }
   };
 
   const handleRouteReportProblem = (orderId: string) => {
@@ -403,20 +394,15 @@ const DriverDashboard = () => {
     toast("Entrega recusada");
   };
 
-  const updateDeliveryStatus = async (newStatus: string) => {
-    if (!activeOrder) return;
-    await supabase.from("orders").update({ status: newStatus as any }).eq("id", activeOrder.id);
-    await supabase.functions.invoke("whatsapp-bot", {
-      body: { action: "notify_status", order_id: activeOrder.id, new_status: newStatus },
+  const completeActiveOrder = async (code: string) => {
+    if (!activeOrder) throw new Error("Nenhum pedido ativo");
+    await invokeDriverApp("complete_delivery", {
+      orderId: activeOrder.id,
+      confirmCode: code,
     });
-    if (newStatus === "delivered") {
-      await supabase.from("delivery_tracking").update({ is_active: false }).eq("order_id", activeOrder.id);
-      toast.success("Entrega finalizada! 🎉");
-    } else {
-      toast.success("Status atualizado!");
-    }
-    loadCurrentOrders();
-    loadAvailableOrders();
+    toast.success("Entrega finalizada! 🎉");
+    await loadCurrentOrders();
+    await loadAvailableOrders();
   };
 
   const openNavigation = () => {
@@ -430,9 +416,7 @@ const DriverDashboard = () => {
 
   const handleLogout = () => {
     stopLocationSharing();
-    localStorage.removeItem("driver_id");
-    localStorage.removeItem("driver_name");
-    localStorage.removeItem("driver_phone");
+    clearDriverSession();
     navigate("/entregador/login");
   };
 
@@ -503,11 +487,7 @@ const DriverDashboard = () => {
             onConfirmDelivery={async (orderId, code) => {
               const idx = routeStops.findIndex((s) => s.order_id === orderId);
               if (idx < 0) throw new Error("Parada não encontrada");
-              const stop = routeStops[idx];
-              if (stop.order?.delivery_code && String(stop.order.delivery_code) !== String(code)) {
-                throw new Error("Código incorreto");
-              }
-              await handleStopDelivered(idx);
+              await handleStopDelivered(idx, code);
             }}
           />
         ) : currentOrders.length > 0 && viewMode === "orders" ? (
@@ -534,10 +514,7 @@ const DriverDashboard = () => {
                 onOpenNavigation={openNavigation}
                 onReportProblem={() => { setProblemOrderId(activeOrder.id); setShowProblem(true); }}
                 onConfirmDelivery={async (code) => {
-                  if (activeOrder.delivery_code && String(activeOrder.delivery_code) !== String(code)) {
-                    throw new Error("Código incorreto");
-                  }
-                  await updateDeliveryStatus("delivered");
+                  await completeActiveOrder(code);
                 }}
               />
             )}
