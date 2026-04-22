@@ -35,9 +35,9 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json()) as PixBody | CardBody;
     if (!body?.order_id || !body?.amount || !body?.method) {
-      return json({ error: "Campos obrigatórios faltando" }, 400);
+      return json({ error: "Campos obrigatórios faltando", error_code: "invalid_payment_method" }, 400);
     }
-    if (body.amount <= 0) return json({ error: "Valor inválido" }, 400);
+    if (body.amount <= 0) return json({ error: "Valor inválido", error_code: "invalid_payment_method" }, 400);
 
     // ---- Idempotency check ----
     const orderRes = await fetch(
@@ -46,9 +46,9 @@ Deno.serve(async (req) => {
     );
     const orders = await orderRes.json();
     const order = orders?.[0];
-    if (!order) return json({ error: "Pedido não encontrado" }, 404);
+    if (!order) return json({ error: "Pedido não encontrado", error_code: "order_not_found" }, 404);
     if (order.status === "cancelled") {
-      return json({ error: "Pedido cancelado. Crie um novo pedido." }, 409);
+      return json({ error: "Pedido cancelado. Crie um novo pedido.", error_code: "order_cancelled" }, 409);
     }
 
     // Optional auth user (if frontend forwarded a JWT)
@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
           return json(
             {
               error: "Pagamento já aprovado para este pedido.",
+              error_code: "payment_already_approved",
               payment_id: existing.id,
               status: existing.status,
             },
@@ -184,6 +185,7 @@ Deno.serve(async (req) => {
 
     if (!mpRes.ok) {
       console.error("MP error:", mpData);
+      const errCode = mpData?.cause?.[0]?.code ? String(mpData.cause[0].code) : null;
       await logPaymentFailure({
         order_id: body.order_id,
         method: body.method,
@@ -191,7 +193,7 @@ Deno.serve(async (req) => {
         mp_payment_id: mpData?.id ? String(mpData.id) : null,
         status: mpData?.status || "error",
         status_detail: mpData?.status_detail || mpData?.error || null,
-        error_code: mpData?.cause?.[0]?.code ? String(mpData.cause[0].code) : null,
+        error_code: errCode,
         error_message: mpData?.message || mpData?.error || null,
         payment_method_id: (body as CardBody).payment_method_id || body.method,
         installments: (body as CardBody).installments || null,
@@ -199,7 +201,17 @@ Deno.serve(async (req) => {
         ...failureContext,
         ...cardInfo,
       });
-      return json({ error: mpData?.message || "Erro Mercado Pago", details: mpData }, 400);
+      return json(
+        {
+          error: mpData?.message || "Erro Mercado Pago",
+          // Standardized fields the front maps via mpErrors catalog:
+          error_code: errCode,
+          error_status: mpData?.status || null,
+          error_status_detail: mpData?.status_detail || null,
+          details: mpData,
+        },
+        400,
+      );
     }
 
     if (body.method === "card" && mpData.status === "rejected") {
@@ -248,7 +260,7 @@ Deno.serve(async (req) => {
     return json(result, 200);
   } catch (err: any) {
     console.error("create-payment fatal:", err);
-    return json({ error: err?.message || "Erro interno" }, 500);
+    return json({ error: err?.message || "Erro interno", error_code: "server_error" }, 500);
   }
 });
 
