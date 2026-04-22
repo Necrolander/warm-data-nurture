@@ -447,6 +447,9 @@ const Orders = () => {
   const [autoAccept, setAutoAccept] = useState(() => {
     return localStorage.getItem("truebox_auto_accept") === "true";
   });
+  const [autoAssign, setAutoAssign] = useState(() => {
+    return localStorage.getItem("truebox_auto_assign_driver") === "true";
+  });
 
   const soundIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
