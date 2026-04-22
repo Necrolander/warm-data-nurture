@@ -198,11 +198,16 @@ const NewOrder = () => {
   ) : false;
 
   const updateQuantity = (uid: string, delta: number) => {
-    setCart(prev => prev.map(c => {
-      if (c.uid !== uid) return c;
-      const newQty = c.quantity + delta;
-      return newQty > 0 ? { ...c, quantity: newQty } : c;
-    }).filter(c => c.quantity > 0));
+    const current = cart.find(c => c.uid === uid);
+    if (!current) return;
+    const newQty = current.quantity + delta;
+    if (newQty < 1) {
+      toast.warning("Quantidade mínima é 1", {
+        description: "Para retirar este item do pedido, use o botão X.",
+      });
+      return;
+    }
+    setCart(prev => prev.map(c => (c.uid === uid ? { ...c, quantity: newQty } : c)));
   };
 
   const removeItem = (uid: string) => {
