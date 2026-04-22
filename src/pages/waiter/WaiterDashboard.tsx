@@ -219,7 +219,7 @@ const WaiterDashboard = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchData]);
 
-  const handleLogout = async () => { await supabase.auth.signOut(); navigate("/waiter/login"); };
+  const handleLogout = async () => { await supabase.auth.signOut(); navigate("/garcom/login"); };
 
   const activeOrders = orders.filter(o => !["delivered", "cancelled"].includes(o.status));
   const occupiedTableNumbers = new Set(activeOrders.filter(o => o.order_type === "dine_in" && o.table_number).map(o => o.table_number!));
@@ -351,7 +351,7 @@ const WaiterDashboard = () => {
                 const tableOrder = getTableOrder(table.table_number);
                 return (
                   <Card key={table.id} className={`border-2 cursor-pointer active:scale-95 transition-all ${occupied ? "border-red-500 bg-red-500/10" : "border-green-500 bg-green-500/10"}`}
-                    onClick={() => { if (occupied && tableOrder) { setSelectedOrder(tableOrder); } else { navigate(`/waiter/new-order?table=${table.table_number}`); } }}>
+                    onClick={() => { if (occupied && tableOrder) { setSelectedOrder(tableOrder); } else { navigate(`/garcom/novo-pedido?table=${table.table_number}`); } }}>
                     <CardContent className="p-4 text-center">
                       <p className="text-2xl font-black text-foreground">{table.table_number}</p>
                       <p className="text-xs text-muted-foreground mt-1">{occupied ? "Ocupada" : "Livre"}</p>
@@ -364,7 +364,7 @@ const WaiterDashboard = () => {
               })}
             </div>
           )}
-          <Button onClick={() => navigate("/waiter/new-order")} variant="outline" className="w-full mt-4 h-12 font-bold gap-2">
+          <Button onClick={() => navigate("/garcom/novo-pedido")} variant="outline" className="w-full mt-4 h-12 font-bold gap-2">
             <Plus className="w-5 h-5" /> Pedido sem mesa (Retirada / Entrega)
           </Button>
         </div>
@@ -437,7 +437,7 @@ const WaiterDashboard = () => {
 
                 {!["delivered", "cancelled"].includes(selectedOrder.status) && (
                   <div className="grid grid-cols-2 gap-2 pt-2">
-                    <Button variant="outline" size="sm" className="gap-1" onClick={() => { setSelectedOrder(null); navigate(`/waiter/new-order?edit=${selectedOrder.id}`); }}>
+                    <Button variant="outline" size="sm" className="gap-1" onClick={() => { setSelectedOrder(null); navigate(`/garcom/novo-pedido?edit=${selectedOrder.id}`); }}>
                       <Edit className="w-4 h-4" /> Editar
                     </Button>
                     <Button variant="outline" size="sm" className="gap-1" onClick={() => setManagingItems(true)}>

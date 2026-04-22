@@ -14,7 +14,7 @@ const CartDrawer = ({ open, onClose }: CartDrawerProps) => {
 
   const goToCheckout = () => {
     onClose();
-    navigate("/checkout");
+    navigate("/finalizar");
   };
 
   return (

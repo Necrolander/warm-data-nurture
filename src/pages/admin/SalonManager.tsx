@@ -100,7 +100,7 @@ const SalonManager = () => {
                   size="icon"
                   variant="ghost"
                   title="Imprimir QR Code"
-                  onClick={() => window.open(`/table-qr/${table.table_number}`, "_blank")}
+                  onClick={() => window.open(`/mesa-qr/${table.table_number}`, "_blank")}
                 >
                   <Printer className="h-4 w-4" />
                 </Button>

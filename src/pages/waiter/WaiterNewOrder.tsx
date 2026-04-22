@@ -326,7 +326,7 @@ const WaiterNewOrder = () => {
         toast.success(`Pedido #${order.order_number} enviado! 🔥`);
       }
 
-      navigate("/waiter");
+      navigate("/garcom");
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar pedido");
     } finally {
@@ -425,7 +425,7 @@ const WaiterNewOrder = () => {
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-card border-b border-border p-4 flex items-center gap-3">
-        <button onClick={() => navigate("/waiter")} className="text-foreground">
+        <button onClick={() => navigate("/garcom")} className="text-foreground">
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="text-lg font-black text-foreground">

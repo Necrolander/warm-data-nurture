@@ -41,7 +41,7 @@ const WaiterLogin = () => {
       }
 
       toast.success("Login realizado! ✅");
-      navigate("/waiter");
+      navigate("/garcom");
     } catch (err: any) {
       toast.error(err.message || "Erro no login");
     } finally {

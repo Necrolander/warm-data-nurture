@@ -109,7 +109,7 @@ export default function IfoodReviews() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Link to="/admin/ifood-bot">
+          <Link to="/painel/ifood-bot">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>

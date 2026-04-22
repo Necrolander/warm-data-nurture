@@ -48,7 +48,7 @@ const AdminLogin = () => {
     }
 
     toast.success("Login realizado com sucesso!");
-    navigate("/admin");
+    navigate("/painel");
   };
 
   return (

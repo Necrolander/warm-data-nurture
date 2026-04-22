@@ -209,7 +209,7 @@ const Checkout = () => {
 
       clearCart();
       toast.success("Pedido confirmado com sucesso! 🎉");
-      navigate("/order-success");
+      navigate("/pedido-confirmado");
     } catch (err) {
       console.error("Order error:", err);
       toast.error("Erro ao salvar pedido. Tente novamente.");
