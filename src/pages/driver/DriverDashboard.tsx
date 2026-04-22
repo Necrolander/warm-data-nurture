@@ -254,7 +254,7 @@ const DriverDashboard = () => {
       supabase.removeChannel(routeChannel);
       supabase.removeChannel(availChannel);
     };
-  }, [driverId, isOnline, sendPushNotification]);
+  }, [driverId, isOnline, sendPushNotification, pushAssignmentEntry]);
 
   const loadDriverStatus = async () => {
     const { data } = await supabase.from("delivery_persons").select("is_online").eq("id", driverId!).single();
