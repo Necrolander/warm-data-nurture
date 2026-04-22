@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Bike, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/logo-truebox-new.png";
+import { saveDriverSession } from "@/lib/driverApp";
 
 const normalizePhone = (value: string) => value.replace(/\D/g, "");
 
@@ -30,14 +31,17 @@ const DriverLogin = () => {
       });
 
       if (error) throw error;
-      if (data?.error || !data?.driver) {
+      if (data?.error || !data?.driver || !data?.token) {
         toast.error(data?.error || "Entregador não encontrado ou inativo");
         return;
       }
 
-      localStorage.setItem("driver_id", data.driver.id);
-      localStorage.setItem("driver_name", data.driver.name);
-      localStorage.setItem("driver_phone", data.driver.phone);
+      saveDriverSession({
+        id: data.driver.id,
+        name: data.driver.name,
+        phone: data.driver.phone,
+        token: data.token,
+      });
 
       toast.success(`Bem-vindo, ${data.driver.name}!`);
       navigate("/entregador");
