@@ -4,6 +4,8 @@ import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { getStoreCoords } from "@/services/routing/distanceUtils";
 import { getDriverPresence } from "@/lib/driverPresence";
 
@@ -15,6 +17,15 @@ const OperationalMap = () => {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [routes, setRoutes] = useState<any[]>([]);
   const [pendingOrders, setPendingOrders] = useState<any[]>([]);
+  // Filtro: por padrão só exibe motoboys efetivamente online (GPS recente).
+  const [onlyOnline, setOnlyOnline] = useState<boolean>(() => {
+    const saved = localStorage.getItem("op_map_only_online");
+    return saved === null ? true : saved === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("op_map_only_online", String(onlyOnline));
+  }, [onlyOnline]);
 
   const loadData = async () => {
     const [{ data: d }, { data: r }, { data: o }] = await Promise.all([
@@ -112,6 +123,8 @@ const OperationalMap = () => {
     drivers.forEach(d => {
       if (!d.current_lat || !d.current_lng) return;
       const presence = getDriverPresence(d);
+      // Quando o filtro está ativo, oculta motoboys com GPS parado/offline.
+      if (onlyOnline && !presence.isEffectivelyOnline) return;
       const color = presence.state === "on_route"
         ? "hsl(var(--primary))"
         : presence.state === "stale"
@@ -136,15 +149,24 @@ const OperationalMap = () => {
       const group = L.featureGroup(markersRef.current);
       map.fitBounds(group.getBounds().pad(0.2));
     }
-  }, [drivers, pendingOrders, routes]);
+  }, [drivers, pendingOrders, routes, onlyOnline]);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold text-foreground">Mapa Operacional</h2>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border bg-card">
+            <Switch id="only-online" checked={onlyOnline} onCheckedChange={setOnlyOnline} />
+            <Label htmlFor="only-online" className="text-xs cursor-pointer">
+              Somente online (GPS recente)
+            </Label>
+          </div>
           <Badge variant="outline" className="gap-1">📦 {pendingOrders.length} aguardando</Badge>
           <Badge variant="outline" className="gap-1">🏍️ {drivers.filter((driver) => getDriverPresence(driver).isEffectivelyOnline).length} online</Badge>
+          {!onlyOnline && (
+            <Badge variant="outline" className="gap-1">🟠 {drivers.filter((driver) => getDriverPresence(driver).state === "stale").length} GPS parado</Badge>
+          )}
           <Badge variant="outline" className="gap-1">🛣️ {routes.length} rotas ativas</Badge>
         </div>
       </div>
