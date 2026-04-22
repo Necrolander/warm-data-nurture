@@ -489,11 +489,7 @@ const DriverDashboard = () => {
             onConfirmDelivery={async (orderId, code) => {
               const idx = routeStops.findIndex((s) => s.order_id === orderId);
               if (idx < 0) throw new Error("Parada não encontrada");
-              const stop = routeStops[idx];
-              if (stop.order?.delivery_code && String(stop.order.delivery_code) !== String(code)) {
-                throw new Error("Código incorreto");
-              }
-              await handleStopDelivered(idx);
+              await handleStopDelivered(idx, code);
             }}
           />
         ) : currentOrders.length > 0 && viewMode === "orders" ? (
@@ -520,10 +516,7 @@ const DriverDashboard = () => {
                 onOpenNavigation={openNavigation}
                 onReportProblem={() => { setProblemOrderId(activeOrder.id); setShowProblem(true); }}
                 onConfirmDelivery={async (code) => {
-                  if (activeOrder.delivery_code && String(activeOrder.delivery_code) !== String(code)) {
-                    throw new Error("Código incorreto");
-                  }
-                  await updateDeliveryStatus("delivered");
+                  await completeActiveOrder(code);
                 }}
               />
             )}
