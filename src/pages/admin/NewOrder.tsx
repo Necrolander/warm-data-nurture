@@ -496,7 +496,14 @@ const NewOrder = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-0.5 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => updateQuantity(item.uid, -1)}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 disabled:opacity-40"
+                          disabled={item.quantity <= 1}
+                          aria-label={item.quantity <= 1 ? "Quantidade mínima atingida" : "Diminuir quantidade"}
+                          onClick={() => updateQuantity(item.uid, -1)}
+                        >
                           <Minus className="h-3 w-3" />
                         </Button>
                         <span className="text-sm font-bold w-5 text-center">{item.quantity}</span>
