@@ -665,9 +665,15 @@ const Orders = () => {
         const lastAttempt = autoAssignAttemptRef.current.get(order.id) || 0;
         if (now - lastAttempt < COOLDOWN) continue;
 
-        // Rank candidates
+        // Rank candidates — exige GPS atualizado nos últimos 5 minutos
+        const FRESH_MS = 5 * 60 * 1000;
         const candidates = deliveryPersons
-          .filter((d) => d.is_active && d.is_online && (d.status === "available" || d.status === "on_route"))
+          .filter((d) => {
+            if (!d.is_active || !d.is_online) return false;
+            if (d.status !== "available" && d.status !== "on_route") return false;
+            const ts = d.location_updated_at ? new Date(d.location_updated_at).getTime() : 0;
+            return ts > 0 && now - ts <= FRESH_MS;
+          })
           .filter((d) => (activeByDriver.get(d.id) || 0) < 3)
           .map((d) => {
             const active = activeByDriver.get(d.id) || 0;
