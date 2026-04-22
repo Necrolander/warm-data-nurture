@@ -877,6 +877,12 @@ const Orders = () => {
     toast.success(checked ? "⚡ Aceitar automaticamente ATIVADO" : "🔔 Aceitar automaticamente DESATIVADO");
   };
 
+  const handleAutoAssignToggle = (checked: boolean) => {
+    setAutoAssign(checked);
+    localStorage.setItem("truebox_auto_assign_driver", String(checked));
+    toast.success(checked ? "🤖 Atribuição automática de motoboy ATIVADA" : "👤 Atribuição automática de motoboy DESATIVADA");
+  };
+
   const columns = [
     { title: "🕐 Pendente", icon: Clock, status: "pending", color: "border-yellow-500/50" },
     { title: "🔥 Em Produção", icon: Clock, status: "production", color: "border-blue-500/50" },
