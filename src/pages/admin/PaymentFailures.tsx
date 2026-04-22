@@ -303,6 +303,8 @@ const PaymentFailures = () => {
                 <TableRow>
                   <TableHead>Quando</TableHead>
                   <TableHead>Método</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Cartão</TableHead>
                   <TableHead>Motivo</TableHead>
                   <TableHead>Código</TableHead>
                   <TableHead>Parcelas</TableHead>
@@ -314,47 +316,90 @@ const PaymentFailures = () => {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Carregando…
                     </TableCell>
                   </TableRow>
                 ) : filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Nenhuma falha registrada.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((r) => (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-xs whitespace-nowrap">
-                        {format(new Date(r.created_at), "dd/MM HH:mm", { locale: ptBR })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={r.method === "card" ? "default" : "secondary"}>
-                          {r.method === "card" ? "Cartão" : "PIX"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[260px] truncate">
-                        {labelFor(r.status_detail || r.error_code)}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {r.status_detail || r.error_code || "—"}
-                      </TableCell>
-                      <TableCell>{r.installments ?? "—"}</TableCell>
-                      <TableCell>
-                        {r.amount != null ? `R$ ${Number(r.amount).toFixed(2).replace(".", ",")}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">
-                        {r.order_id ? r.order_id.slice(0, 8) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => setDetail(r)}>
-                          Ver
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filtered.map((r) => {
+                    const phoneCount = r.customer_phone ? recurrenceByPhone.get(r.customer_phone) || 0 : 0;
+                    const cardKey = r.card_last_four
+                      ? `${r.card_first_six || "??????"}-${r.card_last_four}`
+                      : null;
+                    const cardCount2 = cardKey ? recurrenceByCard.get(cardKey) || 0 : 0;
+                    return (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs whitespace-nowrap">
+                          {format(new Date(r.created_at), "dd/MM HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={r.method === "card" ? "default" : "secondary"}>
+                            {r.method === "card" ? "Cartão" : "PIX"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {r.customer_name || r.customer_phone ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex flex-col">
+                                <span className="font-medium">{r.customer_name || "—"}</span>
+                                <span className="text-muted-foreground font-mono">{r.customer_phone || ""}</span>
+                              </div>
+                              {phoneCount > 1 && (
+                                <Badge variant="destructive" className="h-5 text-[10px]">
+                                  {phoneCount}×
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono">
+                          {r.card_last_four ? (
+                            <div className="flex items-center gap-1.5">
+                              <span>•••• {r.card_last_four}</span>
+                              {cardCount2 > 1 && (
+                                <Badge variant="destructive" className="h-5 text-[10px]">
+                                  {cardCount2}×
+                                </Badge>
+                              )}
+                              {r.previous_payment_id && (
+                                <Badge variant="outline" className="h-5 text-[10px]" title="Tentativa após pagamento anterior">
+                                  retry
+                                </Badge>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate">
+                          {labelFor(r.status_detail || r.error_code)}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.status_detail || r.error_code || "—"}
+                        </TableCell>
+                        <TableCell>{r.installments ?? "—"}</TableCell>
+                        <TableCell>
+                          {r.amount != null ? `R$ ${Number(r.amount).toFixed(2).replace(".", ",")}` : "—"}
+                        </TableCell>
+                        <TableCell className="text-xs font-mono text-muted-foreground">
+                          {r.order_id ? r.order_id.slice(0, 8) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="sm" onClick={() => setDetail(r)}>
+                            Ver
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
