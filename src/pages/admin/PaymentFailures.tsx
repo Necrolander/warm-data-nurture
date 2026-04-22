@@ -451,6 +451,34 @@ const PaymentFailures = () => {
                   <p className="text-muted-foreground">MP Payment ID</p>
                   <p className="font-mono text-xs">{detail.mp_payment_id || "—"}</p>
                 </div>
+                <div>
+                  <p className="text-muted-foreground">Cliente</p>
+                  <p>{detail.customer_name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Telefone</p>
+                  <p className="font-mono text-xs">{detail.customer_phone || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Cartão</p>
+                  <p className="font-mono text-xs">
+                    {detail.card_last_four
+                      ? `${detail.card_first_six || "??????"} •••• ${detail.card_last_four}`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Titular</p>
+                  <p className="text-xs">{detail.card_holder_name || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Tentativa anterior</p>
+                  <p className="font-mono text-xs">{detail.previous_payment_id || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Usuário (auth)</p>
+                  <p className="font-mono text-xs">{detail.user_id ? detail.user_id.slice(0, 8) : "—"}</p>
+                </div>
               </div>
               <div>
                 <p className="text-muted-foreground mb-1">Mensagem</p>
