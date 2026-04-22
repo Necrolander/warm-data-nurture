@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.mercadopago-cancel-payment]
 verify_jwt = false
+
+[functions.driver-login]
+verify_jwt = false

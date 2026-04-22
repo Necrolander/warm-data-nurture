@@ -7,38 +7,45 @@ import { Bike, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/logo-truebox-new.png";
 
+const normalizePhone = (value: string) => value.replace(/\D/g, "");
+
 const DriverLogin = () => {
   const navigate = useNavigate();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!phone.trim()) {
+    const normalizedPhone = normalizePhone(phone);
+
+    if (!normalizedPhone) {
       toast.error("Preencha o telefone");
       return;
     }
+
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("delivery_persons")
-      .select("id, name, phone")
-      .eq("phone", phone.trim())
-      .eq("is_active", true)
-      .single();
+    try {
+      const { data, error } = await supabase.functions.invoke("driver-login", {
+        body: { phone: normalizedPhone },
+      });
 
-    if (error || !data) {
-      toast.error("Entregador não encontrado ou inativo");
+      if (error) throw error;
+      if (data?.error || !data?.driver) {
+        toast.error(data?.error || "Entregador não encontrado ou inativo");
+        return;
+      }
+
+      localStorage.setItem("driver_id", data.driver.id);
+      localStorage.setItem("driver_name", data.driver.name);
+      localStorage.setItem("driver_phone", data.driver.phone);
+
+      toast.success(`Bem-vindo, ${data.driver.name}!`);
+      navigate("/entregador");
+    } catch (error: any) {
+      toast.error(error?.message || "Erro ao entrar");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    localStorage.setItem("driver_id", data.id);
-    localStorage.setItem("driver_name", data.name);
-    localStorage.setItem("driver_phone", data.phone);
-
-    toast.success(`Bem-vindo, ${data.name}!`);
-    navigate("/entregador");
-    setLoading(false);
   };
 
   return (
