@@ -211,24 +211,29 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
 
     setLoading(true);
     try {
-      const { data: res, error } = await supabase.functions.invoke("mercadopago-create-payment", {
-        body: {
-          method: "card",
-          order_id: orderId,
-          amount,
-          token: data.token,
-          installments: Number(data.installments) || 1,
-          payment_method_id: data.paymentMethodId,
-          issuer_id: data.issuerId,
-          payer: {
-            email: data.cardholderEmail,
-            identification: {
-              type: data.identificationType,
-              number: data.identificationNumber,
-            },
+      const { data: res, error } = await invokeWithTimeout("mercadopago-create-payment", {
+        method: "card",
+        order_id: orderId,
+        amount,
+        token: data.token,
+        installments: Number(data.installments) || 1,
+        payment_method_id: data.paymentMethodId,
+        issuer_id: data.issuerId,
+        payer: {
+          email: data.cardholderEmail,
+          identification: {
+            type: data.identificationType,
+            number: data.identificationNumber,
           },
         },
       });
+
+      // Network/timeout/server error → friendly recovery message
+      if (error && ["network_offline", "network_timeout", "network_error", "server_error"].includes(error.code)) {
+        setCardError({ code: error.code, message: error.message });
+        toast.error(friendlyMpError(error.code, error.message));
+        return;
+      }
 
       // Edge function may return 400 with details in body
       const fnError = (res as any)?.error;
@@ -249,16 +254,13 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
         toast.info("Pagamento em análise — você será notificado quando confirmar.");
         onPending();
       } else {
-        // rejected
         setCardError({ code: res?.status_detail, message: "Pagamento recusado pelo emissor do cartão." });
         toast.error(friendlyMpError(res?.status_detail, "Pagamento recusado pelo emissor do cartão."));
       }
     } catch (err: any) {
-      const msg = err?.message?.includes("Failed to fetch")
-        ? "Sem conexão com o servidor. Verifique sua internet e tente novamente."
-        : err?.message || "Erro inesperado ao processar o cartão.";
-      setCardError({ message: msg });
-      toast.error(msg);
+      // invokeWithTimeout already handles network errors, but keep a safety net
+      setCardError({ code: "network_error", message: err?.message });
+      toast.error(friendlyMpError("network_error", err?.message));
     } finally {
       setLoading(false);
     }
@@ -266,27 +268,35 @@ const MercadoPagoPayment = ({ orderId, amount, payerName, payerPhone, method, on
 
   const generatePix = async () => {
     setLoading(true);
+    setPixError(null);
     try {
       const [first, ...rest] = (payerName || "Cliente").split(" ");
-      const { data, error } = await supabase.functions.invoke("mercadopago-create-payment", {
-        body: {
-          method: "pix",
-          order_id: orderId,
-          amount,
-          payer: {
-            first_name: first,
-            last_name: rest.join(" ") || "Truebox",
-            phone: payerPhone,
-          },
+      const { data, error } = await invokeWithTimeout("mercadopago-create-payment", {
+        method: "pix",
+        order_id: orderId,
+        amount,
+        payer: {
+          first_name: first,
+          last_name: rest.join(" ") || "Truebox",
+          phone: payerPhone,
         },
       });
-      if (error) throw error;
-      if (!data?.qr_code) throw new Error("QR Code não gerado");
+      if (error) {
+        setPixError({ code: error.code, message: error.message });
+        toast.error(friendlyMpError(error.code, error.message));
+        return;
+      }
+      if (!data?.qr_code) {
+        setPixError({ code: "server_error", message: "QR Code não gerado" });
+        toast.error(friendlyMpError("server_error", "QR Code não gerado"));
+        return;
+      }
       setPix({ qr_code: data.qr_code, qr_code_base64: data.qr_code_base64 });
       if (data?.status) setPaymentStatus(data.status);
       startPolling();
     } catch (err: any) {
-      toast.error(friendlyMpError(null, err?.message || "Erro ao gerar PIX"));
+      setPixError({ code: "network_error", message: err?.message });
+      toast.error(friendlyMpError("network_error", err?.message));
     } finally {
       setLoading(false);
     }
