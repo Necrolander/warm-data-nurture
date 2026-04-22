@@ -108,8 +108,12 @@ const AdminDriverChat = () => {
     setThreads(threadList);
 
     const anyEmergency = threadList.some(t => t.has_emergency);
-    if (anyEmergency && !emergencyActive) startAlarm();
-    else if (!anyEmergency && emergencyActive) stopAlarm();
+    if (anyEmergency && !alarmRef.current) startAlarm();
+    else if (!anyEmergency && alarmRef.current) {
+      clearInterval(alarmRef.current);
+      alarmRef.current = null;
+      setEmergencyActive(false);
+    }
   };
 
   const fetchMessages = async (driverId: string, orderId: string | null) => {
