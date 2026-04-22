@@ -1,5 +1,6 @@
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, RefreshCw, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { getMpError, MpErrorEntry } from "@/lib/mpErrors";
 
 interface Props {
@@ -12,6 +13,12 @@ interface Props {
   /** Compact one-line variant, no title */
   compact?: boolean;
   className?: string;
+  /** Optional retry handler — when provided, renders a "Tentar novamente" button */
+  onRetry?: () => void;
+  /** Disable retry while a request is in flight */
+  retrying?: boolean;
+  /** Custom retry button label */
+  retryLabel?: string;
 }
 
 const ICONS = {
@@ -30,9 +37,8 @@ const VARIANT: Record<MpErrorEntry["severity"], "default" | "destructive"> = {
  * Standardized PT-BR error display for any Mercado Pago failure.
  * Use across tokenization, payment creation, and status updates.
  */
-export const MpErrorAlert = ({ code, status, fallback, compact, className }: Props) => {
+export const MpErrorAlert = ({ code, status, fallback, compact, className, onRetry, retrying, retryLabel }: Props) => {
   const entry = getMpError(code, status);
-  // If user passed an explicit fallback and we got the default, prefer fallback message
   const message =
     entry.message === "Não foi possível processar o pagamento. Tente novamente." && fallback
       ? fallback
@@ -40,11 +46,32 @@ export const MpErrorAlert = ({ code, status, fallback, compact, className }: Pro
 
   const Icon = ICONS[entry.severity];
 
+  const retryBtn = onRetry ? (
+    <Button
+      type="button"
+      size="sm"
+      variant={entry.severity === "error" ? "outline" : "secondary"}
+      onClick={onRetry}
+      disabled={retrying}
+      className="mt-2 h-8"
+    >
+      {retrying ? (
+        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+      ) : (
+        <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+      )}
+      {retryLabel ?? "Tentar novamente"}
+    </Button>
+  ) : null;
+
   if (compact) {
     return (
       <Alert variant={VARIANT[entry.severity]} className={className}>
         <Icon className="h-4 w-4" />
-        <AlertDescription className="text-sm">{message}</AlertDescription>
+        <AlertDescription className="text-sm">
+          {message}
+          {retryBtn}
+        </AlertDescription>
       </Alert>
     );
   }
@@ -56,6 +83,7 @@ export const MpErrorAlert = ({ code, status, fallback, compact, className }: Pro
       <AlertDescription className="text-sm">
         {message}
         {entry.hint && <span className="block text-xs mt-1 opacity-80">{entry.hint}</span>}
+        {retryBtn}
       </AlertDescription>
     </Alert>
   );
