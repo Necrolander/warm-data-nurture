@@ -10,6 +10,7 @@ import { Plus, Minus, ShoppingCart, Trash2, Search, X, Check } from "lucide-reac
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Product {
   id: string;
