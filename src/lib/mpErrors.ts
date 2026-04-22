@@ -129,6 +129,32 @@ export const MP_ERROR_CATALOG: Record<string, MpErrorEntry> = {
     "Meio de pagamento inválido. Recarregue a página e tente novamente.",
     "Meio inválido",
   ),
+
+  // ---- Network / connectivity ----
+  network_timeout: E(
+    "O servidor demorou muito para responder. Verifique sua conexão e tente novamente em alguns instantes.",
+    "Tempo esgotado",
+    "warning",
+    "Sua internet pode estar instável. Aguarde alguns segundos e clique em Tentar novamente.",
+  ),
+  network_offline: E(
+    "Você está sem conexão com a internet. Verifique sua rede e tente novamente.",
+    "Sem conexão",
+    "warning",
+    "Reconecte-se ao Wi-Fi ou aos dados móveis e clique em Tentar novamente.",
+  ),
+  network_error: E(
+    "Não conseguimos falar com o servidor. Verifique sua internet ou tente novamente em instantes.",
+    "Falha de rede",
+    "warning",
+    "Se o problema persistir, aguarde 1 minuto antes de tentar de novo.",
+  ),
+  server_error: E(
+    "O servidor de pagamento está temporariamente indisponível. Tente novamente em instantes.",
+    "Servidor indisponível",
+    "warning",
+    "Se o problema persistir, tente novamente em alguns minutos.",
+  ),
 };
 
 /** Generic fallback messages by status when no detail is provided */
