@@ -42,6 +42,7 @@ import IfoodBot from "./pages/admin/IfoodBot";
 import IfoodBotMetrics from "./pages/admin/IfoodBotMetrics";
 import IfoodReviews from "./pages/admin/IfoodReviews";
 import IfoodChat from "./pages/admin/IfoodChat";
+import IfoodExtension from "./pages/admin/IfoodExtension";
 import WhatsAppOutbox from "./pages/admin/WhatsAppOutbox";
 import WhatsAppConnect from "./pages/admin/WhatsAppConnect";
 import ExternalIntegrations from "./pages/admin/ExternalIntegrations";
@@ -115,6 +116,8 @@ const App = () => (
                 <Route path="ifood-bot/metricas" element={<IfoodBotMetrics />} />
                 <Route path="ifood-bot/avaliacoes" element={<IfoodReviews />} />
                 <Route path="ifood-bot/chat" element={<IfoodChat />} />
+                <Route path="ifood-extensao" element={<IfoodExtension />} />
+                <Route path="ifood-extension" element={<IfoodExtension />} />
                 <Route path="whatsapp-outbox" element={<WhatsAppOutbox />} />
                 <Route path="whatsapp-fila" element={<WhatsAppOutbox />} />
                 <Route path="whatsapp-connect" element={<WhatsAppConnect />} />
