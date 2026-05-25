@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<title>Truebox iFood</title>
+<style>
+  :root { color-scheme: light; }
+  body { font: 13px system-ui; margin: 0; width: 340px; background: #fafafa; color: #111; }
+  header { background: #ea1d2c; color: #fff; padding: 12px 14px; font-weight: 700; }
+  main { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  label { font-size: 11px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font: inherit; box-sizing: border-box; }
+  .row { display: flex; gap: 8px; }
+  button { flex: 1; padding: 9px; border: 0; border-radius: 6px; background: #111; color: #fff; font-weight: 600; cursor: pointer; }
+  button.secondary { background: #fff; color: #111; border: 1px solid #ddd; }
+  .status { display: flex; gap: 8px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
+  .dot.on { background: #16a34a; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 8px; text-align: center; }
+  .stat b { display: block; font-size: 18px; }
+  .logs { max-height: 140px; overflow: auto; background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 6px; font: 11px ui-monospace,monospace; }
+  .log { padding: 3px 4px; border-bottom: 1px solid #f3f3f3; }
+  .ok { color: #16a34a; } .err { color: #dc2626; }
+</style>
+</head>
+<body>
+<header>Truebox · Leitor iFood</header>
+<main>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="statusTxt">—</span>
+  </div>
+
+  <div>
+    <label>Token do bot</label>
+    <input id="token" type="password" placeholder="Cole o EXTERNAL_BOT_TOKEN" />
+  </div>
+  <div>
+    <label>URL de ingestão</label>
+    <input id="url" type="text" />
+  </div>
+
+  <div class="row">
+    <button id="save">Salvar</button>
+    <button id="test" class="secondary">Testar</button>
+  </div>
+  <div class="row">
+    <button id="toggle" class="secondary">Ativar/Pausar</button>
+    <button id="openPortal" class="secondary">Abrir Portal iFood</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="captured">0</b>capturados</div>
+    <div class="stat"><b id="failures">0</b>falhas</div>
+  </div>
+
+  <div>
+    <label>Atividade recente</label>
+    <div class="logs" id="logs"></div>
+  </div>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

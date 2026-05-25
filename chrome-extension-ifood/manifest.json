@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Truebox - Leitor de Pedidos iFood",
+  "version": "1.0.0",
+  "description": "Lê pedidos do Portal iFood e envia para o painel Truebox em tempo real.",
+  "permissions": ["storage", "alarms", "notifications", "scripting", "activeTab"],
+  "host_permissions": [
+    "https://portal.ifood.com.br/*",
+    "https://*.ifood.com.br/*",
+    "https://yxmirlnvrrintrvicqic.supabase.co/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png",
+    "default_title": "Truebox iFood"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://portal.ifood.com.br/*", "https://*.ifood.com.br/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
