@@ -13,20 +13,21 @@ const DOWNLOAD_URL = "/truebox-ifood-extension.zip";
 
 const IfoodExtension = () => {
   const [hb, setHb] = useState<any>(null);
+  const [botHb, setBotHb] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStatus = async () => {
-    const { data } = await supabase
+    const { data: rows } = await supabase
       .from("bot_heartbeats" as any)
       .select("*")
       .eq("channel", "ifood")
       .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    // Só consideramos heartbeat vindo da extensão
-    const meta = (data as any)?.meta;
-    if (meta?.source === "chrome-extension") setHb(data);
-    else setHb(null);
+      .limit(10);
+    const list = (rows as any[]) || [];
+    const ext = list.find((r) => r?.meta?.source === "chrome-extension") || null;
+    const bot = list.find((r) => r?.meta?.source !== "chrome-extension") || null;
+    setHb(ext);
+    setBotHb(bot);
     setLoading(false);
   };
 
@@ -36,11 +37,12 @@ const IfoodExtension = () => {
     return () => clearInterval(i);
   }, []);
 
-  const isOnline = (() => {
-    if (!hb?.last_polled_at) return false;
-    const age = (Date.now() - new Date(hb.last_polled_at).getTime()) / 1000;
-    return age < 120; // 2min
-  })();
+  const ageOnline = (ts?: string | null) => {
+    if (!ts) return false;
+    return (Date.now() - new Date(ts).getTime()) / 1000 < 120;
+  };
+  const isOnline = ageOnline(hb?.last_polled_at);
+  const isBotOnline = ageOnline(botHb?.last_polled_at);
 
   const download = () => {
     fetch(DOWNLOAD_URL)
