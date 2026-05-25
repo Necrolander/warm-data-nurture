@@ -389,8 +389,9 @@ const OrderCard = ({
               <>
                 <Button
                   size="sm"
-                  variant="outline"
+                  className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
                   onClick={() => onCancel(order)}
+                  title="Cancelar pedido"
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
@@ -406,8 +407,9 @@ const OrderCard = ({
               <>
                 <Button
                   size="sm"
-                  variant="outline"
+                  className="bg-red-600 hover:bg-red-700 text-white border border-red-700"
                   onClick={() => onCancel(order)}
+                  title="Cancelar pedido"
                 >
                   <X className="h-3.5 w-3.5" />
                 </Button>
