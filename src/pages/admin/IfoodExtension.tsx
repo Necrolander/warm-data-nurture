@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Chrome, Download, CheckCircle2, AlertTriangle, ExternalLink, Activity, RefreshCw } from "lucide-react";
+import { Chrome, Download, CheckCircle2, AlertTriangle, ExternalLink, Activity, RefreshCw, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,20 +13,21 @@ const DOWNLOAD_URL = "/truebox-ifood-extension.zip";
 
 const IfoodExtension = () => {
   const [hb, setHb] = useState<any>(null);
+  const [botHb, setBotHb] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchStatus = async () => {
-    const { data } = await supabase
+    const { data: rows } = await supabase
       .from("bot_heartbeats" as any)
       .select("*")
       .eq("channel", "ifood")
       .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    // Só consideramos heartbeat vindo da extensão
-    const meta = (data as any)?.meta;
-    if (meta?.source === "chrome-extension") setHb(data);
-    else setHb(null);
+      .limit(10);
+    const list = (rows as any[]) || [];
+    const ext = list.find((r) => r?.meta?.source === "chrome-extension") || null;
+    const bot = list.find((r) => r?.meta?.source !== "chrome-extension") || null;
+    setHb(ext);
+    setBotHb(bot);
     setLoading(false);
   };
 
@@ -36,11 +37,12 @@ const IfoodExtension = () => {
     return () => clearInterval(i);
   }, []);
 
-  const isOnline = (() => {
-    if (!hb?.last_polled_at) return false;
-    const age = (Date.now() - new Date(hb.last_polled_at).getTime()) / 1000;
-    return age < 120; // 2min
-  })();
+  const ageOnline = (ts?: string | null) => {
+    if (!ts) return false;
+    return (Date.now() - new Date(ts).getTime()) / 1000 < 120;
+  };
+  const isOnline = ageOnline(hb?.last_polled_at);
+  const isBotOnline = ageOnline(botHb?.last_polled_at);
 
   const download = () => {
     fetch(DOWNLOAD_URL)
@@ -121,6 +123,44 @@ const IfoodExtension = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Bot iFood (servidor) */}
+      <Card className={isBotOnline ? "border-green-500/50" : "border-red-500/40"}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Bot className="h-4 w-4" /> Bot iFood (servidor)
+            </span>
+            <Badge className={isBotOnline ? "bg-green-500/20 text-green-700" : "bg-red-500/20 text-red-700"}>
+              <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${isBotOnline ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
+              {loading ? "..." : isBotOnline ? "Ativo" : "Inativo"}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-1">
+          {botHb ? (
+            <>
+              <div>Último heartbeat: <strong>{formatDistanceToNow(new Date(botHb.last_polled_at), { addSuffix: true, locale: ptBR })}</strong></div>
+              <div className="text-muted-foreground text-xs">
+                Pedidos: <strong className="text-foreground">{botHb.orders_captured_total ?? 0}</strong>
+                {" · "}Falhas: <strong className="text-foreground">{botHb.failures_total ?? 0}</strong>
+              </div>
+              <div className="pt-1">
+                <a href="/painel/ifood-bot" className="text-primary text-xs hover:underline inline-flex items-center gap-1">
+                  Abrir painel do Bot iFood <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded p-2 text-xs">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>Nenhum heartbeat do bot servidor. Configure em <a href="/painel/ifood-bot" className="text-primary hover:underline">Bot iFood</a>.</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
 
       <Card>
         <CardHeader><CardTitle className="text-base">1. Instalar no Chrome</CardTitle></CardHeader>
