@@ -280,7 +280,7 @@ const Checkout = () => {
 
         <div className="space-y-3 bg-card rounded-xl border border-border p-4">
           <h3 className="font-black text-foreground">Forma de pagamento</h3>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {PAYMENT_METHODS.map((m) => (
               <button key={m} onClick={() => setPayment(m)}
                 className={`py-3 rounded-xl text-sm font-bold border transition-colors ${

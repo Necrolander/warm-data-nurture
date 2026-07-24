@@ -62,9 +62,53 @@
   * {
     @apply border-border;
   }
-  body {
+  html, body {
     @apply bg-background text-foreground;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    /* Prevent accidental horizontal scroll on mobile from any overflowing child */
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+  /* Fluid media */
+  img, video, canvas, svg {
+    max-width: 100%;
+    height: auto;
+  }
+  /* Break long unbreakable strings (URLs, tokens) instead of overflowing */
+  p, span, h1, h2, h3, h4, h5, h6, li, td, th, a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Inputs/textarea/select must never exceed their parent on mobile */
+  input, textarea, select {
+    max-width: 100%;
+  }
+  /* Prevent flex/grid children from forcing overflow */
+  .min-w-0-fix > * {
+    min-width: 0;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* Wrap wide tables in <div class="table-responsive"> to add horizontal scroll on small screens */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table-responsive > table {
+    min-width: 640px;
+  }
+  /* Safe area padding for iOS bottom bars */
+  .pb-safe {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
   }
 }
 
@@ -73,4 +117,11 @@
   height: 100%;
   width: 100%;
   border-radius: 0.75rem;
+}
+
+/* Radix Dialog fullscreen on very small screens */
+@media (max-width: 480px) {
+  [role="dialog"][data-state="open"].fixed {
+    max-width: 100vw;
+  }
 }

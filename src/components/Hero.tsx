@@ -66,29 +66,29 @@ const Hero = ({ onViewMenu }: HeroProps) => {
           </div>
         )}
 
-        <h1 className="text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-foreground mb-4 leading-tight">
           Os burgers mais{" "}
           <span className="text-secondary">brabos</span> do Gama 🔥
         </h1>
 
-        <div className="flex flex-wrap justify-center gap-4 mb-8 text-sm text-muted-foreground">
+        <div className="flex flex-wrap justify-center gap-2 sm:gap-4 mb-6 sm:mb-8 text-xs sm:text-sm text-muted-foreground">
           <span className="flex items-center gap-1">🚀 {deliveryTime}</span>
           <span className="flex items-center gap-1">🍔 Hambúrguer artesanal</span>
           <span className="flex items-center gap-1">📍 Gama DF</span>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center w-full">
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={onViewMenu}
-            className="bg-primary text-primary-foreground font-bold text-lg px-10 py-4 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all"
+            className="w-full sm:w-auto bg-primary text-primary-foreground font-bold text-base sm:text-lg px-6 sm:px-10 py-3.5 sm:py-4 rounded-xl shadow-lg shadow-primary/30 hover:brightness-110 transition-all"
           >
             VER CARDÁPIO
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={onViewMenu}
-            className="bg-secondary text-secondary-foreground font-bold text-lg px-10 py-4 rounded-xl shadow-lg shadow-secondary/30 hover:brightness-110 transition-all"
+            className="w-full sm:w-auto bg-secondary text-secondary-foreground font-bold text-base sm:text-lg px-6 sm:px-10 py-3.5 sm:py-4 rounded-xl shadow-lg shadow-secondary/30 hover:brightness-110 transition-all"
           >
             PEDIR AGORA 🍔
           </motion.button>
