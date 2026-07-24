@@ -238,19 +238,19 @@ const AdminLayout = () => {
           </SidebarContent>
         </Sidebar>
 
-        <div className="flex-1 flex flex-col">
-          <header className="h-14 flex items-center border-b border-border px-4">
-            <SidebarTrigger className="mr-4" />
-            <h1 className="text-lg font-semibold text-foreground flex-1">
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="h-14 flex items-center border-b border-border px-2 sm:px-4 gap-2">
+            <SidebarTrigger className="flex-shrink-0" />
+            <h1 className="text-sm sm:text-lg font-semibold text-foreground flex-1 min-w-0 truncate">
               {menuItems.find(i => i.url === "/painel" ? location.pathname === "/painel" : location.pathname.startsWith(i.url))?.title || "Painel"}
             </h1>
             <button onClick={toggleStore} disabled={toggling}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${storeOpen ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"}`} />
-              {storeOpen ? "Aberta" : "Fechada"}
+              className={`flex-shrink-0 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-colors ${storeOpen ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-red-500/20 text-red-400 hover:bg-red-500/30"}`}>
+              <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${storeOpen ? "bg-green-500" : "bg-red-500"}`} />
+              <span className="hidden xs:inline sm:inline">{storeOpen ? "Aberta" : "Fechada"}</span>
             </button>
           </header>
-          <main className="flex-1 p-4 md:p-6 overflow-auto">
+          <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto min-w-0">
             <Outlet />
           </main>
         </div>
