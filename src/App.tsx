@@ -43,6 +43,7 @@ import IfoodBotMetrics from "./pages/admin/IfoodBotMetrics";
 import IfoodReviews from "./pages/admin/IfoodReviews";
 import IfoodChat from "./pages/admin/IfoodChat";
 import IfoodExtension from "./pages/admin/IfoodExtension";
+import DeliveryStudio from "./pages/admin/DeliveryStudio";
 import WhatsAppOutbox from "./pages/admin/WhatsAppOutbox";
 import WhatsAppConnect from "./pages/admin/WhatsAppConnect";
 import ExternalIntegrations from "./pages/admin/ExternalIntegrations";
