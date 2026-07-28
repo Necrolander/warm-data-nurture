@@ -102,23 +102,32 @@ Deno.serve(async (req) => {
     console.warn(`DeliveryStudio webhook: unexpected source IP ${sourceIp}`);
   }
 
-  // Signature verification: signed payload = `${t}.${rawBody}`
+  // Signature verification: signed payload = `${t}.${rawBody}` (raw bytes, not reparsed JSON)
   let signatureValid = false;
   const providedSig = pickHeader(req, SIG_HEADERS);
   if (SECRET && providedSig) {
     try {
       const parsed = parseSigHeader(providedSig);
       const ts = parsed.t ?? timestampHeader;
-      if (parsed.v1) {
-        // Preferred: t=..,v1=.. with signed payload `${t}.${body}`
-        if (ts) {
-          const expected = await hmacHex(SECRET, `${ts}.${rawBody}`);
-          signatureValid = timingSafeEqual(expected, parsed.v1);
-        }
-        // Fallback: HMAC over raw body only (older/simpler schemes)
-        if (!signatureValid) {
-          const expectedBodyOnly = await hmacHex(SECRET, rawBody);
-          signatureValid = timingSafeEqual(expectedBodyOnly, parsed.v1);
+      if (parsed.v1 && ts) {
+        const expected = await hmacHex(SECRET, `${ts}.${rawBody}`);
+        signatureValid = timingSafeEqual(expected, parsed.v1);
+      }
+      // Fallback: HMAC over raw body only (older/simpler schemes)
+      if (!signatureValid && parsed.v1) {
+        const expectedBodyOnly = await hmacHex(SECRET, rawBody);
+        signatureValid = timingSafeEqual(expectedBodyOnly, parsed.v1);
+      }
+      // Anti-replay: reject if timestamp drifts more than 5 minutes
+      if (signatureValid && ts) {
+        const tsNum = Number(ts);
+        const nowSec = Date.now() / 1000;
+        if (!Number.isFinite(tsNum) || Math.abs(nowSec - tsNum) > 300) {
+          console.warn(`DeliveryStudio webhook: stale timestamp ${ts}`);
+          return new Response(JSON.stringify({ error: 'stale_timestamp' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       }
     } catch (_e) {
