@@ -9,7 +9,7 @@ import { NavLink } from "@/components/NavLink";
 import {
   ClipboardList, PlusCircle, UtensilsCrossed, Receipt, Bot, Armchair, Settings,
   Users, Gift, BarChart3, Truck, LogOut, Smartphone, Store, Bike, AlertTriangle, X, MessageSquare, History,
-  Route, Map, UserCog, Cog, CreditCard,
+  Route, Map, UserCog, Cog, CreditCard, Webhook,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ const menuItems = [
   { title: "Bot iFood", url: "/painel/ifood-bot", icon: Bot },
   { title: "Extensão iFood", url: "/painel/ifood-extensao", icon: Smartphone },
   { title: "Bots Externos", url: "/painel/integracoes-externas", icon: Bot },
+  { title: "DeliveryStudio", url: "/painel/deliverystudio", icon: Webhook },
   { title: "Roteirização", url: "/painel/roteirizacao", icon: Route },
   { title: "Rotas", url: "/painel/rotas", icon: Map },
   { title: "Mapa Operacional", url: "/painel/mapa-operacional", icon: Map },
