@@ -138,7 +138,10 @@ const DeliveryStudioPage = () => {
                         )}
                       </td>
                       <td className="p-2">
-                        <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>Ver</Button>
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          <Button size="sm" variant="ghost" onClick={() => setSelected(r)}>Ver</Button>
+                          {r.order_public_id && <ActionButtons orderPublicId={r.order_public_id} />}
+                        </div>
                       </td>
                     </tr>
                   ))}
