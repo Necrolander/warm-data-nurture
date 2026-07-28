@@ -92,6 +92,15 @@ Deno.serve(async (req) => {
   const rawBody = await req.text();
   const timestampHeader = req.headers.get('x-deliverystudio-timestamp') ?? undefined;
   const eventHeader = req.headers.get('x-deliverystudio-event') ?? undefined;
+  const sourceIp =
+    (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() ||
+    req.headers.get('cf-connecting-ip') ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+  const EXPECTED_IPS = new Set(['187.77.45.222']);
+  if (sourceIp !== 'unknown' && !EXPECTED_IPS.has(sourceIp)) {
+    console.warn(`DeliveryStudio webhook: unexpected source IP ${sourceIp}`);
+  }
 
   // Signature verification: signed payload = `${t}.${rawBody}`
   let signatureValid = false;
