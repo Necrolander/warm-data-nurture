@@ -18,6 +18,55 @@ type WebhookRow = {
   payload: any;
 };
 
+const ACTIONS: { key: string; label: string; variant?: "default" | "destructive" | "secondary" }[] = [
+  { key: "accept", label: "Aceitar" },
+  { key: "preparing", label: "Preparo" },
+  { key: "ready", label: "Pronto" },
+  { key: "dispatch", label: "Despachar" },
+  { key: "deliver", label: "Entregue" },
+  { key: "cancel", label: "Cancelar", variant: "destructive" },
+];
+
+const ActionButtons = ({ orderPublicId }: { orderPublicId: string }) => {
+  const [busy, setBusy] = useState<string | null>(null);
+  const run = async (action: string) => {
+    let reason: string | undefined;
+    if (action === "cancel") {
+      reason = window.prompt("Motivo do cancelamento:") || undefined;
+      if (!reason) return;
+    }
+    setBusy(action);
+    const { data, error } = await supabase.functions.invoke("deliverystudio-action", {
+      body: { orderPublicId, action, ...(reason ? { reason, notifyCustomer: false } : {}) },
+    });
+    setBusy(null);
+    if (error) {
+      toast.error(`Falha: ${error.message}`);
+      return;
+    }
+    if ((data as any)?.error) {
+      toast.error(`Erro: ${(data as any).error}`);
+      return;
+    }
+    toast.success(`Ação "${action}" enviada`);
+  };
+  return (
+    <>
+      {ACTIONS.map((a) => (
+        <Button
+          key={a.key}
+          size="sm"
+          variant={a.variant ?? "outline"}
+          disabled={busy !== null}
+          onClick={() => run(a.key)}
+        >
+          {busy === a.key ? "..." : a.label}
+        </Button>
+      ))}
+    </>
+  );
+};
+
 const DeliveryStudioPage = () => {
   const [rows, setRows] = useState<WebhookRow[]>([]);
   const [loading, setLoading] = useState(false);
