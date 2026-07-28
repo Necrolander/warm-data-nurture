@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
     envelope?.id ||
     crypto.randomUUID();
 
-  const event: string = envelope?.event || envelope?.type || 'unknown';
+  const event: string = eventHeader || envelope?.event || envelope?.type || 'unknown';
   const order = envelope?.order ?? envelope?.data?.order ?? envelope?.data ?? {};
   const orderPublicId: string | null = order?.publicId ?? order?.id ?? null;
   const status: string | null = order?.status ?? envelope?.status ?? null;
