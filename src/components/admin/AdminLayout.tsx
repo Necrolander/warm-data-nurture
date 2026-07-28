@@ -41,6 +41,7 @@ const menuItems = [
   { title: "Bot iFood", url: "/painel/ifood-bot", icon: Bot },
   { title: "Extensão iFood", url: "/painel/ifood-extensao", icon: Smartphone },
   { title: "Bots Externos", url: "/painel/integracoes-externas", icon: Bot },
+  { title: "DeliveryStudio", url: "/painel/deliverystudio", icon: Webhook },
   { title: "Roteirização", url: "/painel/roteirizacao", icon: Route },
   { title: "Rotas", url: "/painel/rotas", icon: Map },
   { title: "Mapa Operacional", url: "/painel/mapa-operacional", icon: Map },
