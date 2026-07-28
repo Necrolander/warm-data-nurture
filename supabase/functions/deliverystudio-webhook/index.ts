@@ -52,10 +52,24 @@ function pickHeader(req: Request, names: string[]): string | null {
   return null;
 }
 
-function normalizeSig(raw: string): string {
-  // supports "sha256=abcd..." or plain hex
-  const eq = raw.indexOf('=');
-  return eq >= 0 ? raw.slice(eq + 1).trim().toLowerCase() : raw.trim().toLowerCase();
+function parseSigHeader(raw: string): { t?: string; v1?: string } {
+  // Format: "t=<epoch>,v1=<hex>" (DeliveryStudio). Fallback: "sha256=<hex>" or plain hex.
+  const parts = raw.split(',').map((p) => p.trim());
+  const out: { t?: string; v1?: string } = {};
+  for (const p of parts) {
+    const eq = p.indexOf('=');
+    if (eq < 0) continue;
+    const k = p.slice(0, eq).trim().toLowerCase();
+    const v = p.slice(eq + 1).trim();
+    if (k === 't') out.t = v;
+    else if (k === 'v1' || k === 'sha256') out.v1 = v.toLowerCase();
+  }
+  if (!out.v1) {
+    // plain hex fallback
+    const hex = raw.trim().toLowerCase();
+    if (/^[0-9a-f]{64}$/.test(hex)) out.v1 = hex;
+  }
+  return out;
 }
 
 Deno.serve(async (req) => {
@@ -76,14 +90,28 @@ Deno.serve(async (req) => {
   }
 
   const rawBody = await req.text();
+  const timestampHeader = req.headers.get('x-deliverystudio-timestamp') ?? undefined;
+  const eventHeader = req.headers.get('x-deliverystudio-event') ?? undefined;
 
-  // Signature verification
+  // Signature verification: signed payload = `${t}.${rawBody}`
   let signatureValid = false;
   const providedSig = pickHeader(req, SIG_HEADERS);
   if (SECRET && providedSig) {
     try {
-      const expected = await hmacHex(SECRET, rawBody);
-      signatureValid = timingSafeEqual(expected, normalizeSig(providedSig));
+      const parsed = parseSigHeader(providedSig);
+      const ts = parsed.t ?? timestampHeader;
+      if (parsed.v1) {
+        // Preferred: t=..,v1=.. with signed payload `${t}.${body}`
+        if (ts) {
+          const expected = await hmacHex(SECRET, `${ts}.${rawBody}`);
+          signatureValid = timingSafeEqual(expected, parsed.v1);
+        }
+        // Fallback: HMAC over raw body only (older/simpler schemes)
+        if (!signatureValid) {
+          const expectedBodyOnly = await hmacHex(SECRET, rawBody);
+          signatureValid = timingSafeEqual(expectedBodyOnly, parsed.v1);
+        }
+      }
     } catch (_e) {
       signatureValid = false;
     }
@@ -95,7 +123,6 @@ Deno.serve(async (req) => {
       });
     }
   } else if (SECRET) {
-    // secret configured but no signature header sent
     console.warn('DeliveryStudio webhook: missing signature header');
     return new Response(JSON.stringify({ error: 'missing_signature' }), {
       status: 401,
@@ -119,7 +146,7 @@ Deno.serve(async (req) => {
     envelope?.id ||
     crypto.randomUUID();
 
-  const event: string = envelope?.event || envelope?.type || 'unknown';
+  const event: string = eventHeader || envelope?.event || envelope?.type || 'unknown';
   const order = envelope?.order ?? envelope?.data?.order ?? envelope?.data ?? {};
   const orderPublicId: string | null = order?.publicId ?? order?.id ?? null;
   const status: string | null = order?.status ?? envelope?.status ?? null;
