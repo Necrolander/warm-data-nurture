@@ -119,6 +119,7 @@ const App = () => (
                 <Route path="ifood-bot/chat" element={<IfoodChat />} />
                 <Route path="ifood-extensao" element={<IfoodExtension />} />
                 <Route path="ifood-extension" element={<IfoodExtension />} />
+                <Route path="deliverystudio" element={<DeliveryStudio />} />
                 <Route path="whatsapp-outbox" element={<WhatsAppOutbox />} />
                 <Route path="whatsapp-fila" element={<WhatsAppOutbox />} />
                 <Route path="whatsapp-connect" element={<WhatsAppConnect />} />
